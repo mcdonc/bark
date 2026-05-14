@@ -36,7 +36,7 @@ EOF
 # Install Nix and devenv (if not already installed)
 ./bootstrap
 
-# Start the app (builds Docker image on first run)
+# Start the app (builds Docker image and Flutter web on first run)
 # Make sure Docker is running before this step
 devenv processes up
 ```
@@ -61,14 +61,13 @@ Open [http://localhost:8997](http://localhost:8997) and log in with `admin`/`adm
 
 ### Rebuilding
 
-After code changes:
+To force rebuild the Docker image and Flutter web app:
 
 ```bash
 devenv shell -- rebuild
-devenv processes restart
 ```
 
-This rebuilds both the Docker image and the Flutter web app, then restarts the services.
+Then restart the processes. On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing).
 
 ## Architecture
 

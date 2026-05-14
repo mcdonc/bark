@@ -34,14 +34,14 @@ $DEVENV_STATE/.bark/workspaces/<user-id>/<workspace-name>/
 - **AG-UI Protocol**: Standardized agent-user interaction protocol for event streaming
 - **Pi Coding Agent**: Minimal terminal coding harness (pi.dev) running in RPC mode with native session persistence and extension tools
 - **Ollama**: LLM provider — supports both Ollama Cloud and self-hosted instances, configurable via env vars (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `OLLAMA_API_KEY`)
-- **devenv**: Nix-based development environment with auto-setup
+- **devenv**: Nix-based development environment with auto-setup, conditional build tasks (`execIfModified`), auto-reload disabled
 
 ## Project Structure
 
 ```
 bark/
-  devenv.nix                    # Dev environment: Python (uv), Flutter, Docker CLI
-  devenv.yaml                   # devenv inputs
+  devenv.nix                    # Dev environment: Python (uv), Flutter, Docker CLI, conditional build tasks
+  devenv.yaml                   # devenv inputs, reload: false
   .envrc                        # direnv integration
   .env                          # Secrets: OLLAMA_API_KEY, OLLAMA_BASE_URL, OLLAMA_MODEL, BARK_JWT_SECRET, etc.
   .gitignore
@@ -58,6 +58,8 @@ bark/
     extensions/                 # Pi extensions (TypeScript, registered as first-class LLM tools)
       word-count.ts             # Fast file stats: lines, words, characters, size
       pig-latin.ts              # Text to Pig Latin converter
+      celebrate.ts              # Triggers confetti animation in the browser
+      beep.ts                   # Plays an audible beep tone via Web Audio API
     tools/                      # Python helper scripts called by extensions
       word_count.py             # Backend for word-count extension
 
@@ -83,7 +85,10 @@ bark/
       utils/
         page_title.dart         # Browser tab title updates
         backend_url.dart        # Derives API base URL from <base href> for subpath hosting
-      widgets/bark_logo.dart    # Bark logo widget (orange paw icon)
+      widgets/
+        bark_logo.dart          # Bark logo widget (orange paw icon)
+        confetti.dart           # Confetti animation overlay for celebrate tool
+        beep.dart               # Web Audio API beep via dart:js_interop
       auth/
         auth_service.dart       # JWT storage, login/register/logout, async init
         login_page.dart         # Login/register form
@@ -220,10 +225,16 @@ open http://localhost:8997
 - `9000+`: User app ports (5 per workspace)
 
 ### Rebuild
+
+To force rebuild the Docker image and Flutter web app:
+
 ```bash
 devenv shell -- rebuild
-devenv processes restart
 ```
+
+Then restart the processes. On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
+- **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`
+- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `docker/extensions`, `docker/tools`
 
 ### Adding Extension Tools
 1. Create a TypeScript file in `docker/extensions/` (see existing examples)
