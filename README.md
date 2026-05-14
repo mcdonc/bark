@@ -31,10 +31,8 @@ EOF
 # Install Nix and devenv (if not already installed)
 ./bootstrap
 
-# Make sure Docker is running before this step — devenv shell builds a Docker image on first run
-devenv shell
-
-# Start the app
+# Start the app (builds Docker image on first run)
+# Make sure Docker is running before this step
 devenv processes up
 ```
 
@@ -62,10 +60,11 @@ Open [http://localhost:8997](http://localhost:8997) and log in with `admin`/`adm
 After code changes:
 
 ```bash
-rebuild
+devenv shell -- rebuild
+devenv processes restart
 ```
 
-This rebuilds both the Docker image and the Flutter web app.
+This rebuilds both the Docker image and the Flutter web app, then restarts the services.
 
 ## Architecture
 
