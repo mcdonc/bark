@@ -171,6 +171,24 @@ class _ChatPanelState extends State<ChatPanel> {
         }
         _scrollToBottom();
         break;
+
+      case AguiEventType.custom:
+        if (event.customName == 'prompt_queued') {
+          // Mark the last user entry as queued
+          setState(() {
+            for (int i = _entries.length - 1; i >= 0; i--) {
+              if (_entries[i].type == _EntryType.user && !_entries[i].isQueued) {
+                _entries[i] = _ChatEntry(
+                  type: _EntryType.user,
+                  content: _entries[i].content,
+                  isQueued: true,
+                );
+                break;
+              }
+            }
+          });
+        }
+        break;
     }
   }
 
@@ -319,19 +337,30 @@ class _ChatPanelState extends State<ChatPanel> {
   }
 
   Widget _buildUserMessage(_ChatEntry entry) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.35),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: SelectableText(
-          entry.content,
-          style: const TextStyle(fontSize: 16),
+    final opacity = entry.isQueued ? 0.5 : 1.0;
+    return Opacity(
+      opacity: opacity,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.35),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              SelectableText(
+                entry.content,
+                style: const TextStyle(fontSize: 16),
+              ),
+              if (entry.isQueued)
+                const Text('queued', style: TextStyle(fontSize: 10, color: Colors.grey)),
+            ],
+          ),
         ),
       ),
     );
@@ -492,12 +521,14 @@ class _ChatEntry {
   final String? toolArgs;
   final String? toolOutput;
   final bool isComplete;
+  final bool isQueued;
 
   _ChatEntry({
     required this.type,
     required this.content,
     this.toolArgs,
     this.toolOutput,
+    this.isQueued = false,
     this.isComplete = false,
   });
 }

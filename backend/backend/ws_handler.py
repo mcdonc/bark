@@ -30,7 +30,7 @@ async def handle_websocket(ws: WebSocket) -> None:
         return
 
     await ws.accept()
-    conn_state: dict = {"user": user, "pi_client": None, "container_id": None, "event_task": None}
+    conn_state: dict = {"user": user, "pi_client": None, "container_id": None, "event_task": None, "agent_running": False}
     _connections[ws] = conn_state
 
     try:
@@ -194,7 +194,16 @@ async def _handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
             "name": "query_prompt",
             "value": {"text": preview},
         }})
-        await pi_client.prompt(text)
+        if state.get("agent_running"):
+            await pi_client.follow_up(text)
+            await ws.send_json({"type": "event", "event": {
+                "type": "CUSTOM",
+                "name": "prompt_queued",
+                "value": {"text": text},
+            }})
+            logger.info("Agent busy, queued as follow_up: %s", text[:50])
+        else:
+            await pi_client.prompt(text)
     except Exception as e:
         logger.info("Prompt failed (%s), auto-restarting container for workspace %s", e, workspace_id)
         try:
@@ -315,8 +324,14 @@ async def _forward_events(ws: WebSocket, pi_client: PiRpcClient, workspace_id: s
             for agui_event in agui_events:
                 await ws.send_json({"type": "event", "event": agui_event})
 
-                # Accumulate and save to history
+                # Track agent running state
                 etype = agui_event.get("type", "")
+                if etype == "RUN_STARTED":
+                    state["agent_running"] = True
+                elif etype in ("RUN_FINISHED", "RUN_ERROR"):
+                    state["agent_running"] = False
+
+                # Accumulate and save to history
                 if etype == "TEXT_MESSAGE_CONTENT":
                     assistant_text += agui_event.get("delta", "")
                 elif etype == "TEXT_MESSAGE_END":
