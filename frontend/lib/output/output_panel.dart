@@ -119,6 +119,15 @@ class _OutputPanelState extends State<OutputPanel> {
             content: reason.toString(),
             timestamp: DateTime.now(),
           );
+        } else if (event.customName == 'session_resume') {
+          final value = event.customValue;
+          final reason = value is Map ? (value['reason'] ?? '') : '';
+          entry = _OutputEntry(
+            type: _EntryType.step,
+            title: 'Session Resume',
+            content: reason.toString(),
+            timestamp: DateTime.now(),
+          );
         } else if (event.customName == 'container_idle_stop') {
           final value = event.customValue;
           final reason = value is Map ? (value['reason'] ?? '') : '';

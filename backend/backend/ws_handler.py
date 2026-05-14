@@ -117,7 +117,7 @@ async def _start_workspace_container(ws: WebSocket, state: dict, workspace_id: s
     # Cache workspace info for auto-restart
     state["workspace"] = workspace
 
-    asyncio.create_task(_resume_pi_session(pi_client, workspace_id, user["id"], workspace["name"]))
+    asyncio.create_task(_resume_pi_session(ws, pi_client, workspace_id, user["id"], workspace["name"], state))
     logger.info("Container ready for workspace %s", workspace_id)
 
 
@@ -264,7 +264,7 @@ async def _handle_abort(state: dict) -> None:
     await pi_client.abort()
 
 
-async def _resume_pi_session(pi_client: PiRpcClient, workspace_id: str, user_id: str, workspace_name: str) -> None:
+async def _resume_pi_session(ws: WebSocket, pi_client: PiRpcClient, workspace_id: str, user_id: str, workspace_name: str, state: dict) -> None:
     """Resume Pi's most recent native session if one exists in the workspace."""
     import glob
     try:
@@ -289,6 +289,15 @@ async def _resume_pi_session(pi_client: PiRpcClient, workspace_id: str, user_id:
             "sessionPath": container_path,
         })
         logger.info("Resumed Pi session %s for workspace %s", container_path, workspace_id)
+
+        try:
+            await ws.send_json({"type": "event", "event": {
+                "type": "CUSTOM",
+                "name": "session_resume",
+                "value": {"reason": "Session resumed."},
+            }})
+        except Exception:
+            pass
     except Exception as e:
         logger.warning("Failed to resume Pi session: %s", e)
 

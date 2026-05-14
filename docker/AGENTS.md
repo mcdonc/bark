@@ -22,8 +22,9 @@ Testing and running:
 
 Handling large files (CSV, logs, datasets, etc.):
 - Do NOT read entire large files and send them to the LLM — this is extremely slow
-- Instead, use `bash` to inspect files: `head -20 file.csv`, `wc -l file.csv`, `cut -d, -f1 file.csv | head`
-- For data analysis, write a Python script that processes the file locally and prints a summary
+- Prefer registered tools over bash for file inspection when an appropriate tool is available
+- When using bash and the full file content is not necessary, read only portions (e.g., `head -20`, column headers) rather than the entire file
+- For deeper analysis, write a Python script that processes the file locally and prints a summary
 - Only read small files (< 10KB) directly with the `read` tool
 
 Available runtimes: Python 3, Node.js/npm, Dart, Flutter, Rust/Cargo, GCC/G++ (build-essential)
