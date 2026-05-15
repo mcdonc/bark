@@ -30,19 +30,19 @@ plugins:
   # Default plugins (from the Bark repo)
   - name: celebrate
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/celebrate
+    path: plugins/celebrate
     ref: main
   - name: beep
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/beep
+    path: plugins/beep
     ref: main
   - name: pig-latin
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/pig-latin
+    path: plugins/pig-latin
     ref: main
   - name: word-count
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/word-count
+    path: plugins/word-count
     ref: main
   # Soliplex knowledge base integration
   - name: soliplex

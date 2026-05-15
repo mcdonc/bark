@@ -57,18 +57,22 @@ bark/
   synctoarctor.sh               # Deploy script for arctor.repoze.org
   bootstrap                     # Install Nix + devenv
 
+  plugins/              # Starter plugins (source of truth, fetched into $BARK_PLUGINS_DIR by update-plugins)
+    celebrate/                  # Confetti animation (client-side)
+    beep/                       # Audible beep tone (client-side)
+    pig-latin/                  # Text to Pig Latin converter (server-side)
+    word-count/                 # Fast file stats (server-side)
+  scripts/
+    gen_plugins.py              # Codegen: scans plugins, generates plugins_generated.dart
+    update_plugins.py           # Fetches plugins from git repos, writes plugins.lock
+
   docker/
     Dockerfile                  # Pi agent image: node:22-slim + Pi + Python3 + Dart + Flutter + Rust + build-essential
     entrypoint.sh               # Generates models.json, settings.json, AGENTS.md; starts Pi in RPC mode
     models.json                 # Generated at startup from env vars
     settings.json               # Generated at startup from env vars
-    extensions/                 # Pi extensions (TypeScript, registered as first-class LLM tools)
-      word-count.ts             # Fast file stats: lines, words, characters, size
-      pig-latin.ts              # Text to Pig Latin converter
-      celebrate.ts              # Triggers confetti animation in the browser
-      beep.ts                   # Plays an audible beep tone via Web Audio API
-    tools/                      # Python helper scripts called by extensions
-      word_count.py             # Backend for word-count extension
+    extensions/                 # Generated: collected from $BARK_PLUGINS_DIR/*/extension.ts at build time
+    tools/                      # Generated: collected from $BARK_PLUGINS_DIR/*/tools/ at build time
 
   backend/
     pyproject.toml              # Python deps: fastapi, aiodocker, aiosqlite, bcrypt, python-jose
@@ -94,8 +98,10 @@ bark/
         backend_url.dart        # Derives API base URL from <base href> for subpath hosting
       widgets/
         bark_logo.dart          # Bark logo widget (orange paw icon)
-        confetti.dart           # Confetti animation overlay for celebrate tool
-        beep.dart               # Web Audio API beep via dart:js_interop
+      tools/
+        tool_plugin.dart        # ToolPlugin base class and ToolPluginRegistry
+        plugins_generated.dart  # Generated: imports and registers all plugins with plugin.dart
+        plugins/                # Generated: .dart files copied from $BARK_PLUGINS_DIR by gen_plugins.py
       auth/
         auth_service.dart       # JWT storage, login/register/logout, async init
         login_page.dart         # Login/register form
@@ -144,16 +150,18 @@ bark/
 - 15-minute idle timeout with automatic container stop and debug notification
 - All user containers stopped on logout and backend shutdown
 
-### Pi Extensions (Server-Side Tools)
-- Extensions are TypeScript files in `docker/extensions/` — registered as first-class LLM tools
+### Pi Extensions (Tools)
+- Extensions are TypeScript files collected from `$BARK_PLUGINS_DIR/*/extension.ts` into `docker/extensions/` at build time
 - The LLM sees them in its tool list alongside built-in tools (read, write, edit, bash)
-- Extensions can call Python scripts, run shell commands, or execute pure TypeScript logic
+- Extensions can be server-side (run code inside the container) or client-side (delegate to the browser via the Extension UI Sub-Protocol)
 - AGENTS.md is generated dynamically on each container start, listing all registered extension tools
-- Current extensions:
-  - `word_count` — fast file stats (lines, words, characters, size) via Python script
-  - `pig_latin` — text to Pig Latin converter (pure TypeScript)
-  - `celebrate` — triggers confetti animation in the browser (frontend detects tool call)
-  - `beep` — plays an audible beep tone via Web Audio API (frontend detects tool call)
+- Default plugins:
+  - `word_count` — fast file stats (lines, words, characters, size) via Python script (server-side)
+  - `pig_latin` — text to Pig Latin converter, pure TypeScript (server-side)
+  - `celebrate` — triggers confetti animation in the browser (client-side, via Extension UI Sub-Protocol)
+  - `beep` — plays an audible beep tone via Web Audio API (client-side, via Extension UI Sub-Protocol)
+  - `soliplex_list_rooms` — lists Soliplex knowledge base rooms (client-side)
+  - `soliplex_query` — queries a Soliplex room with a natural language question (client-side)
 
 ### Chat Interface
 - Markdown rendering for assistant responses (flutter_markdown)
@@ -240,8 +248,8 @@ devenv shell -- rebuild
 ```
 
 Then restart the processes. On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
-- **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`, `plugins/**/*.dart`
-- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `plugins/**/*.ts`, `plugins/**/tools/**`
+- **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`, `$BARK_PLUGINS_DIR/**/*.dart`, `$BARK_PLUGINS_DIR/plugins.lock`
+- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
 
 ### Plugin System
 
@@ -274,19 +282,19 @@ All plugins live in `plugins/` (gitignored). Plugins are declared in `plugins/pl
 plugins:
   - name: celebrate
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/celebrate
+    path: plugins/celebrate
     ref: main
   - name: beep
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/beep
+    path: plugins/beep
     ref: main
   - name: pig-latin
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/pig-latin
+    path: plugins/pig-latin
     ref: main
   - name: word-count
     git: git@github.com:mcdonc/bark.git
-    path: default-plugins/word-count
+    path: plugins/word-count
     ref: main
   - name: soliplex
     git: git@github.com:soliplex/soliplex.git
@@ -305,7 +313,7 @@ plugins:
   - If `plugins.yaml` exists, fetches listed plugins, resolves git refs to commit SHAs, and writes `plugins.lock`
 - `update-plugins` — devenv script alias that runs `python3 scripts/update_plugins.py "$@"`
 - `update-plugins <name>` — fetch/update a single plugin by name, preserving other lock entries
-- `default-plugins/` — directory in the Bark repo containing starter plugins. These aren't special — they're just plugins that happen to live in the same repo and are included in the generated template.
+- `plugins/` — directory in the Bark repo containing starter plugins. These aren't special — they're just plugins that happen to live in the same repo and are included in the generated template.
 - `plugins.lock` — records resolved commit SHAs for reproducible builds
 - On first `devenv up`, if `plugins.yaml` exists but no lockfile is found, `update-plugins` runs automatically. After that, updates are explicit only.
 - Local plugin development: drop a directory into `$BARK_PLUGINS_DIR` directly — the build system treats it the same as a fetched plugin.
@@ -344,10 +352,10 @@ LLM calls tool → Pi extension execute()
 
 ### Current client-side tools
 
-- **celebrate** (`docker/extensions/celebrate.ts`): Triggers confetti animation in the browser
-- **beep** (`docker/extensions/beep.ts`): Plays a beep sound in the browser
-- **soliplex_list_rooms** (`docker/extensions/soliplex.ts`): Lists available Soliplex knowledge base rooms
-- **soliplex_query** (`docker/extensions/soliplex.ts`): Queries a Soliplex room via AG-UI (creates thread, posts question, collects SSE response). Default room: `search`
+- **celebrate** (`plugins/celebrate/`): Triggers confetti animation in the browser
+- **beep** (`plugins/beep/`): Plays a beep sound in the browser
+- **soliplex_list_rooms** (external, via `plugins.yaml`): Lists available Soliplex knowledge base rooms
+- **soliplex_query** (external, via `plugins.yaml`): Queries a Soliplex room via AG-UI (creates thread, posts question, collects SSE response). Default room: `search`
 
 ### Soliplex integration
 

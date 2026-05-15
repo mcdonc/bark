@@ -43,8 +43,6 @@ Thumbs.db
 # Bark data
 .bark/
 
-# Fetched plugins
-plugins/
 docker/extensions/
 docker/tools/
 frontend/lib/tools/plugins_generated.dart
