@@ -45,7 +45,7 @@
   processes = {
     backend = {
       exec = ''
-        cd $DEVENV_ROOT/backend && uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8997
+        cd $DEVENV_ROOT/backend && exec uvicorn backend.main:app --host 0.0.0.0 --port 8997
       '';
       after = [
         "bark:flutter-build"
@@ -100,7 +100,7 @@
           }
         }
         NGINX
-        nginx -c $DEVENV_STATE/nginx/nginx.conf
+        exec nginx -e stderr -c $DEVENV_STATE/nginx/nginx.conf
       '';
       after = [
         "bark:flutter-build"
@@ -110,6 +110,7 @@
   };
 
   env.SOURCE_DATE_EPOCH = "";
+  env.UV_PYTHON = config.devenv.state + "/venv/bin/python";
   env.BARK_PLUGINS_DIR = builtins.getEnv "HOME" + "/.bark/plugins";
   dotenv.enable = true;
 
