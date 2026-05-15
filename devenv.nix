@@ -14,6 +14,7 @@
 
   packages = with pkgs; [
     docker-client
+    nginx
   ];
 
   tasks = {
@@ -47,13 +48,68 @@
         "bark:docker-build"
       ];
     };
+    nginx = {
+      exec = ''
+        mkdir -p $DEVENV_STATE/nginx
+        cat > $DEVENV_STATE/nginx/nginx.conf << 'NGINX'
+        daemon off;
+        pid /tmp/nginx.pid;
+        error_log stderr;
+        events { worker_connections 64; }
+        http {
+          access_log /dev/stdout;
+          client_body_temp_path /tmp/nginx_client_body;
+          proxy_temp_path /tmp/nginx_proxy;
+          fastcgi_temp_path /tmp/nginx_fastcgi;
+          uwsgi_temp_path /tmp/nginx_uwsgi;
+          scgi_temp_path /tmp/nginx_scgi;
+
+          map $http_upgrade $connection_upgrade {
+            default upgrade;
+            "" close;
+          }
+
+          server {
+            listen 8995;
+
+            location /bark/ {
+              proxy_pass http://127.0.0.1:8997/;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $connection_upgrade;
+            }
+
+            location / {
+              proxy_pass http://127.0.0.1:8555/;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $connection_upgrade;
+            }
+          }
+        }
+        NGINX
+        nginx -c $DEVENV_STATE/nginx/nginx.conf
+      '';
+      after = [
+        "bark:flutter-build"
+        "bark:docker-build"
+      ];
+    };
   };
 
   dotenv.enable = true;
 
   scripts.flutterbuildweb.exec = ''
     cd $DEVENV_ROOT
-    cd frontend && flutter pub get && flutter build web
+    cd frontend && flutter pub get && flutter build web --base-href=/bark/
     rm -f build/web/flutter_service_worker.js
   '';
 

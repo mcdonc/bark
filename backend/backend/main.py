@@ -51,6 +51,15 @@ app.add_middleware(
 )
 
 
+# --- Config endpoint ---
+
+SOLIPLEX_URL = os.environ.get("SOLIPLEX_URL", "")
+
+@app.get("/api/config")
+async def get_config():
+    return {"soliplex_url": SOLIPLEX_URL}
+
+
 # --- Auth endpoints ---
 
 @app.post("/auth/register", response_model=auth.TokenResponse)
@@ -169,6 +178,7 @@ async def upload_file(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"path": saved_path, "status": "uploaded"}
+
 
 
 # --- WebSocket ---

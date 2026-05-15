@@ -31,6 +31,7 @@ OLLAMA_MODEL=gemma4:31b                     # any model available on your Ollama
 BARK_JWT_SECRET=change-this-to-a-random-secret
 BARK_DEFAULT_USER=admin
 BARK_DEFAULT_PASSWORD=admin
+
 EOF
 
 # Install Nix and devenv (if not already installed)
@@ -85,6 +86,7 @@ Workspace files on disk
 - **Backend**: FastAPI serving both API and frontend static files on a single port
 - **Agent**: Pi coding agent in RPC mode with Ollama (cloud or self-hosted, configurable model)
 - **Protocol**: [AG-UI](https://docs.ag-ui.com/) for standardized agent-user communication
+- **Soliplex**: Optional RAG knowledge base integration via client-side tools
 
 Each workspace gets its own Docker container with a bind-mounted directory. Pi sessions persist across container restarts, and conversation history is stored in SQLite.
 
@@ -93,8 +95,12 @@ Each workspace gets its own Docker container with a bind-mounted directory. Pi s
 The agent has custom tools registered as Pi extensions that the LLM can call directly:
 - `word_count` — fast file stats (lines, words, characters, size)
 - `pig_latin` — text to Pig Latin converter
-- `celebrate` — triggers a confetti animation in the browser
-- `beep` — plays an audible beep tone in the browser
+- `celebrate` — triggers a confetti animation in the browser (client-side)
+- `beep` — plays an audible beep tone in the browser (client-side)
+- `soliplex_list_rooms` — lists available Soliplex knowledge base rooms (client-side)
+- `soliplex_query` — queries a Soliplex room with a natural language question (client-side)
+
+**Client-side tools** use Pi's Extension UI Sub-Protocol to delegate execution to the browser. This enables tools that need browser authentication (e.g., Soliplex cookies) or browser-native capabilities (audio, animations).
 
 To add your own: create a TypeScript file in `docker/extensions/`, rebuild the Docker image, and the tool will automatically appear in the LLM's tool list and in the dynamically generated `AGENTS.md`.
 

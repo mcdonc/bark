@@ -16,6 +16,7 @@ import '../file_viewer/file_viewer_panel.dart';
 import '../layout/ide_layout.dart';
 import '../output/output_panel.dart';
 import '../terminal/chat_panel.dart';
+import '../tools/soliplex_tools.dart';
 
 class WorkspacePage extends StatefulWidget {
   final String workspaceId;
@@ -149,6 +150,15 @@ class _WorkspacePageState extends State<WorkspacePage> {
             playBeep();
             responseText = 'Beep played! (${request['frequency'] ?? 440}Hz, ${request['duration'] ?? 600}ms)';
             break;
+          case 'soliplex_list_rooms':
+            responseText = await _soliplexListRooms();
+            break;
+          case 'soliplex_query':
+            responseText = await _soliplexQuery(
+              request['room_id'] as String? ?? 'search',
+              request['question'] as String? ?? '',
+            );
+            break;
           default:
             responseText = 'Unknown action: $action';
         }
@@ -162,6 +172,29 @@ class _WorkspacePageState extends State<WorkspacePage> {
     // For other extension UI requests (select, confirm, etc.), cancel them
     // since we don't have a UI for them yet
     aguiClient.sendExtensionUiResponse(id, cancelled: true);
+  }
+
+  Future<String> _soliplexListRooms() async {
+    try {
+      final client = SoliplexClient();
+      final rooms = await client.listRooms();
+      if (rooms.isEmpty) return 'No rooms available.';
+      return rooms.map((r) =>
+        '- ${r['room_id'] ?? r['id']}: ${r['name'] ?? 'unnamed'} — ${r['description'] ?? 'no description'}'
+      ).join('\n');
+    } catch (e) {
+      return 'Error listing rooms: $e';
+    }
+  }
+
+  Future<String> _soliplexQuery(String roomId, String question) async {
+    if (question.isEmpty) return 'Error: question is required';
+    try {
+      final client = SoliplexClient();
+      return await client.queryRoom(roomId, question);
+    } catch (e) {
+      return 'Error querying Soliplex: $e';
+    }
   }
 
   @override

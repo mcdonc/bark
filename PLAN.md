@@ -7,16 +7,23 @@ Bark is a multi-user web app that gives each user their own isolated Pi coding a
 ## Architecture
 
 ```
+nginx reverse proxy (port 8995)
+    ├── /bark/     → Bark backend (port 8997)
+    └── /          → Soliplex backend (port 8555)
+
 Browser (Flutter Web + Chat UI + AG-UI)
-    ↕ AG-UI events over WebSocket (authenticated)
+    ├── AG-UI events over WebSocket (authenticated)
+    ├── Extension UI responses (client-side tool results)
+    └── Direct Soliplex API calls (same domain, browser cookies)
 Python/FastAPI backend (port 8997, serves API + frontend static files)
     ├── Auth (JWT sessions, SQLite user store)
     ├── Workspace registry (user → [workspace] → container)
     ├── Pi-to-AG-UI translator (Pi RPC events → AG-UI events)
+    ├── Extension UI request/response forwarding
     ├── Message history (SQLite)
     ↕ docker attach subprocess
 Pi container per workspace (stdin/stdout JSON-RPC)
-    ├── Pi extensions (TypeScript tools: word_count, pig_latin, etc.)
+    ├── Pi extensions (celebrate, beep, soliplex, word_count, pig_latin)
     ├── Server-side tools (Python scripts in /usr/local/bin/bark-tools/)
     ├── AGENTS.md (dynamically generated on container start)
     ↕ bind mount
@@ -250,24 +257,44 @@ Then restart the processes. On normal startup, Flutter and Docker builds run aut
 - Pi sessions: `workspaces/<user-id>/<workspace-name>/.pi/sessions/`
 - Database persists across restarts and rebuilds
 
-## Tool Delegation (Research Notes)
+## Client-Side Tool Delegation via Extension UI Sub-Protocol
 
-Pi's RPC mode supports **host tools** (`set_host_tools`, `host_tool_call`, `host_tool_result`) — tools registered by the RPC client that the LLM can call, with execution delegated back to the caller. We investigated using this to run tools in the Flutter frontend (browser-side Dart).
+Pi's RPC mode does **not** support host tools (`set_host_tools` returns "Unknown command"). Instead, we use Pi's **Extension UI Sub-Protocol** to delegate tool execution to the browser.
 
-**Findings**:
-- Speed, library access, and reliability are all better with server-side tools in the container.
-- Since Pi runs inside the container, the container must be running for any tool call regardless.
-- The LLM still needs an inference step to decide which tool to call and to process the result.
-- Privacy is limited: files live on the server (uploaded or created by Pi), so client-side processing still requires downloading the file from the server first.
-- A local-only analysis mode (file never leaves the browser) would require a different UX that doesn't exist yet.
+### How it works
 
-**Current approach**: Pi extensions (TypeScript) registered as first-class tools, with dynamic AGENTS.md generation listing available tools. Extensions can be pure TypeScript or call Python helper scripts.
+Pi extensions can call `ctx.ui.input(title, placeholder)` from within a tool's `execute` method. In RPC mode, this emits an `extension_ui_request` event on stdout and blocks until an `extension_ui_response` comes back on stdin. We use this as a general-purpose request/response channel between the container and the browser.
 
-**Host tool delegation remains interesting** for future use cases — e.g., local-only file analysis without server upload, browser-native capabilities (clipboard, camera, microphone), or offloading work from resource-constrained containers. The Pi RPC protocol supports it whenever we find the right application.
+**Convention**: Extensions use `ctx.ui.input("HOST_TOOL_REQUEST", jsonPayload)` where the payload encodes the action to perform. The frontend parses the JSON, executes the action, and sends the result back.
+
+### Flow
+
+```
+LLM calls tool → Pi extension execute()
+  → ctx.ui.input("HOST_TOOL_REQUEST", '{"action":"...", ...}')
+  → Pi emits: {"type":"extension_ui_request","id":"...","method":"input","title":"HOST_TOOL_REQUEST","placeholder":"..."}
+  → Backend forwards to frontend via WebSocket
+  → Frontend executes action (browser-side, with auth cookies)
+  → Frontend sends: {"cmd":"extension_ui_response","id":"...","value":"result"}
+  → Backend forwards to Pi stdin
+  → Extension receives result, returns to LLM
+```
+
+### Current client-side tools
+
+- **celebrate** (`docker/extensions/celebrate.ts`): Triggers confetti animation in the browser
+- **beep** (`docker/extensions/beep.ts`): Plays a beep sound in the browser
+- **soliplex_list_rooms** (`docker/extensions/soliplex.ts`): Lists available Soliplex knowledge base rooms
+- **soliplex_query** (`docker/extensions/soliplex.ts`): Queries a Soliplex room via AG-UI (creates thread, posts question, collects SSE response). Default room: `search`
+
+### Soliplex integration
+
+The Soliplex tools run entirely in the browser, which has the user's Soliplex authentication cookies. When deployed behind nginx on the same domain, the browser can call Soliplex APIs directly with no CORS issues. The backend serves a `/api/config` endpoint that tells the frontend where Soliplex is located (via `SOLIPLEX_URL` env var).
+
+The query flow: frontend creates a thread in the Soliplex room, posts the user's question as an AG-UI `RunAgentInput`, collects the streamed SSE response, extracts `TEXT_MESSAGE_CONTENT` deltas, and returns the assembled text to the Pi extension.
 
 ## TODO
 
-- **Stop running Pi as root**: Create a non-root user (e.g., `bark`) in the Dockerfile, set ownership of `/workspace` and `/opt/*` to that user, and use `USER bark` before the entrypoint. This improves security and prevents files created by Pi from being owned by root on the host bind mount.
 - **Read-only root filesystem**: Use `--read-only` Docker flag to make the container's root filesystem unwritable. Only `/workspace` (bind mount) and necessary tmpfs mounts (`/tmp`, `/root/.pi`) should be writable. This prevents the agent from modifying system files or installing packages outside the workspace.
 - **Container resource limits**: Add CPU/memory limits to containers to prevent runaway processes.
 - **Container network isolation**: Restrict container network access to prevent use as an attack platform. Use a custom Docker network with limited egress — allow only the Ollama API endpoint (cloud or self-hosted) and block all other outbound traffic. Consider using `--network=none` with a proxy sidecar for allowlisted domains only.
@@ -277,6 +304,5 @@ Pi's RPC mode supports **host tools** (`set_host_tools`, `host_tool_call`, `host
 - **Container terminal pane**: Add a terminal panel (xterm.dart) that gives the user direct shell access to the workspace container via `docker exec`. Would allow users to run commands, inspect processes, debug code, and interact with running servers without going through the AI agent.
 - **Same-workspace multi-window**: Opening the same workspace in two browser windows simultaneously has undefined behavior — both WebSocket connections share one Pi container/session, and prompts from either window could collide or interleave unpredictably. Consider either locking a workspace to one connection at a time, or multiplexing both windows onto the same event stream.
 - **Remove migration code**: The entrypoint.sh contains one-time migration logic (copying sessions from `/workspace/.pi/sessions` to the new bind mount, removing stale `AGENTS.md` and `.pi` from workspaces). Once all existing workspaces have been started at least once with the new container image, this migration code can be removed.
-- **Investigate soliplex_agent**: Evaluate [soliplex_agent](https://github.com/soliplex/frontend/tree/main/packages/soliplex_agent) as a potential replacement or complement for our custom AG-UI client. It's a pure Dart agent orchestration package with AG-UI integration, SSE streaming, multi-turn conversation support, tool registry, and state machine-based session management. Could simplify our `agui_client.dart` and `agui_events.dart` and provide a more robust agent session lifecycle.
 - **Workspace disk quotas**: Limit how much disk space each workspace can consume. Options: use filesystem quotas (XFS/ext4 project quotas on the host), overlay2 with size limits, or a loopback-mounted filesystem per workspace with a fixed size. Should also surface current disk usage in the UI (file viewer header or workspace list) so users can see how much space they've used.
 - **Investigate running Pi under bubblewrap**: Explore using [bubblewrap](https://github.com/containers/bubblewrap) (bwrap) as an alternative to Docker for sandboxing Pi. Bubblewrap is lighter-weight than Docker — no daemon, no image builds, no container overhead — and provides namespace-based isolation (mount, PID, network, user). This could significantly reduce startup time and resource usage. Trade-offs: no pre-built image caching, need to manage tool installations on the host, less isolation than full container. Could be offered as an alternative backend alongside Docker.
