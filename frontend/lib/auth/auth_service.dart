@@ -95,6 +95,36 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Make an authenticated HTTP request. If the response is 401,
+  /// clear the token (router will redirect to login).
+  Future<http.Response> authGet(String path) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl$path'),
+      headers: _authHeaders,
+    );
+    if (response.statusCode == 401) await _clearToken();
+    return response;
+  }
+
+  Future<http.Response> authPost(String path, {String? body}) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl$path'),
+      headers: _authHeaders,
+      body: body,
+    );
+    if (response.statusCode == 401) await _clearToken();
+    return response;
+  }
+
+  Future<http.Response> authDelete(String path) async {
+    final response = await http.delete(
+      Uri.parse('$_baseUrl$path'),
+      headers: _authHeaders,
+    );
+    if (response.statusCode == 401) await _clearToken();
+    return response;
+  }
+
   Future<void> logout() async {
     try {
       await http.post(

@@ -22,7 +22,7 @@ Pi container per workspace (stdin/stdout JSON-RPC)
     ├── Server-side tools (from $BARK_PLUGINS_DIR/*/tools/)
     ├── AGENTS.md (dynamically generated on container start)
     ↕ bind mount
-$DEVENV_STATE/.bark/workspaces/<user-id>/<workspace-name>/
+$BARK_DATA_DIR/workspaces/<user-id>/data/<workspace-id>/
 ```
 
 ### Components
@@ -295,9 +295,12 @@ plugins:
     ref: main
 ```
 
-- `BARK_PLUGINS_DIR` — env var controlling where plugins are stored. Defaults to `~/.bark/plugins`. The default directory path lives outside the repo so that devenv's `execIfModified` can detect changes without `.gitignore` conflicts. Override via `devenv.local.nix` (gitignored, loaded automatically alongside `devenv.nix` for local-only settings):
+- `BARK_DATA_DIR` — env var controlling where Bark stores its data (database, workspaces, Pi sessions). Defaults to `~/.bark/data`.
+- `BARK_PLUGINS_DIR` — env var controlling where plugins are stored. Defaults to `~/.bark/plugins`. Lives outside the repo so that devenv's `execIfModified` can detect changes without `.gitignore` conflicts.
+- Both can be overridden via `devenv.local.nix` (gitignored, loaded automatically alongside `devenv.nix` for local-only settings):
   ```nix
   { lib, ... }: {
+    env.BARK_DATA_DIR = lib.mkForce "/path/to/my/data";
     env.BARK_PLUGINS_DIR = lib.mkForce "/path/to/my/plugins";
   }
   ```
@@ -314,10 +317,10 @@ plugins:
 - Since `$BARK_PLUGINS_DIR` is outside the repo, there are no `.gitignore` conflicts with devenv's `execIfModified`.
 
 ### Data
-- All data stored in `$DEVENV_STATE/.bark/`
+- All data stored in `$BARK_DATA_DIR` (defaults to `~/.bark/data`)
 - SQLite database: `bark.db` (users, workspaces, messages, token blocklist)
-- Workspace files: `workspaces/<user-id>/<workspace-name>/`
-- Pi sessions: `workspaces/<user-id>/<workspace-name>/.pi/sessions/`
+- Workspace files: `workspaces/<user-id>/data/<workspace-id>/`
+- Pi sessions: `workspaces/<user-id>/sessions/<workspace-id>/`
 - Database persists across restarts and rebuilds
 
 ## Client-Side Tool Delegation via Extension UI Sub-Protocol
@@ -373,7 +376,6 @@ nginx reverse proxy (port 8995)
 
 - **Extract devenv scripts**: Move inline shell code from `devenv.nix` script definitions into standalone scripts in `scripts/`. Candidates: `flutterbuildweb` (plugin auto-fetch, codegen, flutter build), `dockerbuild` (plugin auto-fetch, collect extensions/tools, docker build, container cleanup), and `nginx` process (config generation and exec). This would make the logic easier to read, test, and reuse outside devenv.
 - **Configurable backend port**: The backend port (8997) is hardcoded in the uvicorn command and the nginx proxy_pass in `devenv.nix`. Extract it into a variable so both reference the same value and it can be overridden via `devenv.local.nix`.
-- **Configurable data directory**: Allow `BARK_DATA_DIR` to be set by the user instead of hardcoding it to `$DEVENV_STATE/.bark`. This would let Bark store its database, workspace files, and Pi sessions in a user-chosen location, similar to how `BARK_PLUGINS_DIR` works for plugins. Useful for deployments outside devenv or when data should persist independently of the devenv state directory.
 - **Plugin directory structure**: Consider whether each plugin should have explicit subdirectories for different file types (e.g., `dart/` for Flutter code, `extension/` for TypeScript, `tools/` for server-side scripts) instead of the current flat layout where `import_plugins.py` copies all `*.dart` files and `dockerbuild` picks up `extension.ts` by name. Subdirectories would simplify the copying logic and make it clearer what goes where.
 - **Plugin version numbers**: Plugins may want their own version numbers (in `plugin.yaml` or similar metadata) for compatibility checking, display in the UI, and meaningful pinning beyond git refs.
 - **Read-only root filesystem**: Use `--read-only` Docker flag to make the container's root filesystem unwritable. Only `/workspace` (bind mount) and necessary tmpfs mounts (`/tmp`, `/root/.pi`) should be writable. This prevents the agent from modifying system files or installing packages outside the workspace.

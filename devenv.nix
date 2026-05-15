@@ -111,6 +111,7 @@
 
   env.SOURCE_DATE_EPOCH = "";
   env.UV_PYTHON = config.devenv.state + "/venv/bin/python";
+  env.BARK_DATA_DIR = builtins.getEnv "HOME" + "/.bark/data";
   env.BARK_PLUGINS_DIR = builtins.getEnv "HOME" + "/.bark/plugins";
   dotenv.enable = true;
 
@@ -164,7 +165,6 @@
   '';
 
   enterShell = ''
-    export BARK_DATA_DIR="''${DEVENV_STATE}/.bark"
     mkdir -p "$BARK_DATA_DIR"
     echo "Bark dev environment ready"
     echo "Run 'rebuild' to rebuild all sofware."

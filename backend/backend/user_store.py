@@ -4,7 +4,7 @@ import aiosqlite
 import uuid
 from pathlib import Path
 
-_data_dir = Path(os.environ.get("BARK_DATA_DIR", str(Path.home() / ".bark")))
+_data_dir = Path(os.environ.get("BARK_DATA_DIR", str(Path.home() / ".bark" / "data")))
 DB_PATH = _data_dir / "bark.db"
 
 

@@ -27,21 +27,12 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
     _loadWorkspaces();
   }
 
-  Map<String, String> get _headers {
-    final token = context.read<AuthService>().token;
-    return {
-      'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
+  AuthService get _auth => context.read<AuthService>();
 
   Future<void> _loadWorkspaces() async {
     setState(() => _loading = true);
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/workspaces'),
-        headers: _headers,
-      );
+      final response = await _auth.authGet('/workspaces');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List;
         setState(() {
@@ -92,10 +83,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
     if (name == null || name.isEmpty) return;
 
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/workspaces?name=$name'),
-        headers: _headers,
-      );
+      final response = await _auth.authPost('/workspaces?name=$name');
       if (response.statusCode == 200) {
         await _loadWorkspaces();
       } else {
@@ -135,10 +123,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
     if (confirmed != true) return;
 
     try {
-      await http.delete(
-        Uri.parse('$_baseUrl/workspaces/$id'),
-        headers: _headers,
-      );
+      await _auth.authDelete('/workspaces/$id');
       await _loadWorkspaces();
     } catch (e) {
       if (mounted) {

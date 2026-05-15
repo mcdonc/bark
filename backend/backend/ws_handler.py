@@ -86,8 +86,8 @@ async def handle_websocket(ws: WebSocket) -> None:
 async def _start_workspace_container(ws: WebSocket, state: dict, workspace_id: str, workspace: dict) -> None:
     """Start/restart container, connect Pi RPC, start event forwarding, resume session."""
     user = state["user"]
-    host_path = str(workspace_manager.get_workspace_host_path(user["id"], workspace["name"]))
-    sessions_path = str(workspace_manager.get_sessions_host_path(user["id"], workspace["name"]))
+    host_path = str(workspace_manager.get_workspace_host_path(user["id"], workspace_id))
+    sessions_path = str(workspace_manager.get_sessions_host_path(user["id"], workspace_id))
     container_id, container_status = await container_manager.start_container(
         workspace_id, host_path, sessions_path, workspace.get("container_id")
     )
@@ -120,7 +120,7 @@ async def _start_workspace_container(ws: WebSocket, state: dict, workspace_id: s
     # Cache workspace info for auto-restart
     state["workspace"] = workspace
 
-    asyncio.create_task(_resume_pi_session(ws, pi_client, workspace_id, user["id"], workspace["name"], state))
+    asyncio.create_task(_resume_pi_session(ws, pi_client, workspace_id, user["id"], state))
     logger.info("Container ready for workspace %s", workspace_id)
 
 
@@ -293,14 +293,14 @@ async def _handle_abort(state: dict) -> None:
     await pi_client.abort()
 
 
-async def _resume_pi_session(ws: WebSocket, pi_client: PiRpcClient, workspace_id: str, user_id: str, workspace_name: str, state: dict) -> None:
+async def _resume_pi_session(ws: WebSocket, pi_client: PiRpcClient, workspace_id: str, user_id: str, state: dict) -> None:
     """Resume Pi's most recent native session if one exists in the workspace."""
     import glob
     try:
         await asyncio.sleep(1)  # Give Pi a moment to finish startup
 
         # Find the most recent session file in the sessions dir
-        sessions_host = str(workspace_manager.get_sessions_host_path(user_id, workspace_name))
+        sessions_host = str(workspace_manager.get_sessions_host_path(user_id, workspace_id))
         session_files = sorted(glob.glob(f"{sessions_host}/**/*.jsonl", recursive=True))
 
         if not session_files:

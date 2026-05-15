@@ -134,7 +134,7 @@ async def list_files(
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        return file_service.list_files(user["id"], workspace["name"], path)
+        return file_service.list_files(user["id"], workspace_id, path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -149,7 +149,7 @@ async def read_file(
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        content = file_service.read_file(user["id"], workspace["name"], path)
+        content = file_service.read_file(user["id"], workspace_id, path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if content is None:
@@ -174,7 +174,7 @@ async def upload_file(
 
     content = await file.read()
     try:
-        saved_path = file_service.write_file(user["id"], workspace["name"], filename, content)
+        saved_path = file_service.write_file(user["id"], workspace_id, filename, content)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"path": saved_path, "status": "uploaded"}

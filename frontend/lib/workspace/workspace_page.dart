@@ -50,12 +50,8 @@ class _WorkspacePageState extends State<WorkspacePage> {
   }
 
   Future<void> _fetchWorkspaceName() async {
-    final token = context.read<AuthService>().token;
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/workspaces'),
-        headers: {if (token != null) 'Authorization': 'Bearer $token'},
-      );
+      final response = await context.read<AuthService>().authGet('/workspaces');
       if (response.statusCode == 200) {
         final workspaces = jsonDecode(response.body) as List;
         for (final ws in workspaces) {
