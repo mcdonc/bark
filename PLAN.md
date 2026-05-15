@@ -253,7 +253,7 @@ Then restart the processes. On normal startup, Flutter and Docker builds run aut
 
 ### Plugin System
 
-All tools live in `plugins/<name>/` directories. A plugin can contain:
+All tools live in `$BARK_PLUGINS_DIR/<name>/` directories. A plugin can contain:
 
 - `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `docker/extensions/` at build time.
 - `plugin.dart` — Dart class extending `ToolPlugin` for client-side action handling. Must export a class with `extends ToolPlugin`.
