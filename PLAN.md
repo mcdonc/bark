@@ -351,6 +351,7 @@ The query flow: frontend creates a thread in the Soliplex room, posts the user's
 
 ## TODO
 
+- **Plugin version numbers**: Plugins may want their own version numbers (in `plugin.yaml` or similar metadata) for compatibility checking, display in the UI, and meaningful pinning beyond git refs.
 - **Read-only root filesystem**: Use `--read-only` Docker flag to make the container's root filesystem unwritable. Only `/workspace` (bind mount) and necessary tmpfs mounts (`/tmp`, `/root/.pi`) should be writable. This prevents the agent from modifying system files or installing packages outside the workspace.
 - **Container resource limits**: Add CPU/memory limits to containers to prevent runaway processes.
 - **Container network isolation**: Restrict container network access to prevent use as an attack platform. Use a custom Docker network with limited egress — allow only the Ollama API endpoint (cloud or self-hosted) and block all other outbound traffic. Consider using `--network=none` with a proxy sidecar for allowlisted domains only.

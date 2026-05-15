@@ -27,6 +27,7 @@
         "frontend/pubspec.yaml"
         "frontend/pubspec.lock"
         "plugins/**/*.dart"
+        "plugins/plugins.lock"
       ];
     };
     "bark:docker-build" = {
@@ -36,6 +37,7 @@
         "docker/entrypoint.sh"
         "plugins/**/*.ts"
         "plugins/**/tools/**"
+        "plugins/plugins.lock"
       ];
     };
   };
@@ -112,6 +114,11 @@
 
   scripts.flutterbuildweb.exec = ''
     cd $DEVENV_ROOT
+    # Auto-fetch plugins on first run
+    if [ -f plugins/plugins.yaml ] && [ ! -f plugins/plugins.lock ]; then
+      echo "No plugins.lock found, running update-plugins..."
+      python3 scripts/update_plugins.py
+    fi
     python3 scripts/gen_plugins.py
     cd frontend && flutter pub get && flutter build web --base-href=/bark/
     rm -f build/web/flutter_service_worker.js
@@ -119,6 +126,11 @@
 
   scripts.dockerbuild.exec = ''
     cd $DEVENV_ROOT
+    # Auto-fetch plugins on first run
+    if [ -f plugins/plugins.yaml ] && [ ! -f plugins/plugins.lock ]; then
+      echo "No plugins.lock found, running update-plugins..."
+      python3 scripts/update_plugins.py
+    fi
     # Collect plugin files into docker build context
     rm -rf docker/extensions docker/tools
     mkdir -p docker/extensions docker/tools
