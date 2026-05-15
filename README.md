@@ -92,7 +92,18 @@ Each workspace gets its own Docker container with a bind-mounted directory. Pi s
 
 ### Plugins
 
-All tools live in `plugins/<name>/` directories. Each plugin can contain:
+Plugins are fetched from git repos into `plugins/` at development time. Run `update-plugins` to set up:
+
+```bash
+devenv shell -- update-plugins   # creates plugins/plugins.yaml on first run
+# edit plugins/plugins.yaml to add/remove plugins
+devenv shell -- update-plugins   # fetches plugins
+devenv up                        # builds and starts
+```
+
+Default plugins (celebrate, beep, pig-latin, word-count) are included in the generated template. Their source lives in `default-plugins/` in this repo.
+
+Each plugin directory can contain:
 
 | File | Purpose |
 |------|---------|
@@ -101,22 +112,7 @@ All tools live in `plugins/<name>/` directories. Each plugin can contain:
 | `*.dart` | Supporting Dart files (widgets, utilities) |
 | `tools/` | Server-side scripts copied into the Docker image |
 
-**Built-in plugins:**
-- `word-count` — fast file stats (server-side Python script)
-- `pig-latin` — text to Pig Latin converter (server-side)
-- `celebrate` — confetti animation in the browser (client-side)
-- `beep` — audible beep tone in the browser (client-side)
-- `soliplex` — query Soliplex knowledge base rooms via RAG (client-side)
-
 **Client-side plugins** use Pi's Extension UI Sub-Protocol to delegate execution to the browser. This enables tools that need browser authentication (e.g., Soliplex cookies) or browser-native capabilities (audio, animations).
-
-**Adding a new plugin:**
-
-1. Create `plugins/<name>/extension.ts` with a `pi.registerTool()` call
-2. Optionally add `plugin.dart` extending `ToolPlugin` for client-side handling
-3. Optionally add server-side scripts in `plugins/<name>/tools/`
-4. Run `python scripts/gen_plugins.py` (or let `devenv up` handle it)
-5. Rebuild — the plugin is automatically discovered and wired in
 
 See [PLAN.md](PLAN.md) for detailed architecture and feature documentation.
 
