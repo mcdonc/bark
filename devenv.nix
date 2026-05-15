@@ -1,4 +1,4 @@
-{ pkgs, ... }: {
+{ pkgs, config, ... }: {
   languages.dart = {
     enable = true;
     package = pkgs.flutter;
@@ -26,8 +26,8 @@
         "frontend/web"
         "frontend/pubspec.yaml"
         "frontend/pubspec.lock"
-        "plugins/**/*.dart"
-        "plugins/plugins.lock"
+        "${config.env.BARK_PLUGINS_DIR}/**/*.dart"
+        "${config.env.BARK_PLUGINS_DIR}/plugins.lock"
       ];
     };
     "bark:docker-build" = {
@@ -35,9 +35,9 @@
       execIfModified = [
         "docker/Dockerfile"
         "docker/entrypoint.sh"
-        "plugins/**/*.ts"
-        "plugins/**/tools/**"
-        "plugins/plugins.lock"
+        "${config.env.BARK_PLUGINS_DIR}/**/*.ts"
+        "${config.env.BARK_PLUGINS_DIR}/**/tools/**"
+        "${config.env.BARK_PLUGINS_DIR}/plugins.lock"
       ];
     };
   };
@@ -110,12 +110,13 @@
   };
 
   env.SOURCE_DATE_EPOCH = "";
+  env.BARK_PLUGINS_DIR = builtins.getEnv "HOME" + "/.bark/plugins";
   dotenv.enable = true;
 
   scripts.flutterbuildweb.exec = ''
     cd $DEVENV_ROOT
     # Auto-fetch plugins on first run
-    if [ -f plugins/plugins.yaml ] && [ ! -f plugins/plugins.lock ]; then
+    if [ -f $BARK_PLUGINS_DIR/plugins.yaml ] && [ ! -f $BARK_PLUGINS_DIR/plugins.lock ]; then
       echo "No plugins.lock found, running update-plugins..."
       python3 scripts/update_plugins.py
     fi
@@ -127,14 +128,14 @@
   scripts.dockerbuild.exec = ''
     cd $DEVENV_ROOT
     # Auto-fetch plugins on first run
-    if [ -f plugins/plugins.yaml ] && [ ! -f plugins/plugins.lock ]; then
+    if [ -f $BARK_PLUGINS_DIR/plugins.yaml ] && [ ! -f $BARK_PLUGINS_DIR/plugins.lock ]; then
       echo "No plugins.lock found, running update-plugins..."
       python3 scripts/update_plugins.py
     fi
     # Collect plugin files into docker build context
     rm -rf docker/extensions docker/tools
     mkdir -p docker/extensions docker/tools
-    for d in plugins/*/; do
+    for d in $BARK_PLUGINS_DIR/*/; do
       [ -d "$d" ] || continue
       name=$(basename "$d")
       # TypeScript extensions

@@ -2,6 +2,7 @@
 .devenv/
 .devenv.flake.nix
 devenv.lock
+devenv.local.nix
 
 # Python
 __pycache__/
@@ -42,7 +43,7 @@ Thumbs.db
 # Bark data
 .bark/
 
-# Fetched plugins (remove this line to share plugins.yaml/plugins.lock across a team)
+# Fetched plugins
 plugins/
 docker/extensions/
 docker/tools/

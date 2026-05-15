@@ -10,7 +10,7 @@ import re
 import shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PLUGINS_DIR = os.path.join(ROOT, "plugins")
+PLUGINS_DIR = os.environ.get("BARK_PLUGINS_DIR") or os.path.join(os.path.expanduser("~"), ".bark", "plugins")
 DEST_DIR = os.path.join(ROOT, "frontend", "lib", "tools", "plugins")
 OUTPUT = os.path.join(ROOT, "frontend", "lib", "tools", "plugins_generated.dart")
 

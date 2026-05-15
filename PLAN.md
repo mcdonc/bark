@@ -294,17 +294,23 @@ plugins:
     ref: main
 ```
 
+- `BARK_PLUGINS_DIR` — env var controlling where plugins are stored. Defaults to `~/.bark/plugins`. The directory lives outside the repo so that devenv's `execIfModified` can detect changes without `.gitignore` conflicts. Override via `devenv.local.nix` (gitignored, loaded automatically alongside `devenv.nix` for local-only settings):
+  ```nix
+  { lib, ... }: {
+    env.BARK_PLUGINS_DIR = lib.mkForce "/path/to/my/plugins";
+  }
+  ```
 - `scripts/update_plugins.py` — Python script that manages plugin fetching:
-  - If `plugins/` doesn't exist, creates it with a template `plugins.yaml` that includes the default plugins (celebrate, beep, pig-latin, word-count) and soliplex
-  - If `plugins/plugins.yaml` exists, fetches listed plugins into `plugins/`, resolves git refs to commit SHAs, and writes `plugins/plugins.lock`
+  - If `$BARK_PLUGINS_DIR` doesn't exist, creates it with a template `plugins.yaml` that includes the default plugins (celebrate, beep, pig-latin, word-count) and soliplex
+  - If `plugins.yaml` exists, fetches listed plugins, resolves git refs to commit SHAs, and writes `plugins.lock`
 - `update-plugins` — devenv script alias that runs `python3 scripts/update_plugins.py "$@"`
 - `update-plugins <name>` — fetch/update a single plugin by name, preserving other lock entries
 - `default-plugins/` — directory in the Bark repo containing starter plugins. These aren't special — they're just plugins that happen to live in the same repo and are included in the generated template.
-- `plugins/plugins.lock` — records resolved commit SHAs for reproducible builds
-- On first `devenv up`, if `plugins/plugins.yaml` exists but no lockfile is found, `update-plugins` runs automatically. After that, updates are explicit only.
-- Local plugin development: drop a directory into `plugins/` directly — the build system treats it the same as a fetched plugin.
-- Deployments that want to share plugin config across a team can check in `plugins/plugins.yaml` and `plugins/plugins.lock` by adjusting `.gitignore`.
-- `execIfModified` watches `plugins/plugins.lock` to trigger rebuilds when plugin versions change.
+- `plugins.lock` — records resolved commit SHAs for reproducible builds
+- On first `devenv up`, if `plugins.yaml` exists but no lockfile is found, `update-plugins` runs automatically. After that, updates are explicit only.
+- Local plugin development: drop a directory into `$BARK_PLUGINS_DIR` directly — the build system treats it the same as a fetched plugin.
+- `execIfModified` watches `$BARK_PLUGINS_DIR` to trigger rebuilds when plugin content or the lockfile changes.
+- Since `$BARK_PLUGINS_DIR` is outside the repo, there are no `.gitignore` conflicts with devenv's `execIfModified`.
 
 ### Data
 - All data stored in `$DEVENV_STATE/.bark/`
