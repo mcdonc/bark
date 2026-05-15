@@ -253,7 +253,7 @@ Then restart the processes. On normal startup, Flutter and Docker builds run aut
 
 ### Plugin System
 
-All tools live in `$BARK_PLUGINS_DIR/<name>/` directories. A plugin can contain:
+All plugins live in `$BARK_PLUGINS_DIR/<name>/` directories. A plugin can contain:
 
 - `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `docker/extensions/` at build time.
 - `plugin.dart` — Dart class extending `ToolPlugin` for client-side action handling. Must export a class with `extends ToolPlugin`.
@@ -269,10 +269,14 @@ A plugin needs at minimum an `extension.ts`. The `plugin.dart` is only needed fo
 - Both are triggered automatically by `devenv up` via `execIfModified`
 
 **Adding a plugin:**
+
+For local development, create files directly in `$BARK_PLUGINS_DIR`:
 1. Create `$BARK_PLUGINS_DIR/<name>/extension.ts` with `pi.registerTool()` 
 2. For client-side tools, add `plugin.dart` extending `ToolPlugin` with action handlers
 3. For server-side scripts, add files in `$BARK_PLUGINS_DIR/<name>/tools/`
 4. `devenv up` rebuilds automatically when `$BARK_PLUGINS_DIR` changes
+
+For remote plugins, add an entry to `$BARK_PLUGINS_DIR/plugins.yaml` and run `update-plugins` to fetch it. See **Plugin management** below.
 
 **Plugin management:**
 
@@ -354,8 +358,6 @@ LLM calls tool → Pi extension execute()
 
 - **celebrate** (`plugins/celebrate/`): Triggers confetti animation in the browser
 - **beep** (`plugins/beep/`): Plays a beep sound in the browser
-- **soliplex_list_rooms** (external, via `plugins.yaml`): Lists available Soliplex knowledge base rooms
-- **soliplex_query** (external, via `plugins.yaml`): Queries a Soliplex room via AG-UI (creates thread, posts question, collects SSE response). Default room: `search`
 
 ### Soliplex integration
 
@@ -363,8 +365,15 @@ The Soliplex tools run entirely in the browser, which has the user's Soliplex au
 
 The query flow: frontend creates a thread in the Soliplex room, posts the user's question as an AG-UI `RunAgentInput`, collects the streamed SSE response, extracts `TEXT_MESSAGE_CONTENT` deltas, and returns the assembled text to the Pi extension.
 
+Soliplex has its own Bark plugins:
+
+- **soliplex_list_rooms** (external, via `plugins.yaml`): Lists available Soliplex knowledge base rooms
+- **soliplex_query** (external, via `plugins.yaml`): Queries a Soliplex room via AG-UI (creates thread, posts question, collects SSE response). Default room: `search`
+
+
 ## TODO
 
+- **Configurable data directory**: Allow `BARK_DATA_DIR` to be set by the user instead of hardcoding it to `$DEVENV_STATE/.bark`. This would let Bark store its database, workspace files, and Pi sessions in a user-chosen location, similar to how `BARK_PLUGINS_DIR` works for plugins. Useful for deployments outside devenv or when data should persist independently of the devenv state directory.
 - **Plugin version numbers**: Plugins may want their own version numbers (in `plugin.yaml` or similar metadata) for compatibility checking, display in the UI, and meaningful pinning beyond git refs.
 - **Read-only root filesystem**: Use `--read-only` Docker flag to make the container's root filesystem unwritable. Only `/workspace` (bind mount) and necessary tmpfs mounts (`/tmp`, `/root/.pi`) should be writable. This prevents the agent from modifying system files or installing packages outside the workspace.
 - **Container resource limits**: Add CPU/memory limits to containers to prevent runaway processes.
