@@ -23,8 +23,8 @@ Python/FastAPI backend (port 8997, serves API + frontend static files)
     ├── Message history (SQLite)
     ↕ docker attach subprocess
 Pi container per workspace (stdin/stdout JSON-RPC)
-    ├── Pi extensions (celebrate, beep, soliplex, word_count, pig_latin)
-    ├── Server-side tools (Python scripts in /usr/local/bin/bark-tools/)
+    ├── Pi extensions (from plugins/*/extension.ts)
+    ├── Server-side tools (from plugins/*/tools/)
     ├── AGENTS.md (dynamically generated on container start)
     ↕ bind mount
 $DEVENV_STATE/.bark/workspaces/<user-id>/<workspace-name>/
@@ -240,15 +240,31 @@ devenv shell -- rebuild
 ```
 
 Then restart the processes. On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
-- **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`
-- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `docker/extensions`, `docker/tools`
+- **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`, `plugins/**/*.dart`
+- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `plugins/**/*.ts`, `plugins/**/tools/**`
 
-### Adding Extension Tools
-1. Create a TypeScript file in `docker/extensions/` (see existing examples)
-2. Use `pi.registerTool()` with name, description, parameters, and execute function
-3. Optionally add a Python helper script in `docker/tools/`
-4. Rebuild Docker image: `docker build --platform linux/amd64 -t bark-pi docker/`
-5. AGENTS.md will auto-include the tool on next container start
+### Plugin System
+
+All tools live in `plugins/<name>/` directories. A plugin can contain:
+
+- `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `docker/extensions/` at build time.
+- `plugin.dart` — Dart class extending `ToolPlugin` for client-side action handling. Must export a class with `extends ToolPlugin`.
+- `*.dart` — Supporting Dart files (widgets, utilities). All `.dart` files are copied alongside `plugin.dart`.
+- `tools/` — Server-side scripts. Everything in this subdirectory is copied to `/usr/local/bin/bark-tools/` in the Docker image.
+
+A plugin needs at minimum an `extension.ts`. The `plugin.dart` is only needed for client-side tools that delegate execution to the browser via `ctx.ui.input("HOST_TOOL_REQUEST", ...)`.
+
+**Build integration:**
+- `scripts/gen_plugins.py` scans `plugins/*/plugin.dart`, copies `.dart` files into `frontend/lib/tools/plugins/`, and generates `plugins_generated.dart`
+- `dockerbuild` collects `extension.ts` and `tools/` files from all plugins into the Docker build context
+- `flutterbuildweb` runs the codegen before compiling
+- Both are triggered automatically by `devenv up` via `execIfModified`
+
+**Adding a plugin:**
+1. Create `plugins/<name>/extension.ts` with `pi.registerTool()` 
+2. For client-side tools, add `plugin.dart` extending `ToolPlugin` with action handlers
+3. For server-side scripts, add files in `plugins/<name>/tools/`
+4. `devenv up` rebuilds automatically when `plugins/` changes
 
 ### Data
 - All data stored in `$DEVENV_STATE/.bark/`

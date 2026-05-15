@@ -90,19 +90,33 @@ Workspace files on disk
 
 Each workspace gets its own Docker container with a bind-mounted directory. Pi sessions persist across container restarts, and conversation history is stored in SQLite.
 
-### Extension Tools
+### Plugins
 
-The agent has custom tools registered as Pi extensions that the LLM can call directly:
-- `word_count` — fast file stats (lines, words, characters, size)
-- `pig_latin` — text to Pig Latin converter
-- `celebrate` — triggers a confetti animation in the browser (client-side)
-- `beep` — plays an audible beep tone in the browser (client-side)
-- `soliplex_list_rooms` — lists available Soliplex knowledge base rooms (client-side)
-- `soliplex_query` — queries a Soliplex room with a natural language question (client-side)
+All tools live in `plugins/<name>/` directories. Each plugin can contain:
 
-**Client-side tools** use Pi's Extension UI Sub-Protocol to delegate execution to the browser. This enables tools that need browser authentication (e.g., Soliplex cookies) or browser-native capabilities (audio, animations).
+| File | Purpose |
+|------|---------|
+| `extension.ts` | Pi extension (TypeScript) — registered as an LLM-callable tool |
+| `plugin.dart` | Dart plugin class — handles client-side execution and optional UI |
+| `*.dart` | Supporting Dart files (widgets, utilities) |
+| `tools/` | Server-side scripts copied into the Docker image |
 
-To add your own: create a TypeScript file in `docker/extensions/`, rebuild the Docker image, and the tool will automatically appear in the LLM's tool list and in the dynamically generated `AGENTS.md`.
+**Built-in plugins:**
+- `word-count` — fast file stats (server-side Python script)
+- `pig-latin` — text to Pig Latin converter (server-side)
+- `celebrate` — confetti animation in the browser (client-side)
+- `beep` — audible beep tone in the browser (client-side)
+- `soliplex` — query Soliplex knowledge base rooms via RAG (client-side)
+
+**Client-side plugins** use Pi's Extension UI Sub-Protocol to delegate execution to the browser. This enables tools that need browser authentication (e.g., Soliplex cookies) or browser-native capabilities (audio, animations).
+
+**Adding a new plugin:**
+
+1. Create `plugins/<name>/extension.ts` with a `pi.registerTool()` call
+2. Optionally add `plugin.dart` extending `ToolPlugin` for client-side handling
+3. Optionally add server-side scripts in `plugins/<name>/tools/`
+4. Run `python scripts/gen_plugins.py` (or let `devenv up` handle it)
+5. Rebuild — the plugin is automatically discovered and wired in
 
 See [PLAN.md](PLAN.md) for detailed architecture and feature documentation.
 

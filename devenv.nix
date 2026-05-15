@@ -25,7 +25,7 @@
         "frontend/web"
         "frontend/pubspec.yaml"
         "frontend/pubspec.lock"
-        "plugins"
+        "plugins/**/*.dart"
       ];
     };
     "bark:docker-build" = {
@@ -33,8 +33,8 @@
       execIfModified = [
         "docker/Dockerfile"
         "docker/entrypoint.sh"
-        "plugins"
-        "docker/tools"
+        "plugins/**/*.ts"
+        "plugins/**/tools/**"
       ];
     };
   };
@@ -106,6 +106,7 @@
     };
   };
 
+  env.SOURCE_DATE_EPOCH = "";
   dotenv.enable = true;
 
   scripts.flutterbuildweb.exec = ''
@@ -117,14 +118,15 @@
 
   scripts.dockerbuild.exec = ''
     cd $DEVENV_ROOT
-    # Collect plugin extension.ts files into docker/extensions/
-    rm -rf docker/extensions
-    mkdir -p docker/extensions
+    # Collect plugin files into docker build context
+    rm -rf docker/extensions docker/tools
+    mkdir -p docker/extensions docker/tools
     for d in plugins/*/; do
-      if [ -f "$d/extension.ts" ]; then
-        name=$(basename "$d")
-        cp "$d/extension.ts" "docker/extensions/$name.ts"
-      fi
+      name=$(basename "$d")
+      # TypeScript extensions
+      [ -f "$d/extension.ts" ] && cp "$d/extension.ts" "docker/extensions/$name.ts"
+      # Server-side tools (any files in tools/ subdir)
+      [ -d "$d/tools" ] && cp -r "$d/tools/"* docker/tools/ 2>/dev/null
     done
     docker build --platform linux/amd64 -t bark-pi docker/
   '';

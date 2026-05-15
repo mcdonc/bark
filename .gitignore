@@ -44,6 +44,7 @@ Thumbs.db
 
 # Generated
 docker/extensions/
+docker/tools/
 frontend/lib/tools/plugins_generated.dart
 frontend/lib/tools/plugins/
 
