@@ -40,7 +40,7 @@ WORKDIR /workspace
 
 # Server-side tools
 COPY tools/ /usr/local/bin/bark-tools/
-RUN chmod +x /usr/local/bin/bark-tools/*.py
+RUN find /usr/local/bin/bark-tools/ -name '*.py' -exec chmod +x {} + 2>/dev/null || true
 
 # Pi extensions and entrypoint stored in /opt/bark (root-owned, read-only at runtime)
 RUN mkdir -p /opt/bark/pi-agent/extensions
