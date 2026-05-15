@@ -7,14 +7,9 @@ Bark is a multi-user web app that gives each user their own isolated Pi coding a
 ## Architecture
 
 ```
-nginx reverse proxy (port 8995)
-    ├── /bark/     → Bark backend (port 8997)
-    └── /          → Soliplex backend (port 8555)
-
 Browser (Flutter Web + Chat UI + AG-UI)
     ├── AG-UI events over WebSocket (authenticated)
     ├── Extension UI responses (client-side tool results)
-    └── Direct Soliplex API calls (same domain, browser cookies)
 Python/FastAPI backend (port 8997, serves API + frontend static files)
     ├── Auth (JWT sessions, SQLite user store)
     ├── Workspace registry (user → [workspace] → container)
@@ -155,13 +150,11 @@ bark/
 - The LLM sees them in its tool list alongside built-in tools (read, write, edit, bash)
 - Extensions can be server-side (run code inside the container) or client-side (delegate to the browser via the Extension UI Sub-Protocol)
 - AGENTS.md is generated dynamically on each container start, listing all registered extension tools
-- Default plugins:
+- Sample plugins exist in `plugins/`:
   - `word_count` — fast file stats (lines, words, characters, size) via Python script (server-side)
   - `pig_latin` — text to Pig Latin converter, pure TypeScript (server-side)
   - `celebrate` — triggers confetti animation in the browser (client-side, via Extension UI Sub-Protocol)
   - `beep` — plays an audible beep tone via Web Audio API (client-side, via Extension UI Sub-Protocol)
-  - `soliplex_list_rooms` — lists Soliplex knowledge base rooms (client-side)
-  - `soliplex_query` — queries a Soliplex room with a natural language question (client-side)
 
 ### Chat Interface
 - Markdown rendering for assistant responses (flutter_markdown)
@@ -300,20 +293,16 @@ plugins:
     git: git@github.com:mcdonc/bark.git
     path: plugins/word-count
     ref: main
-  - name: soliplex
-    git: git@github.com:soliplex/soliplex.git
-    path: bark-plugin
-    ref: main
 ```
 
-- `BARK_PLUGINS_DIR` — env var controlling where plugins are stored. Defaults to `~/.bark/plugins`. The directory lives outside the repo so that devenv's `execIfModified` can detect changes without `.gitignore` conflicts. Override via `devenv.local.nix` (gitignored, loaded automatically alongside `devenv.nix` for local-only settings):
+- `BARK_PLUGINS_DIR` — env var controlling where plugins are stored. Defaults to `~/.bark/plugins`. The default directory path lives outside the repo so that devenv's `execIfModified` can detect changes without `.gitignore` conflicts. Override via `devenv.local.nix` (gitignored, loaded automatically alongside `devenv.nix` for local-only settings):
   ```nix
   { lib, ... }: {
     env.BARK_PLUGINS_DIR = lib.mkForce "/path/to/my/plugins";
   }
   ```
 - `scripts/update_plugins.py` — Python script that manages plugin fetching:
-  - If `$BARK_PLUGINS_DIR` doesn't exist, creates it with a template `plugins.yaml` that includes the default plugins (celebrate, beep, pig-latin, word-count) and soliplex
+  - If `$BARK_PLUGINS_DIR` doesn't exist, creates it with a template `plugins.yaml` that includes sample plugins (celebrate, beep, pig-latin, word-count)
   - If `plugins.yaml` exists, fetches listed plugins, resolves git refs to commit SHAs, and writes `plugins.lock`
 - `update-plugins` — devenv script alias that runs `python3 scripts/update_plugins.py "$@"`
 - `update-plugins <name>` — fetch/update a single plugin by name, preserving other lock entries
@@ -369,6 +358,15 @@ Soliplex has its own Bark plugins:
 
 - **soliplex_list_rooms** (external, via `plugins.yaml`): Lists available Soliplex knowledge base rooms
 - **soliplex_query** (external, via `plugins.yaml`): Queries a Soliplex room via AG-UI (creates thread, posts question, collects SSE response). Default room: `search`
+
+The devenv.nix currently runs nginx for local Soliplex development:
+
+```
+nginx reverse proxy (port 8995)
+    ├── /bark/     → Bark backend (port 8997)
+    └── /          → Soliplex backend (port 8555)
+```
+
 
 
 ## TODO

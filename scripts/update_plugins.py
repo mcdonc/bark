@@ -44,11 +44,6 @@ plugins:
     git: git@github.com:mcdonc/bark.git
     path: plugins/word-count
     ref: main
-  # Soliplex knowledge base integration
-  - name: soliplex
-    git: git@github.com:soliplex/soliplex.git
-    path: bark-plugin
-    ref: main
   # Add more plugins:
   # - name: my-plugin
   #   git: git@github.com:user/repo.git
