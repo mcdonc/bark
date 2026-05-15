@@ -95,13 +95,14 @@ Each workspace gets its own Docker container with a bind-mounted directory. Pi s
 Plugins are fetched from git repos into `plugins/` at development time. Run `update-plugins` to set up:
 
 ```bash
-devenv shell -- update-plugins   # creates plugins/plugins.yaml on first run
+devenv shell -- update-plugins           # creates plugins/plugins.yaml on first run
 # edit plugins/plugins.yaml to add/remove plugins
-devenv shell -- update-plugins   # fetches plugins
-devenv up                        # builds and starts
+devenv shell -- update-plugins           # fetches all plugins
+devenv shell -- update-plugins soliplex  # fetch/update a single plugin
+devenv up                                # builds and starts
 ```
 
-Default plugins (celebrate, beep, pig-latin, word-count) are included in the generated template. Their source lives in `default-plugins/` in this repo.
+Default plugins (celebrate, beep, pig-latin, word-count) and the Soliplex knowledge base integration are included in the generated template. Default plugin source lives in `default-plugins/` in this repo.
 
 Each plugin directory can contain:
 
