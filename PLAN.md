@@ -266,6 +266,32 @@ A plugin needs at minimum an `extension.ts`. The `plugin.dart` is only needed fo
 3. For server-side scripts, add files in `plugins/<name>/tools/`
 4. `devenv up` rebuilds automatically when `plugins/` changes
 
+**Built-in vs external plugins:**
+- `celebrate` and `beep` are built-in (committed to the Bark repo)
+- All other plugins (soliplex, word-count, pig-latin, etc.) are external
+
+**External plugin management (TODO):**
+
+External plugins are declared in `bark-plugins.yaml`:
+
+```yaml
+plugins:
+  - git: https://github.com/mcdonc/bark-plugins
+    path: soliplex
+    ref: v1.2.0
+  - git: https://github.com/mcdonc/bark-plugins
+    path: word-count
+    ref: main
+  - git: https://github.com/someone/bark-plugin-custom
+    ref: v2.0.0
+```
+
+- `update-plugins` — explicit devenv script that fetches remote plugins into `plugins/`, resolves git refs to commit SHAs, and writes `bark-plugins.lock`
+- `bark-plugins.lock` — committed to repo, ensures reproducible builds across machines. `execIfModified` watches this file to trigger rebuilds when plugin versions change.
+- On first `devenv up`, if no lockfile exists, `update-plugins` runs automatically. After that, updates are explicit only.
+- Local plugin development: drop a directory into `plugins/` directly — the build system treats built-in and fetched plugins identically.
+- Built-in plugins (celebrate, beep) are always present and don't need entries in `bark-plugins.yaml`.
+
 ### Data
 - All data stored in `$DEVENV_STATE/.bark/`
 - SQLite database: `bark.db` (users, workspaces, messages, token blocklist)
