@@ -267,7 +267,9 @@ A plugin needs at minimum an `extension.ts`. The `plugin.dart` is only needed fo
 4. `devenv up` rebuilds automatically when `plugins/` changes
 
 **Built-in vs external plugins:**
-- `celebrate` and `beep` are built-in (committed to the Bark repo)
+- `celebrate` and `beep` live in `builtin-plugins/` (committed to the Bark repo)
+- External plugins live in `plugins/` (gitignored, populated by `update-plugins`)
+- The build system merges both directories — they follow the same structure and conventions
 - All other plugins (soliplex, word-count, pig-latin, etc.) are external
 
 **External plugin management (TODO):**
@@ -289,8 +291,8 @@ plugins:
 - `update-plugins` — explicit devenv script that fetches remote plugins into `plugins/`, resolves git refs to commit SHAs, and writes `bark-plugins.lock`
 - `bark-plugins.lock` — lives next to `bark-plugins.yaml`, records resolved commit SHAs for reproducible builds
 - On first `devenv up`, if `bark-plugins.yaml` exists but no lockfile is found, `update-plugins` runs automatically. After that, updates are explicit only.
-- Local plugin development: drop a directory into `plugins/` directly — the build system treats built-in and fetched plugins identically.
-- Built-in plugins (celebrate, beep) are always present and don't need entries in `bark-plugins.yaml`.
+- Local plugin development: drop a directory into `plugins/` directly — the build system treats it the same as a fetched plugin.
+- Built-in plugins in `builtin-plugins/` are always present and don't need entries in `bark-plugins.yaml`.
 - Bark ships without a `bark-plugins.yaml`. Both `bark-plugins.yaml` and `bark-plugins.lock` are gitignored by default. Deployments that want to share plugin config across a team can remove the gitignore entries (e.g., in a fork) or manage the files externally.
 - `execIfModified` watches `bark-plugins.lock` to trigger rebuilds when plugin versions change.
 
