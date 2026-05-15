@@ -266,37 +266,34 @@ A plugin needs at minimum an `extension.ts`. The `plugin.dart` is only needed fo
 3. For server-side scripts, add files in `plugins/<name>/tools/`
 4. `devenv up` rebuilds automatically when `plugins/` changes
 
-**Built-in vs external plugins:**
-- `celebrate` and `beep` live in `builtin-plugins/` (committed to the Bark repo)
-- External plugins live in `plugins/` (gitignored, populated by `update-plugins`)
-- The build system merges both directories — they follow the same structure and conventions
-- All other plugins (soliplex, word-count, pig-latin, etc.) are external
+**Plugin management (TODO):**
 
-**External plugin management (TODO):**
-
-External plugins are declared in `plugins/plugins.yaml`:
+All plugins live in `plugins/` (gitignored). Plugins are declared in `plugins/plugins.yaml`:
 
 ```yaml
 plugins:
+  # Default plugins (shipped with Bark in default-plugins/)
+  - git: https://github.com/mcdonc/bark
+    path: default-plugins/celebrate
+    ref: main
+  - git: https://github.com/mcdonc/bark
+    path: default-plugins/beep
+    ref: main
+  # Third-party plugins
   - git: https://github.com/mcdonc/bark-plugins
     path: soliplex
     ref: v1.2.0
-  - git: https://github.com/mcdonc/bark-plugins
-    path: word-count
-    ref: main
   - git: https://github.com/someone/bark-plugin-custom
     ref: v2.0.0
 ```
 
-The entire `plugins/` directory is gitignored.
-
 - `update-plugins` — explicit devenv script:
-  - If `plugins/` doesn't exist, creates it with a template `plugins.yaml`
+  - If `plugins/` doesn't exist, creates it with a template `plugins.yaml` that includes the default plugins (celebrate, beep) pointing at `default-plugins/` in the Bark repo
   - If `plugins/plugins.yaml` exists, fetches listed plugins into `plugins/`, resolves git refs to commit SHAs, and writes `plugins/plugins.lock`
+- `default-plugins/` — directory in the Bark repo containing starter plugins (celebrate, beep). These aren't special — they're just plugins that happen to live in the same repo and are included in the generated template.
 - `plugins/plugins.lock` — records resolved commit SHAs for reproducible builds
 - On first `devenv up`, if `plugins/plugins.yaml` exists but no lockfile is found, `update-plugins` runs automatically. After that, updates are explicit only.
 - Local plugin development: drop a directory into `plugins/` directly — the build system treats it the same as a fetched plugin.
-- Built-in plugins in `builtin-plugins/` are always present and don't need entries in `plugins.yaml`.
 - Deployments that want to share plugin config across a team can check in `plugins/plugins.yaml` and `plugins/plugins.lock` by adjusting `.gitignore`.
 - `execIfModified` watches `plugins/plugins.lock` to trigger rebuilds when plugin versions change.
 
