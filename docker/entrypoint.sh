@@ -1,23 +1,6 @@
 #!/bin/sh
-# Create a non-root user matching the host user's UID/GID.
-# BARK_UID/BARK_GID are passed by container_manager.py from the host.
-BARK_UID="${BARK_UID:-1000}"
-BARK_GID="${BARK_GID:-1000}"
-
-# Remove any existing user at the target UID
-EXISTING_USER=$(getent passwd "$BARK_UID" | cut -d: -f1)
-if [ -n "$EXISTING_USER" ]; then
-  userdel "$EXISTING_USER"
-fi
-
-# Remove any existing group at the target GID (unless it has other members)
-EXISTING_GROUP=$(getent group "$BARK_GID" | cut -d: -f1)
-if [ -n "$EXISTING_GROUP" ]; then
-  groupdel "$EXISTING_GROUP" 2>/dev/null
-fi
-
-groupadd -g "$BARK_GID" bark 2>/dev/null || true
-useradd -u "$BARK_UID" -g "$BARK_GID" -m -d /home/bark -s /bin/sh bark
+# bark user is created at build time with the host UID/GID.
+# This entrypoint runs as root, sets up Pi config, then drops to bark.
 
 # Set up Pi agent config in bark's home (copied from build-time /opt/bark)
 PI_AGENT_DIR="/home/bark/.pi/agent"

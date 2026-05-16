@@ -157,7 +157,7 @@
     done
     # Remove old containers before rebuilding so they get recreated from the new image
     docker ps -a --filter ancestor=bark-pi -q | xargs -r docker rm -f
-    docker build --platform linux/amd64 -t bark-pi docker/
+    docker build --platform linux/amd64 --build-arg BARK_UID=$(id -u) --build-arg BARK_GID=$(id -g) -t bark-pi docker/
   '';
 
   scripts.rebuild.exec = ''

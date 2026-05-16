@@ -35,7 +35,17 @@ ENV CARGO_HOME=/opt/rust/cargo
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/opt/rust/cargo/bin:$PATH"
 
-RUN mkdir -p /workspace
+# Create bark user with host UID/GID (passed as build args)
+ARG BARK_UID=1000
+ARG BARK_GID=1000
+RUN EXISTING_USER=$(getent passwd $BARK_UID | cut -d: -f1) \
+    && [ -n "$EXISTING_USER" ] && userdel "$EXISTING_USER" || true \
+    && EXISTING_GROUP=$(getent group $BARK_GID | cut -d: -f1) \
+    && [ -n "$EXISTING_GROUP" ] && groupdel "$EXISTING_GROUP" 2>/dev/null || true \
+    && groupadd -g $BARK_GID bark 2>/dev/null || true \
+    && useradd -u $BARK_UID -g $BARK_GID -m -d /home/bark -s /bin/sh bark
+
+RUN mkdir -p /workspace && chown bark:bark /workspace
 WORKDIR /workspace
 
 # Server-side tools

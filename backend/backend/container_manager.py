@@ -98,9 +98,6 @@ async def start_container(
     # Tell the container which ports are available
     env_vars.append(f"BARK_PORT_START={start_port}")
     env_vars.append(f"BARK_PORT_END={end_port}")
-    # Pass host UID/GID so the container can create a matching user
-    env_vars.append(f"BARK_UID={os.getuid()}")
-    env_vars.append(f"BARK_GID={os.getgid()}")
 
     # Build port bindings: map each container port to the same host port
     port_bindings = {}
@@ -113,10 +110,17 @@ async def start_container(
     config = {
         "Image": IMAGE_NAME,
         "HostConfig": {
+            "ReadonlyRootfs": True,
             "Binds": [
                 f"{host_path}:/workspace",
                 f"{sessions_path}:/home/bark/.pi/sessions",
             ],
+            "Tmpfs": {
+                "/tmp": "rw,noexec,nosuid,size=256m",
+                "/home/bark": "rw,nosuid,size=64m",
+                "/run": "rw,noexec,nosuid,size=16m",
+                "/var/log": "rw,noexec,nosuid,size=16m",
+            },
             "PortBindings": port_bindings,
         },
         "ExposedPorts": exposed_ports,

@@ -144,6 +144,13 @@ bark/
 - API keys and LLM config passed via environment variables
 - 15-minute idle timeout with automatic container stop and debug notification
 - All user containers stopped on logout and backend shutdown
+- Read-only root filesystem (`ReadonlyRootfs: True`) — the agent cannot modify system files or install packages outside the workspace. Writable paths:
+  - `/workspace` — bind mount to host (user files)
+  - `/home/bark/.pi/sessions` — bind mount to host (Pi session history)
+  - `/home/bark` — tmpfs (Pi agent config, regenerated each start)
+  - `/tmp` — tmpfs (scratch space)
+  - `/run`, `/var/log` — tmpfs (runtime)
+- `bark` user baked into the image at build time with the host UID/GID (passed as Docker build args)
 
 ### Pi Extensions (Tools)
 - Extensions are TypeScript files collected from `$BARK_PLUGINS_DIR/*/extension.ts` into `docker/extensions/` at build time
@@ -390,7 +397,6 @@ nginx reverse proxy (port 8995)
 - **Extract devenv scripts**: Move inline shell code from `devenv.nix` script definitions into standalone scripts in `scripts/`. Candidates: `flutterbuildweb` (plugin auto-fetch, codegen, flutter build), `dockerbuild` (plugin auto-fetch, collect extensions/tools, docker build, container cleanup), and `nginx` process (config generation and exec). This would make the logic easier to read, test, and reuse outside devenv.
 - **Plugin directory structure**: Consider whether each plugin should have explicit subdirectories for different file types (e.g., `dart/` for Flutter code, `extension/` for TypeScript, `tools/` for server-side scripts) instead of the current flat layout where `import_plugins.py` copies all `*.dart` files and `dockerbuild` picks up `extension.ts` by name. Subdirectories would simplify the copying logic and make it clearer what goes where.
 - **Plugin version numbers**: Plugins may want their own version numbers (in `plugin.yaml` or similar metadata) for compatibility checking, display in the UI, and meaningful pinning beyond git refs.
-- **Read-only root filesystem**: Use `--read-only` Docker flag to make the container's root filesystem unwritable. Only `/workspace` (bind mount) and necessary tmpfs mounts (`/tmp`, `/root/.pi`) should be writable. This prevents the agent from modifying system files or installing packages outside the workspace.
 - **Container resource limits**: Add CPU/memory limits to containers to prevent runaway processes.
 - **Container network isolation**: Restrict container network access to prevent use as an attack platform. Use a custom Docker network with limited egress — allow only the Ollama API endpoint (cloud or self-hosted) and block all other outbound traffic. Consider using `--network=none` with a proxy sidecar for allowlisted domains only.
 - **Multiple LLM providers**: Support selecting different models per workspace.
