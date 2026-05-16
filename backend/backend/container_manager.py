@@ -14,8 +14,10 @@ IDLE_TIMEOUT_SECONDS = 15 * 60  # 15 minutes
 CHECK_INTERVAL_SECONDS = 60
 
 # Port allocation: each workspace gets PORTS_PER_WORKSPACE ports
-# starting from PORT_RANGE_START
+# starting from PORT_RANGE_START on the host, mapped to fixed
+# container ports starting from CONTAINER_PORT_START
 PORT_RANGE_START = 9000
+CONTAINER_PORT_START = 8000
 PORTS_PER_WORKSPACE = 5
 
 # Track active containers: container_id -> {last_activity, workspace_id, ports}
@@ -102,13 +104,15 @@ async def start_container(
     if resume_session:
         env_vars.append(f"BARK_RESUME_SESSION={resume_session}")
 
-    # Build port bindings: map each container port to the same host port
+    # Build port bindings: map well-known container ports to allocated host ports
     port_bindings = {}
     exposed_ports = {}
-    for port in range(start_port, end_port + 1):
-        port_key = f"{port}/tcp"
+    for i in range(PORTS_PER_WORKSPACE):
+        container_port = CONTAINER_PORT_START + i
+        host_port = start_port + i
+        port_key = f"{container_port}/tcp"
         exposed_ports[port_key] = {}
-        port_bindings[port_key] = [{"HostPort": str(port)}]
+        port_bindings[port_key] = [{"HostPort": str(host_port)}]
 
     config = {
         "Image": IMAGE_NAME,

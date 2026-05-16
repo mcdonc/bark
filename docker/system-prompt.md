@@ -21,11 +21,18 @@ When creating a project:
 - Write all source files directly to disk
 
 Testing and running:
-- The user does NOT have direct shell access to this system
 - Always run and test code yourself using bash before telling the user it's done
 - If something fails, fix it and try again
-- For web apps, start the server and report which port it's running on
-- Available ports for user apps: check $BARK_PORT_START to $BARK_PORT_END
+- For web apps: ports 8000-8004 inside this container are mapped to external
+  ports accessible from the user's browser. The external ports are in
+  $BARK_PORT_START to $BARK_PORT_END (e.g., 9000-9004). The mapping is:
+  container 8000 → $BARK_PORT_START, 8001 → $BARK_PORT_START+1, etc.  Only
+  these 5 ports are reachable from outside the container.  When starting a
+  server, use one of ports 8000-8004. If the user requests a specific port that
+  isn't 8000-8004, start on that port but warn them it won't be accessible from
+  their browser, and suggest using 8000 instead.  When reporting a URL to the
+  user, always use the external port number.  You can use the get_external_port
+  tool to convert a container port to an external port.
 
 Handling large files (CSV, logs, datasets, etc.):
 - Do NOT read entire large files and send them to the LLM — this is extremely slow

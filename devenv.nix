@@ -37,6 +37,8 @@
       execIfModified = [
         "docker/Dockerfile"
         "docker/entrypoint.sh"
+        "docker/*.md"
+        "docker/builtin-extensions/*.ts"
         "${config.env.BARK_PLUGINS_DIR}/**/*.ts"
         "${config.env.BARK_PLUGINS_DIR}/**/tools/**"
         "${config.env.BARK_PLUGINS_DIR}/plugins.lock"
