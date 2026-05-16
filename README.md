@@ -50,7 +50,7 @@ Open [http://localhost:8997](http://localhost:8997) and log in with `admin`/`adm
 2. **Chat with the AI agent** — ask it to write code, create projects, fix bugs
 3. **The agent writes files directly** — no copy-paste needed
 4. **The agent runs and tests code** — it has shell access inside the container
-5. **View files** in the file viewer panel, drag-and-drop to upload
+5. **View files** in the file viewer panel, drag-and-drop files or folders to upload, right-click to rename or delete
 6. **Monitor activity** in the debug panel
 
 ### Environment Variables

@@ -50,6 +50,36 @@ def read_file(user_id: str, workspace_id: str, relative_path: str) -> str | None
         return None
 
 
+def delete_path(user_id: str, workspace_id: str, relative_path: str) -> str:
+    """Delete a file or directory. Returns the relative path deleted."""
+    path = _resolve_path(user_id, workspace_id, relative_path)
+    if not path.exists():
+        raise FileNotFoundError("Path not found")
+    if path.is_dir():
+        import shutil
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+    return str(path.relative_to(
+        workspace_manager.get_workspace_host_path(user_id, workspace_id)
+    ))
+
+
+def rename_path(user_id: str, workspace_id: str, old_path: str, new_path: str) -> str:
+    """Rename/move a file or directory. Returns the new relative path."""
+    src = _resolve_path(user_id, workspace_id, old_path)
+    dst = _resolve_path(user_id, workspace_id, new_path)
+    if not src.exists():
+        raise FileNotFoundError("Source path not found")
+    if dst.exists():
+        raise FileExistsError("Destination already exists")
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    src.rename(dst)
+    return str(dst.relative_to(
+        workspace_manager.get_workspace_host_path(user_id, workspace_id)
+    ))
+
+
 def write_file(user_id: str, workspace_id: str, relative_path: str, content: bytes) -> str:
     """Write file contents. Returns the resolved relative path."""
     path = _resolve_path(user_id, workspace_id, relative_path)

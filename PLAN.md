@@ -79,7 +79,7 @@ bark/
       pi_rpc_client.py          # docker attach subprocess for Pi stdin/stdout JSON-RPC (chunked reads for large events)
       agui_translator.py        # Pi RPC events → AG-UI events mapping, file-change detection
       ws_handler.py             # WebSocket auth, workspace routing, AG-UI streaming, session resume, auto-restart
-      file_service.py           # Host-side file read/write with path traversal protection
+      file_service.py           # Host-side file read/write/delete/rename with path traversal protection
 
   frontend/
     pubspec.yaml                # Flutter deps: flutter_markdown, flutter_highlight, go_router, etc.
@@ -182,7 +182,10 @@ bark/
 - Directory tree with file sizes
 - Click to view file contents (16pt JetBrains Mono, left-aligned)
 - Auto-refresh when Pi writes/edits files or runs file-creating/deleting bash commands
-- Drag-and-drop file upload
+- Drag-and-drop upload for files and folders (preserves directory structure, progress indicator)
+- Right-click context menu on files and folders: Rename (with dialog) and Delete (with confirmation)
+- nginx `client_max_body_size 500m` for large file uploads
+- nginx `sub_filter` rewrites `<base href>` for subpath hosting (`/bark/`)
 
 ### Debug Panel
 - Container lifecycle events (starting, ready with port info and status, idle stop, restart)
@@ -404,7 +407,6 @@ nginx reverse proxy (port 8995)
 - **Container network isolation**: Restrict container network access to prevent use as an attack platform. Use a custom Docker network with limited egress — allow only the Ollama API endpoint (cloud or self-hosted) and block all other outbound traffic. Consider using `--network=none` with a proxy sidecar for allowlisted domains only.
 - **Multiple LLM providers**: Support selecting different models per workspace.
 - **Syntax highlighting language detection**: Improve code block language detection for unlabeled blocks.
-- **Folder drag-and-drop upload**: Support dropping entire folders (with contents) into the file pane, preserving directory structure. Requires using the browser's File System Access API or `webkitGetAsEntry()` to traverse directory entries recursively.
 - **Container terminal pane**: Add a terminal panel (xterm.dart) that gives the user direct shell access to the workspace container via `docker exec`. Would allow users to run commands, inspect processes, debug code, and interact with running servers without going through the AI agent.
 - **Same-workspace multi-window**: Opening the same workspace in two browser windows simultaneously has undefined behavior — both WebSocket connections share one Pi container/session, and prompts from either window could collide or interleave unpredictably. Consider either locking a workspace to one connection at a time, or multiplexing both windows onto the same event stream.
 - **Workspace disk quotas**: Limit how much disk space each workspace can consume. Options: use filesystem quotas (XFS/ext4 project quotas on the host), overlay2 with size limits, or a loopback-mounted filesystem per workspace with a fixed size. Should also surface current disk usage in the UI (file viewer header or workspace list) so users can see how much space they've used.

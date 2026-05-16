@@ -157,6 +157,45 @@ async def read_file(
     return {"path": path, "content": content}
 
 
+@app.delete("/workspaces/{workspace_id}/files")
+async def delete_file(
+    workspace_id: str,
+    path: str,
+    user: dict = Depends(auth.get_current_user),
+):
+    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    try:
+        deleted = file_service.delete_path(user["id"], workspace_id, path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Path not found")
+    return {"path": deleted, "status": "deleted"}
+
+
+@app.post("/workspaces/{workspace_id}/files/rename")
+async def rename_file(
+    workspace_id: str,
+    old_path: str,
+    new_path: str,
+    user: dict = Depends(auth.get_current_user),
+):
+    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    try:
+        renamed = file_service.rename_path(user["id"], workspace_id, old_path, new_path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Source not found")
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail="Destination already exists")
+    return {"path": renamed, "status": "renamed"}
+
+
 @app.post("/workspaces/{workspace_id}/files/upload")
 async def upload_file(
     workspace_id: str,

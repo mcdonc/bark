@@ -93,6 +93,113 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
     _loadFiles();
   }
 
+  Future<void> _deletePath(String path, String name, bool isDir) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete ${isDir ? "folder" : "file"}'),
+        content: Text('Delete "$name"? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/workspaces/${widget.workspaceId}/files?path=${Uri.encodeComponent(path)}'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        _loadFiles();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Delete failed: ${response.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _renamePath(String path, String name, bool isDir) async {
+    final controller = TextEditingController(text: name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Rename ${isDir ? "folder" : "file"}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'New name'),
+          onSubmitted: (value) => Navigator.pop(ctx, value),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('Rename')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (newName == null || newName.isEmpty || newName == name) return;
+
+    // Build new path: replace the last component
+    final parentDir = path.contains('/') ? '${path.substring(0, path.lastIndexOf("/"))}/' : '';
+    final newPath = '$parentDir$newName';
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/workspaces/${widget.workspaceId}/files/rename'
+            '?old_path=${Uri.encodeComponent(path)}&new_path=${Uri.encodeComponent(newPath)}'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        _loadFiles();
+      } else {
+        if (mounted) {
+          final body = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Rename failed: ${body["detail"] ?? response.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Rename error: $e')),
+        );
+      }
+    }
+  }
+
+  void _showContextMenu(Offset position, String path, String name, bool isDir) {
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
+      items: [
+        const PopupMenuItem(value: 'rename', child: ListTile(dense: true, leading: Icon(Icons.edit, size: 18), title: Text('Rename'))),
+        const PopupMenuItem(value: 'delete', child: ListTile(dense: true, leading: Icon(Icons.delete, size: 18, color: Colors.red), title: Text('Delete', style: TextStyle(color: Colors.red)))),
+      ],
+    ).then((action) {
+      if (action == 'rename') {
+        _renamePath(path, name, isDir);
+      } else if (action == 'delete') {
+        _deletePath(path, name, isDir);
+      }
+    });
+  }
+
   @override
   void dispose() {
     _eventSub.cancel();
@@ -152,7 +259,7 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_entries.isEmpty) {
-      return const Center(child: Text('Empty directory\nDrag files here to upload'));
+      return const Center(child: Text('Empty directory\nDrag files or folders here to upload'));
     }
     return Column(
       children: [
@@ -164,18 +271,23 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
         final isDir = entry['is_dir'] as bool;
         final name = entry['name'] as String;
         final path = entry['path'] as String;
-        return ListTile(
-          dense: true,
-          leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file, size: 18),
-          title: Text(name, style: const TextStyle(fontSize: 13)),
-          subtitle: isDir ? null : Text('${entry['size'] ?? 0} bytes', style: const TextStyle(fontSize: 11)),
-          onTap: () {
-            if (isDir) {
-              _navigateTo(path);
-            } else {
-              _readFile(path);
-            }
+        return GestureDetector(
+          onSecondaryTapDown: (details) {
+            _showContextMenu(details.globalPosition, path, name, isDir);
           },
+          child: ListTile(
+            dense: true,
+            leading: Icon(isDir ? Icons.folder : Icons.insert_drive_file, size: 18),
+            title: Text(name, style: const TextStyle(fontSize: 13)),
+            subtitle: isDir ? null : Text('${entry['size'] ?? 0} bytes', style: const TextStyle(fontSize: 11)),
+            onTap: () {
+              if (isDir) {
+                _navigateTo(path);
+              } else {
+                _readFile(path);
+              }
+            },
+          ),
         );
       },
     ),
@@ -183,7 +295,7 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Text(
-            'Drag files here to upload',
+            'Drag files or folders here to upload',
             style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.outline),
           ),
         ),

@@ -25,32 +25,58 @@ class _FileDropZoneState extends State<FileDropZone> {
   String get _baseUrl => baseUrl;
   bool _dragging = false;
   bool _uploading = false;
+  int _uploadCount = 0;
+  int _uploadTotal = 0;
+
+  /// Recursively collect all files from drop items, preserving directory paths.
+  /// Returns a list of (relativePath, DropItem) pairs.
+  List<(String, DropItem)> _collectFiles(List<DropItem> items, String prefix) {
+    final result = <(String, DropItem)>[];
+    for (final item in items) {
+      final path = prefix.isEmpty ? (item.name ?? 'unnamed') : '$prefix/${item.name ?? 'unnamed'}';
+      if (item is DropItemDirectory) {
+        result.addAll(_collectFiles(item.children, path));
+      } else {
+        result.add((path, item));
+      }
+    }
+    return result;
+  }
 
   Future<void> _uploadFiles(DropDoneDetails details) async {
-    setState(() => _uploading = true);
+    final files = _collectFiles(details.files, '');
+    if (files.isEmpty) return;
 
-    for (final file in details.files) {
+    setState(() {
+      _uploading = true;
+      _uploadCount = 0;
+      _uploadTotal = files.length;
+    });
+
+    for (final (path, file) in files) {
       try {
         final bytes = await file.readAsBytes();
         final request = http.MultipartRequest(
           'POST',
-          Uri.parse('$_baseUrl/workspaces/${widget.workspaceId}/files/upload?path=${file.name}'),
+          Uri.parse('$_baseUrl/workspaces/${widget.workspaceId}/files/upload?path=${Uri.encodeComponent(path)}'),
         );
         if (widget.authToken != null) {
           request.headers['Authorization'] = 'Bearer ${widget.authToken}';
         }
-        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name));
+        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name ?? 'unnamed'));
         final response = await request.send();
         if (response.statusCode != 200) {
-          debugPrint('Upload failed: ${response.statusCode} for ${file.name}');
+          debugPrint('Upload failed: ${response.statusCode} for $path');
         }
       } catch (e) {
-        debugPrint('Upload error: $e');
+        debugPrint('Upload error for $path: $e');
+      }
+      if (mounted) {
+        setState(() => _uploadCount++);
       }
     }
 
     setState(() => _uploading = false);
-    // Small delay to let the backend finish writing
     await Future.delayed(const Duration(milliseconds: 500));
     widget.onUploadComplete();
   }
@@ -76,7 +102,7 @@ class _FileDropZoneState extends State<FileDropZone> {
                   children: [
                     Icon(Icons.upload_file, size: 48),
                     SizedBox(height: 8),
-                    Text('Drop files to upload'),
+                    Text('Drop files or folders to upload'),
                   ],
                 ),
               ),
@@ -84,7 +110,19 @@ class _FileDropZoneState extends State<FileDropZone> {
           if (_uploading)
             Container(
               color: Colors.black54,
-              child: const Center(child: CircularProgressIndicator()),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Uploading $_uploadCount / $_uploadTotal',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
             ),
         ],
       ),

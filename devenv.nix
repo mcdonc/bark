@@ -75,6 +75,8 @@
             "" close;
           }
 
+          client_max_body_size 500m;
+
           server {
             listen ${toString config.env.BARK_NGINX_PORT};
 
@@ -87,6 +89,8 @@
               proxy_http_version 1.1;
               proxy_set_header Upgrade $http_upgrade;
               proxy_set_header Connection $connection_upgrade;
+              sub_filter '<base href="/">' '<base href="/bark/">';
+              sub_filter_once on;
             }
 
             location / {
