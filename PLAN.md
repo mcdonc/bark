@@ -61,6 +61,9 @@ bark/
     import_plugins.py              # Codegen: scans plugins, generates plugins_generated.dart
     update_plugins.py           # Fetches plugins from git repos, writes plugins.lock
     test_port_allocation.py    # Tests port allocation lifecycle: create, increase, decrease, delete
+  tests/
+    unit/backend/                 # pytest unit tests for backend modules (auth, user_store, file_service, agui_translator)
+    playwright/                   # Playwright E2E browser tests (login, workspace, terminal, files, chat)
 
   docker/
     Dockerfile                  # Pi agent image: node:22-slim + Pi + Python3 + Dart + Flutter + Rust + build-essential + PostgreSQL + SQLite + vim + emacs + net tools
@@ -316,6 +319,23 @@ Then restart the processes. On normal startup, Flutter and Docker builds run aut
 - **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`, `$BARK_PLUGINS_DIR/**/*.dart`, `$BARK_PLUGINS_DIR/plugins.lock`
 - **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `docker/*.md`, `docker/builtin-extensions/*.ts`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
 
+### Testing
+
+**Unit tests** (backend, no Docker required):
+```bash
+devenv shell -- python -m pytest tests/unit/backend -v
+```
+Tests cover auth (password hashing, JWT, login/register, token blocklisting), user_store (users, workspaces, messages, port allocations, cascading deletes), file_service (read, write, list, delete, rename, path traversal protection), and agui_translator (Pi RPC → AG-UI event mapping, bash file detection). Coverage report is printed automatically.
+
+**E2E tests** (Playwright, requires running devenv processes):
+```bash
+# Install browsers (first time only)
+devenv shell -- bash -c "cd tests/playwright && npm run install-browsers"
+# Run tests
+devenv shell -- bash -c "cd tests/playwright && npx playwright test"
+```
+Tests run against `http://localhost:8997` using system Chrome. They cover login, workspace creation/deletion, terminal input, file tab switching, chat input, file upload/rename/delete via API, and logout. Flutter Web renders to canvas, so UI interaction uses coordinate-based clicks on `<flutter-view>`.
+
 ### Plugin System
 
 All plugins live in `$BARK_PLUGINS_DIR/<name>/` directories. A plugin can contain:
@@ -449,6 +469,5 @@ nginx reverse proxy (port 8995)
 - **Strip env vars from terminal session**: Currently `docker exec -e VAR=` blanks sensitive env vars (API keys, BARK_RESUME_SESSION) but they still appear in `env` output as empty strings. Investigate using `env -u` inside the exec command or wrapping the shell invocation to fully unset them rather than just blanking.
 - **Same-workspace multi-window**: Opening the same workspace in two browser windows simultaneously has undefined behavior — both WebSocket connections share one Pi container/session, and prompts from either window could collide or interleave unpredictably. Consider either locking a workspace to one connection at a time, or multiplexing both windows onto the same event stream.
 - **Workspace disk quotas**: Limit how much disk space each workspace can consume. Options: use filesystem quotas (XFS/ext4 project quotas on the host), overlay2 with size limits, or a loopback-mounted filesystem per workspace with a fixed size. Should also surface current disk usage in the UI (file viewer header or workspace list) so users can see how much space they've used.
-- **Playwright end-to-end tests**: Add browser-based tests covering login, workspace creation, chat prompt/response, file upload/download/rename/delete, terminal interaction, container idle timeout and restart, and debug panel output. Run against a live devenv instance with a test user.
 - **User dotfile customization**: Allow users to customize their container shell environment (`.bashrc`, `.vimrc`, `.emacs`, `.gitconfig`, etc.). Options: bind-mount a per-user dotfiles directory from the host into `/home/bark`, or provide a UI for editing dotfiles that persist across container restarts. Currently `/home/bark` is a tmpfs regenerated each start, so any customization is lost.
 - **Investigate running Pi under bubblewrap**: Explore using [bubblewrap](https://github.com/containers/bubblewrap) (bwrap) as an alternative to Docker for sandboxing Pi. Bubblewrap is lighter-weight than Docker — no daemon, no image builds, no container overhead — and provides namespace-based isolation (mount, PID, network, user). This could significantly reduce startup time and resource usage. Trade-offs: no pre-built image caching, need to manage tool installations on the host, less isolation than full container. Could be offered as an alternative backend alongside Docker.
