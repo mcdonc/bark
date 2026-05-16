@@ -61,6 +61,9 @@ bark/
     import_plugins.py              # Codegen: scans plugins, generates plugins_generated.dart
     update_plugins.py           # Fetches plugins from git repos, writes plugins.lock
     test_port_allocation.py    # Tests port allocation lifecycle: create, increase, decrease, delete
+    flutterbuildweb.sh         # Flutter build: plugin auto-fetch, codegen, flutter build web
+    dockerbuild.sh             # Docker build: plugin collection, container cleanup, image build
+    nginx.sh                   # nginx reverse proxy: config generation and exec
   tests/
     unit/backend/                 # pytest unit tests for backend modules (auth, user_store, file_service, agui_translator)
     playwright/                   # Playwright E2E browser tests (login, workspace, terminal, files, chat)
@@ -273,8 +276,14 @@ EOF
 # Install Nix and devenv (if not already installed)
 ./bootstrap
 
-# Start the app
+# Start the app (foreground with TUI)
 devenv processes up
+
+# Or start in background (no TUI)
+devenv processes up -d
+
+# Disable TUI globally (useful for scripting/CI)
+export DEVENV_TUI=0
 
 # Open in browser
 open http://localhost:8997
@@ -459,7 +468,6 @@ nginx reverse proxy (port 8995)
 ## TODO
 
 - **Local files pane**: Add a browser-side file pane where users can upload files into an in-browser-memory filesystem (e.g., using the File System Access API or an in-memory store). These files would be accessible to client-side plugins and could be passed to the REPL as context without uploading to the server. Useful for working with sensitive files that shouldn't leave the browser, or for quick one-off analysis without persisting to the workspace.
-- **Extract devenv scripts**: Move inline shell code from `devenv.nix` script definitions into standalone scripts in `scripts/`. Candidates: `flutterbuildweb` (plugin auto-fetch, codegen, flutter build), `dockerbuild` (plugin auto-fetch, collect extensions/tools, docker build, container cleanup), and `nginx` process (config generation and exec). This would make the logic easier to read, test, and reuse outside devenv.
 - **Plugin directory structure**: Consider whether each plugin should have explicit subdirectories for different file types (e.g., `dart/` for Flutter code, `extension/` for TypeScript, `tools/` for server-side scripts) instead of the current flat layout where `import_plugins.py` copies all `*.dart` files and `dockerbuild` picks up `extension.ts` by name. Subdirectories would simplify the copying logic and make it clearer what goes where.
 - **Plugin version numbers**: Plugins may want their own version numbers (in `plugin.yaml` or similar metadata) for compatibility checking, display in the UI, and meaningful pinning beyond git refs.
 - **Entrypoint nohup zombie**: The `nohup sh -c "cat ... > FIFO ..."` writer in `entrypoint.sh` (line 78) leaves one `[sh] <defunct>` zombie per container start. Its parent is the `su` process which doesn't call `wait()`. Harmless but cosmetic. Fix by restructuring the entrypoint so the writer finishes before the final `exec`, or by using a different mechanism to feed the FIFOs.
