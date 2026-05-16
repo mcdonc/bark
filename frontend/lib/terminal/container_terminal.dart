@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:xterm/xterm.dart';
 import '../agui/agui_client.dart';
+import 'dart:html' as html;
 
 const _theme = TerminalTheme(
   cursor: Color(0xFF5B8C5A),
@@ -41,6 +43,7 @@ class ContainerTerminal extends StatefulWidget {
 
 class ContainerTerminalState extends State<ContainerTerminal> {
   late final Terminal _terminal;
+  final _controller = TerminalController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
   StreamSubscription<String>? _outputSub;
@@ -76,6 +79,7 @@ class ContainerTerminalState extends State<ContainerTerminal> {
 
   @override
   void dispose() {
+    _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
     _outputSub?.cancel();
@@ -106,6 +110,7 @@ class ContainerTerminalState extends State<ContainerTerminal> {
         thumbVisibility: true,
         child: TerminalView(
         _terminal,
+        controller: _controller,
         theme: _theme,
         textStyle: TerminalStyle(
           fontSize: 14,
@@ -115,6 +120,41 @@ class ContainerTerminalState extends State<ContainerTerminal> {
         scrollController: _scrollController,
         autofocus: false,
         autoResize: true,
+        onSecondaryTapDown: (details, offset) {
+          // Suppress the browser context menu for this click
+          void suppress(html.Event e) { e.preventDefault(); }
+          html.document.addEventListener('contextmenu', suppress);
+          Future.delayed(const Duration(milliseconds: 100), () {
+            html.document.removeEventListener('contextmenu', suppress);
+          });
+          // Build menu items based on whether text is selected
+          final hasSelection = _controller.selection != null;
+          final items = <PopupMenuEntry<String>>[
+            if (hasSelection)
+              const PopupMenuItem(value: 'copy', child: ListTile(dense: true, leading: Icon(Icons.copy, size: 18), title: Text('Copy'))),
+            const PopupMenuItem(value: 'paste', child: ListTile(dense: true, leading: Icon(Icons.paste, size: 18), title: Text('Paste'))),
+          ];
+          final pos = details.globalPosition;
+          showMenu<String>(
+            context: context,
+            position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx, pos.dy),
+            items: items,
+          ).then((action) {
+            if (action == 'copy') {
+              final selection = _controller.selection;
+              if (selection != null) {
+                final text = _terminal.buffer.getText(selection);
+                Clipboard.setData(ClipboardData(text: text));
+              }
+            } else if (action == 'paste') {
+              Clipboard.getData(Clipboard.kTextPlain).then((data) {
+                if (data?.text != null) {
+                  _terminal.paste(data!.text!);
+                }
+              });
+            }
+          });
+        },
       ),
     ),
     );

@@ -85,7 +85,7 @@ bark/
       terminal_manager.py      # Docker exec PTY subprocess for interactive shell access
 
   frontend/
-    pubspec.yaml                # Flutter deps: flutter_markdown, flutter_highlight, go_router, etc.
+    pubspec.yaml                # Flutter deps: flutter_markdown_plus, flutter_highlight, go_router, etc.
     web/index.html              # HTML shell with Google Fonts, service worker cleanup
     lib/
       main.dart                 # App entry with Provider setup
@@ -93,6 +93,7 @@ bark/
       utils/
         page_title.dart         # Browser tab title updates
         backend_url.dart        # Derives API base URL from <base href> for subpath hosting
+        suppress_browser_menu.dart  # Widget to suppress browser context menu per-panel
       widgets/
         bark_logo.dart          # Bark logo widget (orange paw icon)
       tools/
@@ -117,7 +118,7 @@ bark/
       output/
         output_panel.dart       # Debug panel: container lifecycle, queries, tool calls, errors
       layout/
-        ide_layout.dart         # Resizable 3-pane split layout with 3D dividers
+        ide_layout.dart         # Split layout: chat left, Terminal+Files tabs + slidable Debug right
 ```
 
 ## Features
@@ -169,11 +170,14 @@ bark/
 - Terminal interaction bumps the container idle timeout via `record_activity()`
 - On-demand: subprocess starts when user clicks the Terminal tab
 - State preserved across tab switches (IndexedStack keeps all panels alive)
+- Right-click context menu with Copy (when text selected) and Paste
+- Scrollbar for terminal history
 - Cleaned up on workspace disconnect or WebSocket close
 
 ### Right Panel Layout
-- Tabbed panel with Files, Terminal, and Debug tabs
-- All tabs stay alive across switches (IndexedStack, not TabBarView)
+- Two-part split: tabbed panel on top (Terminal, Files tabs) and slidable Debug panel on bottom
+- Debug panel collapsed by default, expandable via draggable horizontal divider
+- All panels stay alive across switches (IndexedStack for tabs, always-mounted Debug)
 - Debug pane receives events from the start, even before first viewed
 
 ### Pi Extensions (Tools)
@@ -188,7 +192,7 @@ bark/
   - `beep` — plays an audible beep tone via Web Audio API (client-side, via Extension UI Sub-Protocol)
 
 ### Chat Interface
-- Markdown rendering for assistant responses (flutter_markdown)
+- Markdown rendering for assistant responses (flutter_markdown_plus)
 - Syntax-highlighted code blocks (Monokai Sublime theme, highlight.dart, JetBrains Mono)
 - Collapsible tool call cards showing arguments and results
 - Streaming indicator while agent is thinking
@@ -198,6 +202,8 @@ bark/
 - Input history navigation (up/down arrow keys cycle through previous prompts)
 - Queued messages shown dimmed with "queued" label, persisted in SQLite
 - Persistent error snackbars with close button
+- Text is selectable and copyable via native right-click
+- Clickable URLs open in a new browser tab
 
 ### File Viewer
 - Directory tree with file sizes
@@ -219,14 +225,16 @@ bark/
 - Tool call entries from Pi (including extension tools)
 - Error entries
 - Timestamps and color-coded entries
+- Selectable text for titles and content
 - Clear button
 
 ### UI/Theme
 - Harvest-inspired light theme (warm off-white, green accents, medium gray header)
 - Orange Bark logo (paw icon + "Bark" text)
 - 3D edges on all dividers, panel headers, and borders
-- Two-column layout: chat (left, 38%) and tabbed panel (right, 62%) with resizable divider
-- Right panel tabs: Files, Terminal, Debug — all kept alive via IndexedStack
+- Two-column layout: chat (left, 38%) and right panel (62%) with resizable vertical divider
+- Right panel: Terminal+Files tabs on top, slidable Debug panel on bottom (collapsed by default)
+- All panels kept alive via IndexedStack (tabs) and always-mounted Debug
 - Dark blue back/logout buttons
 - Browser tab title updates per page ("Bark - Login", "Bark - Workspaces", "Bark - workspace-name")
 
@@ -300,7 +308,7 @@ devenv shell -- rebuild
 
 Then restart the processes. On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
 - **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`, `$BARK_PLUGINS_DIR/**/*.dart`, `$BARK_PLUGINS_DIR/plugins.lock`
-- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
+- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `docker/*.md`, `docker/builtin-extensions/*.ts`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
 
 ### Plugin System
 
@@ -432,7 +440,7 @@ nginx reverse proxy (port 8995)
 - **Docker --init for zombie reaping**: Add `Init: True` to container config so Docker runs `tini` as PID 1. Currently Pi runs as PID 1 and doesn't reap child processes, causing zombies from terminal sessions and tool executions.
 - **Container resource limits**: Add CPU/memory limits to containers to prevent runaway processes.
 - **Container network isolation**: Restrict container network access to prevent use as an attack platform. Use a custom Docker network with limited egress — allow only the Ollama API endpoint (cloud or self-hosted) and block all other outbound traffic. Consider using `--network=none` with a proxy sidecar for allowlisted domains only.
-- **Chat text selection and clickable URLs**: Allow users to select and copy text from the chat window. URLs in chat messages should be clickable and open in a new browser tab. Currently flutter_markdown_plus renders links but they may not open in a new tab; text selection may also be limited by the markdown widget.
+- **Debug pane cross-entry text selection**: Currently each debug entry has individually selectable text, but you can't drag-select across multiple entries. Wrapping the ListView in a SelectionArea or similar approach would allow selecting and copying text spanning multiple events.
 - **Syntax highlighting language detection**: Improve code block language detection for unlabeled blocks.
 - **Strip env vars from terminal session**: Currently `docker exec -e VAR=` blanks sensitive env vars (API keys, BARK_RESUME_SESSION) but they still appear in `env` output as empty strings. Investigate using `env -u` inside the exec command or wrapping the shell invocation to fully unset them rather than just blanking.
 - **Same-workspace multi-window**: Opening the same workspace in two browser windows simultaneously has undefined behavior — both WebSocket connections share one Pi container/session, and prompts from either window could collide or interleave unpredictably. Consider either locking a workspace to one connection at a time, or multiplexing both windows onto the same event stream.

@@ -7,6 +7,7 @@ import '../agui/agui_client.dart';
 import '../utils/backend_url.dart';
 import '../agui/agui_events.dart';
 import 'file_upload.dart';
+import '../utils/suppress_browser_menu.dart';
 
 class FileViewerPanel extends StatefulWidget {
   final AguiClient aguiClient;
@@ -239,7 +240,7 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return FileDropZone(
+    return SuppressBrowserContextMenu(child: FileDropZone(
       workspaceId: widget.workspaceId,
       authToken: widget.authToken,
       currentPath: _currentPath,
@@ -298,7 +299,7 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildFileList() {

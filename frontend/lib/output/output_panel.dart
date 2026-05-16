@@ -239,7 +239,7 @@ class _OutputPanelState extends State<OutputPanel> {
         children: [
           Row(
             children: [
-              Text(
+              SelectableText(
                 entry.title,
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
               ),
@@ -251,7 +251,7 @@ class _OutputPanelState extends State<OutputPanel> {
             ],
           ),
           if (entry.content.isNotEmpty)
-            Text(
+            SelectableText(
               entry.content.length > 500
                   ? '${entry.content.substring(0, 500)}...'
                   : entry.content,

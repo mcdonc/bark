@@ -7,7 +7,15 @@ const _bar3d = BoxDecoration(
   ),
 );
 
-/// Split-pane IDE layout: chat on left, tabbed panel on right.
+const _bar3dHorizontal = BoxDecoration(
+  gradient: LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [Color(0xFFB8B8B8), Color(0xFFE8E8E8), Color(0xFFB8B8B8)],
+  ),
+);
+
+/// Split-pane IDE layout: chat on left, tabs + debug on right.
 class IdeLayout extends StatefulWidget {
   final Widget chat;
   final Widget fileViewer;
@@ -31,14 +39,15 @@ class IdeLayout extends StatefulWidget {
 class _IdeLayoutState extends State<IdeLayout>
     with SingleTickerProviderStateMixin {
   double _horizontalRatio = 0.38;
+  double _verticalRatio = 1.0; // debug collapsed by default
   late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
-      if (_tabController.index == 1) {
+      if (_tabController.index == 0) {
         widget.terminalKey?.currentState?.requestFocus();
       }
     });
@@ -57,9 +66,16 @@ class _IdeLayoutState extends State<IdeLayout>
         final totalWidth = constraints.maxWidth;
         final totalHeight = constraints.maxHeight;
         const bar = 6.0;
+        const minDebug = 28.0;
 
         final leftWidth = totalWidth * _horizontalRatio;
         final dividerLeft = leftWidth;
+        final rightWidth = totalWidth - leftWidth - bar;
+
+        // Vertical split: tabs area + horizontal divider + debug pane
+        final rightHeight = totalHeight;
+        final tabsHeight = (rightHeight - bar - minDebug) * _verticalRatio;
+        final debugTop = tabsHeight + bar;
 
         return Stack(
           children: [
@@ -74,12 +90,12 @@ class _IdeLayoutState extends State<IdeLayout>
                 child: widget.chat,
               ),
             ),
-            // Right column: tabbed panel
+            // Right column: tabs area (Files + Terminal)
             Positioned(
               left: leftWidth + bar,
               top: 0,
               right: 0,
-              bottom: 0,
+              height: tabsHeight,
               child: Column(
                 children: [
                   Container(
@@ -103,9 +119,8 @@ class _IdeLayoutState extends State<IdeLayout>
                           const TextStyle(fontSize: 12),
                       indicatorSize: TabBarIndicatorSize.tab,
                       tabs: const [
-                        Tab(text: 'Files'),
                         Tab(text: 'Terminal'),
-                        Tab(text: 'Debug'),
+                        Tab(text: 'Files'),
                       ],
                     ),
                   ),
@@ -116,17 +131,13 @@ class _IdeLayoutState extends State<IdeLayout>
                         index: _tabController.index,
                         children: [
                           Container(
-                            color: const Color(0xFFFFFEFC),
-                            child: widget.fileViewer,
-                          ),
-                          Container(
                             color: const Color(0xFF1D1F21),
                             padding: const EdgeInsets.only(left: 5),
                             child: widget.terminal,
                           ),
                           Container(
-                            color: const Color(0xFFF0EFE9),
-                            child: widget.output,
+                            color: const Color(0xFFFFFEFC),
+                            child: widget.fileViewer,
                           ),
                         ],
                       ),
@@ -135,7 +146,37 @@ class _IdeLayoutState extends State<IdeLayout>
                 ],
               ),
             ),
-            // Center divider (on top so shadow renders over both panels)
+            // Horizontal divider between tabs and debug
+            Positioned(
+              left: leftWidth + bar,
+              top: tabsHeight,
+              right: 0,
+              height: bar,
+              child: GestureDetector(
+                onVerticalDragUpdate: (details) {
+                  setState(() {
+                    _verticalRatio += details.delta.dy / (rightHeight - bar - minDebug);
+                    _verticalRatio = _verticalRatio.clamp(0.2, 1.0);
+                  });
+                },
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.resizeRow,
+                  child: Container(decoration: _bar3dHorizontal),
+                ),
+              ),
+            ),
+            // Debug pane (below tabs)
+            Positioned(
+              left: leftWidth + bar,
+              top: debugTop,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                color: const Color(0xFFF0EFE9),
+                child: widget.output,
+              ),
+            ),
+            // Center vertical divider (on top so shadow renders over both panels)
             Positioned(
               left: dividerLeft,
               top: 0,
