@@ -154,7 +154,10 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
     if (_entries.isEmpty) {
       return const Center(child: Text('Empty directory\nDrag files here to upload'));
     }
-    return ListView.builder(
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
       itemCount: _entries.length,
       itemBuilder: (context, index) {
         final entry = _entries[index];
@@ -175,6 +178,16 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
           },
         );
       },
+    ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Text(
+            'Drag files here to upload',
+            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.outline),
+          ),
+        ),
+      ],
     );
   }
 
