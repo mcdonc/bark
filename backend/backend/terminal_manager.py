@@ -32,11 +32,18 @@ class TerminalSession:
         self._master_fd = master_fd
         self._running = True
 
-        # Spawn docker exec with the slave PTY as stdio
+        # Build docker exec command, blanking sensitive env vars that the
+        # container inherited from container_manager.start_container()
+        exec_cmd = ["docker", "exec", "-it", "-u", "bark", "-w", "/workspace",
+                     "-e", "TERM=xterm-256color"]
+        for key in os.environ:
+            if key.startswith(("OLLAMA_", "ANTHROPIC_", "OPENAI_", "GOOGLE_", "GROQ_", "MISTRAL_")):
+                exec_cmd.extend(["-e", f"{key}="])
+        exec_cmd.extend(["-e", "BARK_RESUME_SESSION="])
+        exec_cmd.extend([self.container_id, "/bin/bash"])
+
         self._proc = await asyncio.create_subprocess_exec(
-            "docker", "exec", "-it", "-u", "bark", "-w", "/workspace",
-            "-e", "TERM=xterm-256color",
-            self.container_id, "/bin/bash",
+            *exec_cmd,
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
