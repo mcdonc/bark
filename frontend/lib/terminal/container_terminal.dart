@@ -115,7 +115,6 @@ class ContainerTerminalState extends State<ContainerTerminal> {
         scrollController: _scrollController,
         autofocus: false,
         autoResize: true,
-        hardwareKeyboardOnly: true,
       ),
     ),
     );
