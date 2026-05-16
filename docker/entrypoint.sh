@@ -89,16 +89,6 @@ if [ -d "$PI_AGENT_DIR/extensions" ] && [ "$(ls "$PI_AGENT_DIR/extensions"/*.ts 
   done
 fi
 
-# Remove stale AGENTS.md from workspace left over from older containers
-rm -f /workspace/AGENTS.md
-
-# Migrate sessions from old location (/workspace/.pi/sessions) to new bind mount
-if [ -d /workspace/.pi/sessions ] && [ "$(ls /workspace/.pi/sessions/ 2>/dev/null)" ]; then
-  cp -rn /workspace/.pi/sessions/* /home/bark/.pi/sessions/ 2>/dev/null
-  chown -R bark:bark /home/bark/.pi/sessions
-fi
-rm -rf /workspace/.pi
-
 # Drop to bark user and run Pi
 # --no-context-files: don't look for AGENTS.md in workspace
 # --append-system-prompt: inject instructions via system prompt instead

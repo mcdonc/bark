@@ -59,11 +59,6 @@ async def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_messages_workspace
             ON messages(workspace_id, id)
         """)
-        # Migration: add is_queued column if missing
-        try:
-            await db.execute("ALTER TABLE messages ADD COLUMN is_queued INTEGER NOT NULL DEFAULT 0")
-        except Exception:
-            pass  # Column already exists
         await db.commit()
     finally:
         await db.close()
