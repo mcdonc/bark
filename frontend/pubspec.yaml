@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  cupertino_icons: ^1.0.0
   xterm: ^4.0.0
   google_fonts: ^6.0.0
   web_socket_channel: ^3.0.0
