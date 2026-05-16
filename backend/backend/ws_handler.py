@@ -168,11 +168,12 @@ async def _handle_workspace_connect(ws: WebSocket, state: dict, msg: dict) -> No
 
     ports = await container_manager.get_workspace_ports(workspace_id)
     status = state.get("container_status", "created")
+    container_name = f"bark-{container_manager.INSTANCE_ID}-{workspace_id[:12]}"
     ports_str = f" (ports {','.join(str(p) for p in ports)})" if ports else ""
     status_msg = {
-        "connected": f"Connected to running container{ports_str}",
-        "restarted": f"Restarted stopped container{ports_str}",
-        "created": f"Created new container{ports_str}",
+        "connected": f"Connected to running container {container_name}{ports_str}",
+        "restarted": f"Restarted stopped container {container_name}{ports_str}",
+        "created": f"Created new container {container_name}{ports_str}",
     }.get(status, "Container ready")
 
     if state.get("resume_session"):
@@ -357,7 +358,8 @@ async def _handle_restart_container(ws: WebSocket, state: dict) -> None:
 
     ports = await container_manager.get_workspace_ports(workspace_id)
     ports_str = f" (ports {','.join(str(p) for p in ports)})" if ports else ""
-    status_msg = f"Container restarted{ports_str}"
+    container_name = f"bark-{container_manager.INSTANCE_ID}-{workspace_id[:12]}"
+    status_msg = f"Container restarted {container_name}{ports_str}"
     if state.get("resume_session"):
         status_msg += " (session resumed)"
 

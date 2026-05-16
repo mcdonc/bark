@@ -29,7 +29,7 @@ $BARK_DATA_DIR/workspaces/<user-id>/data/<workspace-id>/
 
 - **Backend** (`backend/`): Python/FastAPI — single-port server for API, WebSocket, and frontend static files
 - **Frontend** (`frontend/`): Flutter Web — chat with markdown rendering, syntax-highlighted code blocks, file viewer, debug panel
-- **Docker** (`docker/`): Custom Dockerfile for Pi agent containers with Python3, Node.js, Dart, Flutter, Rust, build-essential, Pi extensions
+- **Docker** (`docker/`): Custom Dockerfile for Pi agent containers with Python3, Node.js, Dart, Flutter, Rust, build-essential, PostgreSQL, SQLite, vim, emacs, network tools, Pi extensions
 
 ### Key Technologies
 
@@ -63,7 +63,7 @@ bark/
     test_port_allocation.py    # Tests port allocation lifecycle: create, increase, decrease, delete
 
   docker/
-    Dockerfile                  # Pi agent image: node:22-slim + Pi + Python3 + Dart + Flutter + Rust + build-essential
+    Dockerfile                  # Pi agent image: node:22-slim + Pi + Python3 + Dart + Flutter + Rust + build-essential + PostgreSQL + SQLite + vim + emacs + net tools
     entrypoint.sh               # Sets up Pi config (FIFO for models.json, system prompt), starts Pi in RPC mode
     system-prompt.md            # Static system prompt for Pi (copied into image)
     builtin-extensions/         # Built-in Pi extensions (port-map.ts, etc.) — not from plugins

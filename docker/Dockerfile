@@ -9,6 +9,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     build-essential \
     procps \
+    net-tools \
+    lsof \
+    telnet \
+    iputils-ping \
+    vim \
+    emacs-nox \
+    sqlite3 \
+    postgresql \
     unzip \
     xz-utils \
     && rm -rf /var/lib/apt/lists/*
