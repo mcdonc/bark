@@ -16,7 +16,7 @@ rsync -avz --delete \
   --exclude='.packages' \
   --exclude='.flutter-plugins' \
   --exclude='.flutter-plugins-dependencies' \
-  --exclude='frontend/build/web/flutter_service_worker.js' \
+  --exclude='src/frontend/build/web/flutter_service_worker.js' \
   --exclude='.git/' \
   --exclude='.claude/' \
   --exclude='.venv/' \

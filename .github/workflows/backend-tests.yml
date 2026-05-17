@@ -4,16 +4,12 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "backend/**"
-      - "tests/unit/backend/**"
-      - "pytest.ini"
+      - "src/backend/**"
       - ".github/workflows/backend-tests.yml"
   push:
     branches: [main]
     paths:
-      - "backend/**"
-      - "tests/unit/backend/**"
-      - "pytest.ini"
+      - "src/backend/**"
       - ".github/workflows/backend-tests.yml"
 
 jobs:
@@ -28,8 +24,8 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -e backend/
+        run: pip install -e src/backend/
 
       - name: Run tests
         # -n auto: run tests in parallel across CPUs (pytest-xdist)
-        run: python -m pytest tests/unit/backend -v -n auto
+        run: python -m pytest src/backend/tests -v -n auto

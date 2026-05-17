@@ -10,5 +10,5 @@ if [ -f "$BARK_PLUGINS_DIR/plugins.yaml" ] && [ ! -f "$BARK_PLUGINS_DIR/plugins.
 fi
 
 python3 scripts/import_plugins.py
-cd frontend && flutter --disable-analytics && flutter pub get && flutter build web --base-href=/ --no-wasm-dry-run
+cd src/frontend && flutter --disable-analytics && flutter pub get && flutter build web --base-href=/ --no-wasm-dry-run
 rm -f build/web/flutter_service_worker.js

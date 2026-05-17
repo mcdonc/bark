@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate frontend/lib/tools/plugins_generated.dart from plugins/*/plugin.dart.
+"""Generate src/frontend/lib/tools/plugins_generated.dart from plugins/*/plugin.dart.
 
-Copies plugin .dart files into frontend/lib/tools/plugins/<name>/ so they're
+Copies plugin .dart files into src/frontend/lib/tools/plugins/<name>/ so they're
 within the Flutter package and can be imported normally.
 """
 
@@ -13,8 +13,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLUGINS_DIR = os.environ.get("BARK_PLUGINS_DIR") or os.path.join(
     os.path.expanduser("~"), ".bark", "plugins"
 )
-DEST_DIR = os.path.join(ROOT, "frontend", "lib", "tools", "plugins")
-OUTPUT = os.path.join(ROOT, "frontend", "lib", "tools", "plugins_generated.dart")
+DEST_DIR = os.path.join(ROOT, "src", "frontend", "lib", "tools", "plugins")
+OUTPUT = os.path.join(ROOT, "src", "frontend", "lib", "tools", "plugins_generated.dart")
 
 
 def find_and_copy_plugins():

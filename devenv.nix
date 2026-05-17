@@ -7,7 +7,7 @@
     enable = true;
     npm.enable = true;
     npm.install.enable = true;
-    directory = "./tests/playwright";
+    directory = "./src/e2e_tests";
   };
   languages.python = {
     enable = true;
@@ -16,7 +16,7 @@
       enable = true;
       sync.enable = true;
     };
-    directory = "./backend";
+    directory = "./src/backend";
   };
 
   packages = with pkgs; [
@@ -30,10 +30,10 @@
       showOutput = true;
       execIfModified = [
         "scripts/flutterbuildweb.sh"
-        "frontend/lib"
-        "frontend/web"
-        "frontend/pubspec.yaml"
-        "frontend/pubspec.lock"
+        "src/frontend/lib"
+        "src/frontend/web"
+        "src/frontend/pubspec.yaml"
+        "src/frontend/pubspec.lock"
         "${config.env.BARK_PLUGINS_DIR}/**/*.dart"
         "${config.env.BARK_PLUGINS_DIR}/plugins.lock"
       ];
@@ -43,10 +43,10 @@
       showOutput = true;
       execIfModified = [
         "scripts/dockerbuild.sh"
-        "docker/Dockerfile"
-        "docker/entrypoint.sh"
-        "docker/*.md"
-        "docker/builtin-extensions/*.ts"
+        "src/dockerimage/Dockerfile"
+        "src/dockerimage/entrypoint.sh"
+        "src/dockerimage/*.md"
+        "src/dockerimage/builtin-extensions/*.ts"
         "${config.env.BARK_PLUGINS_DIR}/**/*.ts"
         "${config.env.BARK_PLUGINS_DIR}/**/tools/**"
         "${config.env.BARK_PLUGINS_DIR}/plugins.lock"
@@ -57,7 +57,7 @@
   processes = {
     backend = {
       exec = ''
-        cd $DEVENV_ROOT/backend && exec uvicorn bark_backend.main:app --host 0.0.0.0 --port $BARK_PORT
+        cd $DEVENV_ROOT/src/backend && exec uvicorn bark_backend.main:app --host 0.0.0.0 --port $BARK_PORT
       '';
       after = [
         "bark:flutter-build"
@@ -110,16 +110,16 @@
   # -n auto: run tests in parallel across CPUs (pytest-xdist)
   scripts.test-backend.exec = ''
     cd $DEVENV_ROOT
-    exec python -m pytest tests/unit/backend -v -n auto "$@"
+    exec python -m pytest src/backend/tests -v -n auto "$@"
   '';
 
   scripts.test-e2e.exec = ''
-    cd $DEVENV_ROOT/tests/playwright
+    cd $DEVENV_ROOT/src/e2e_tests
     exec npx playwright test "$@"
   '';
 
   scripts.test-frontend.exec = ''
-    cd $DEVENV_ROOT/frontend
+    cd $DEVENV_ROOT/src/frontend
     exec flutter test "$@"
   '';
 
@@ -157,7 +157,7 @@
       settings.write = true;
       excludes = [
         "node_modules/"
-        "frontend/build/"
+        "src/frontend/build/"
         "\\.devenv/"
       ];
     };
@@ -171,7 +171,7 @@
     # Generate prettierignore (not committed)
     cat > "$DEVENV_ROOT/.prettierignore" <<'PRETTIER'
     node_modules/
-    frontend/build/
+    src/frontend/build/
     .devenv/
     *.lock
     PRETTIER

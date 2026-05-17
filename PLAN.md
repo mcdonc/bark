@@ -27,9 +27,9 @@ $BARK_DATA_DIR/workspaces/<user-id>/data/<workspace-id>/
 
 ### Components
 
-- **Backend** (`backend/`): Python/FastAPI — single-port server for API, WebSocket, and frontend static files
-- **Frontend** (`frontend/`): Flutter Web — chat with markdown rendering, syntax-highlighted code blocks, file viewer, debug panel
-- **Docker** (`docker/`): Custom Dockerfile for Pi agent containers with Python3, Node.js, Dart, Flutter, Rust, build-essential, PostgreSQL, SQLite, vim, emacs, network tools, Pi extensions
+- **Backend** (`src/backend/`): Python/FastAPI — single-port server for API, WebSocket, and frontend static files
+- **Frontend** (`src/frontend/`): Flutter Web — chat with markdown rendering, syntax-highlighted code blocks, file viewer, debug panel
+- **Docker** (`src/dockerimage/`): Custom Dockerfile for Pi agent containers with Python3, Node.js, Dart, Flutter, Rust, build-essential, PostgreSQL, SQLite, vim, emacs, network tools, Pi extensions
 
 ### Key Technologies
 
@@ -65,10 +65,10 @@ bark/
     dockerbuild.sh             # Docker build: plugin collection, container cleanup, image build
     nginx.sh                   # nginx reverse proxy: config generation and exec
   tests/
-    unit/backend/                 # pytest unit tests for backend modules (auth, user_store, file_service, agui_translator)
-    playwright/                   # Playwright E2E browser tests (login, workspace, terminal, files, chat)
+    (tests live in src/backend/tests/)
+    (E2E tests live in src/e2e_tests/)
 
-  docker/
+  src/dockerimage/
     Dockerfile                  # Pi agent image: node:22-slim + Pi + Python3 + Dart + Flutter + Rust + build-essential + PostgreSQL + SQLite + vim + emacs + net tools
     entrypoint.sh               # Sets up Pi config (FIFO for models.json, system prompt), starts Pi in RPC mode
     system-prompt.md            # Static system prompt for Pi (copied into image)
@@ -76,7 +76,7 @@ bark/
     extensions/                 # Generated: collected from $BARK_PLUGINS_DIR/*/extension.ts at build time
     tools/                      # Generated: collected from $BARK_PLUGINS_DIR/*/tools/ at build time
 
-  backend/
+  src/backend/
     pyproject.toml              # Python deps: fastapi, aiodocker, aiosqlite, bcrypt, python-jose
     bark_backend/
       main.py                   # FastAPI app, lifespan, hosted app proxy, default user seeding, static file serving
@@ -91,7 +91,7 @@ bark/
       file_service.py           # Host-side file read/write/delete/rename with path traversal protection
       terminal_manager.py      # Docker exec PTY subprocess for interactive shell access
 
-  frontend/
+  src/frontend/
     pubspec.yaml                # Flutter deps: flutter_markdown_plus, flutter_highlight, go_router, etc.
     web/index.html              # HTML shell with Google Fonts, service worker cleanup
     lib/
@@ -161,7 +161,7 @@ bark/
 - API key delivered via `models.json` FIFO (named pipe, written once at startup, deleted after Pi reads it — key never persists on disk)
 - Both config FIFOs written by a `nohup` background process that survives the `exec` to Pi — settings.json is written first (Pi's SettingsManager reads it), then models.json (Pi's ModelRegistry reads it)
 - All provider env vars (`OLLAMA_*`, `ANTHROPIC_*`, etc.) stripped from Pi's process environment before exec
-- System prompt stored as `docker/system-prompt.md`, copied into image at build time
+- System prompt stored as `src/dockerimage/system-prompt.md`, copied into image at build time
 - 30-minute idle timeout (configurable via `BARK_IDLE_TIMEOUT_SECONDS`) with automatic container stop, debug notification, and terminal overlay with restart button
 - All user containers stopped on logout and backend shutdown
 - Read-only root filesystem (`ReadonlyRootfs: True`) — the agent cannot modify system files or install packages outside the workspace. Writable paths:
@@ -198,7 +198,7 @@ bark/
 
 ### Pi Extensions (Tools)
 
-- Extensions are TypeScript files collected from `$BARK_PLUGINS_DIR/*/extension.ts` into `docker/extensions/` at build time
+- Extensions are TypeScript files collected from `$BARK_PLUGINS_DIR/*/extension.ts` into `src/dockerimage/extensions/` at build time
 - The LLM sees them in its tool list alongside built-in tools (read, write, edit, bash)
 - Extensions can be server-side (run code inside the container) or client-side (delegate to the browser via the Extension UI Sub-Protocol)
 - AGENTS.md is generated dynamically on each container start, listing all registered extension tools
@@ -346,8 +346,8 @@ devenv shell -- rebuild
 
 Then restart the processes. On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
 
-- **Flutter**: `frontend/lib`, `frontend/web`, `frontend/pubspec.yaml`, `frontend/pubspec.lock`, `$BARK_PLUGINS_DIR/**/*.dart`, `$BARK_PLUGINS_DIR/plugins.lock`
-- **Docker**: `docker/Dockerfile`, `docker/entrypoint.sh`, `docker/*.md`, `docker/builtin-extensions/*.ts`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
+- **Flutter**: `src/frontend/lib`, `src/frontend/web`, `src/frontend/pubspec.yaml`, `src/frontend/pubspec.lock`, `$BARK_PLUGINS_DIR/**/*.dart`, `$BARK_PLUGINS_DIR/plugins.lock`
+- **Docker**: `src/dockerimage/Dockerfile`, `src/dockerimage/entrypoint.sh`, `src/dockerimage/*.md`, `src/dockerimage/builtin-extensions/*.ts`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
 
 ### Testing
 
@@ -358,10 +358,10 @@ Then restart the processes. On normal startup, Flutter and Docker builds run aut
 devenv shell -- test-backend
 
 # Or directly with pytest
-devenv shell -- python -m pytest tests/unit/backend -v
+devenv shell -- python -m pytest src/backend/tests -v
 
 # Run a single test file
-devenv shell -- test-backend tests/unit/backend/test_auth.py
+devenv shell -- test-backend src/backend/tests/test_auth.py
 
 # Run a single test by name
 devenv shell -- test-backend -k 'test_login_success'
@@ -373,7 +373,7 @@ devenv shell -- test-backend -k 'test_login_success'
 
 ```bash
 # Install browsers (first time only)
-devenv shell -- bash -c "cd tests/playwright && npm run install-browsers"
+devenv shell -- bash -c "cd src/e2e_tests && npm run install-browsers"
 
 # Run all tests (devenv script)
 devenv shell -- test-e2e
@@ -418,15 +418,15 @@ Hooks are installed automatically when entering the devenv shell.
 
 GitHub Actions run automatically on PRs and pushes to main (all also support `workflow_dispatch` for manual triggering):
 
-- **Backend tests** (`.github/workflows/backend-tests.yml`) — triggered by changes to `backend/`, `tests/unit/backend/`, or `pytest.ini`
-- **Frontend tests** (`.github/workflows/frontend-tests.yml`) — triggered by changes to `frontend/lib/`, `frontend/test/`, or `frontend/pubspec.yaml`
+- **Backend tests** (`.github/workflows/backend-tests.yml`) — triggered by changes to `src/backend/` or `pytest.ini`
+- **Frontend tests** (`.github/workflows/frontend-tests.yml`) — triggered by changes to `src/frontend/lib/`, `src/frontend/test/`, or `src/frontend/pubspec.yaml`
 - **E2E tests** (`.github/workflows/e2e-tests.yml`) — runs hourly via schedule (skips if no commits in the last hour) and via manual `workflow_dispatch`. Requires `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` secrets. Uses Nix/devenv to build and run the full stack, then runs Playwright against the running server. Uploads test results as artifacts on failure.
 
 ### Plugin System
 
 All plugins live in `$BARK_PLUGINS_DIR/<name>/` directories. A plugin can contain:
 
-- `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `docker/extensions/` at build time.
+- `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `src/dockerimage/extensions/` at build time.
 - `plugin.dart` — Dart class extending `ToolPlugin` for client-side action handling. Must export a class with `extends ToolPlugin`.
 - `*.dart` — Supporting Dart files (widgets, utilities). All `.dart` files are copied alongside `plugin.dart`.
 - `tools/` — Server-side scripts. Everything in this subdirectory is copied to `/usr/local/bin/bark-tools/` in the Docker image.
@@ -435,7 +435,7 @@ A plugin needs at minimum an `extension.ts`. The `plugin.dart` is only needed fo
 
 **Build integration:**
 
-- `scripts/import_plugins.py` scans `$BARK_PLUGINS_DIR/*/plugin.dart`, copies `.dart` files into `frontend/lib/tools/plugins/`, and generates `plugins_generated.dart`
+- `scripts/import_plugins.py` scans `$BARK_PLUGINS_DIR/*/plugin.dart`, copies `.dart` files into `src/frontend/lib/tools/plugins/`, and generates `plugins_generated.dart`
 - `dockerbuild` collects `extension.ts` and `tools/` files from all plugins into the Docker build context
 - `flutterbuildweb` runs the codegen before compiling
 - Both are triggered automatically by `devenv up` via `execIfModified`
@@ -550,7 +550,7 @@ nginx reverse proxy (port 8995)
 - **Don't stop container on tab navigation**: `workspace_page.dart`'s `deactivate()` calls `disconnectWorkspace()`, which stops the container. This means switching browser tabs or navigating within the app kills the container. The container should only stop on explicit logout, workspace switch, or idle timeout — not on widget deactivation from tab changes. Alternatively (or additionally), the hosted app proxy could auto-start the container before proxying if it's not running.
 
 - **Parallelize Playwright E2E tests**: Tests are now independent (no serial mode, each creates its own workspace), but still run with 1 worker. Setting `workers > 1` would require verifying that concurrent Docker container starts, port allocations, and workspace operations don't conflict on a single Bark server.
-- **Clean up stale plugin build artifacts**: When a plugin is removed from `plugins.yaml`/`plugins.lock`, `update-plugins` removes the plugin directory from `$BARK_PLUGINS_DIR`, but the build artifacts remain: `.dart` files in `frontend/lib/tools/plugins/`, `.ts` files in `docker/extensions/`, and tool scripts in `docker/tools/`. Stale files accumulate and can cause build errors. The build scripts (`import_plugins.py`, `dockerbuild.sh`) should delete any plugin-originated files that don't correspond to a current plugin in `$BARK_PLUGINS_DIR` before copying fresh ones.
+- **Clean up stale plugin build artifacts**: When a plugin is removed from `plugins.yaml`/`plugins.lock`, `update-plugins` removes the plugin directory from `$BARK_PLUGINS_DIR`, but the build artifacts remain: `.dart` files in `src/frontend/lib/tools/plugins/`, `.ts` files in `src/dockerimage/extensions/`, and tool scripts in `src/dockerimage/tools/`. Stale files accumulate and can cause build errors. The build scripts (`import_plugins.py`, `dockerbuild.sh`) should delete any plugin-originated files that don't correspond to a current plugin in `$BARK_PLUGINS_DIR` before copying fresh ones.
 - **Plugin directory structure**: Consider whether each plugin should have explicit subdirectories for different file types (e.g., `dart/` for Flutter code, `extension/` for TypeScript, `tools/` for server-side scripts) instead of the current flat layout where `import_plugins.py` copies all `*.dart` files and `dockerbuild` picks up `extension.ts` by name. Subdirectories would simplify the copying logic and make it clearer what goes where.
 - **Plugin version numbers**: Plugins may want their own version numbers (in `plugin.yaml` or similar metadata) for compatibility checking, display in the UI, and meaningful pinning beyond git refs.
 - **Entrypoint nohup zombie**: The `nohup sh -c "cat ... > FIFO ..."` writer in `entrypoint.sh` (line 78) leaves one `[sh] <defunct>` zombie per container start. Its parent is the `su` process which doesn't call `wait()`. Harmless but cosmetic. Fix by restructuring the entrypoint so the writer finishes before the final `exec`, or by using a different mechanism to feed the FIFOs.

@@ -109,7 +109,7 @@ jobs:
         run: |
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
           devenv shell -- bash -c \
-            "cd tests/playwright && npm run install-browsers"
+            "cd src/e2e_tests && npm run install-browsers"
 
       - name: Run E2E tests
         run: |
@@ -118,7 +118,7 @@ jobs:
             || which chromium-browser 2>/dev/null \
             || echo /usr/bin/google-chrome-stable)
           devenv shell -- bash -c \
-            "cd tests/playwright && \
+            "cd src/e2e_tests && \
              CHROME_PATH=$CHROME npx playwright test"
 
       - name: Upload test results
@@ -126,4 +126,4 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-results
-          path: tests/playwright/test-results/
+          path: src/e2e_tests/test-results/

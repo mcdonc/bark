@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "frontend/lib/**"
-      - "frontend/test/**"
-      - "frontend/pubspec.yaml"
+      - "src/frontend/lib/**"
+      - "src/frontend/test/**"
+      - "src/frontend/pubspec.yaml"
       - ".github/workflows/frontend-tests.yml"
   push:
     branches: [main]
     paths:
-      - "frontend/lib/**"
-      - "frontend/test/**"
-      - "frontend/pubspec.yaml"
+      - "src/frontend/lib/**"
+      - "src/frontend/test/**"
+      - "src/frontend/pubspec.yaml"
       - ".github/workflows/frontend-tests.yml"
 
 jobs:
@@ -28,9 +28,9 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        working-directory: frontend
+        working-directory: src/frontend
         run: flutter pub get
 
       - name: Run tests
-        working-directory: frontend
+        working-directory: src/frontend
         run: flutter test

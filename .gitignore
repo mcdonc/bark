@@ -9,16 +9,16 @@ __pycache__/
 *.pyc
 *.pyo
 .venv/
-backend/.venv/
-backend/uv.lock
+src/backend/.venv/
+src/backend/uv.lock
 
 # Flutter
-frontend/.dart_tool/
-frontend/.packages
-frontend/build/
-frontend/.flutter-plugins
-frontend/.flutter-plugins-dependencies
-frontend/pubspec.lock
+src/frontend/.dart_tool/
+src/frontend/.packages
+src/frontend/build/
+src/frontend/.flutter-plugins
+src/frontend/.flutter-plugins-dependencies
+src/frontend/pubspec.lock
 
 # SQLite
 *.db
@@ -43,10 +43,10 @@ Thumbs.db
 # Bark data
 .bark/
 
-docker/extensions/
-docker/tools/
-frontend/lib/tools/plugins_generated.dart
-frontend/lib/tools/plugins/
+src/dockerimage/extensions/
+src/dockerimage/tools/
+src/frontend/lib/tools/plugins_generated.dart
+src/frontend/lib/tools/plugins/
 
 # Claude
 .claude/
