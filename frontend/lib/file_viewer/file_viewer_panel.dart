@@ -241,6 +241,48 @@ class FileViewerPanelState extends State<FileViewerPanel> {
     super.dispose();
   }
 
+  Widget _buildBreadcrumbs() {
+    if (_currentPath == '.') {
+      return const Text('/', style: TextStyle(fontWeight: FontWeight.bold));
+    }
+    final parts = _currentPath.split('/');
+    final children = <InlineSpan>[];
+    // Leading "/" goes to root
+    children.add(WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: InkWell(
+        onTap: () => _navigateTo('.'),
+        child: const Text('/', style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+    ));
+    for (var i = 0; i < parts.length; i++) {
+      final path = parts.sublist(0, i + 1).join('/');
+      // Segment name — clickable to navigate into that folder
+      children.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: InkWell(
+          onTap: () => _navigateTo(path),
+          child: Text(parts[i], style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+      ));
+      // Trailing slash — navigates to the parent of the next segment
+      if (i < parts.length - 1) {
+        children.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: InkWell(
+            onTap: () => _navigateTo(path),
+            child: const Text('/'),
+          ),
+        ));
+      }
+    }
+    return RichText(
+      overflow: TextOverflow.ellipsis,
+      maxLines: 1,
+      text: TextSpan(children: children),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SuppressBrowserContextMenu(child: FileDropZone(
@@ -262,14 +304,12 @@ class FileViewerPanelState extends State<FileViewerPanel> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.folder, size: 16),
+                InkWell(
+                  onTap: () => _navigateTo('.'),
+                  child: const Icon(Icons.folder, size: 16),
+                ),
                 const SizedBox(width: 4),
-                if (_currentPath != '.')
-                  InkWell(
-                    onTap: () => _navigateTo('.'),
-                    child: const Text('/', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                Expanded(child: Text(_currentPath == '.' ? '/' : _currentPath, overflow: TextOverflow.ellipsis, maxLines: 1)),
+                Expanded(child: _buildBreadcrumbs()),
                 if (_currentPath != '.')
                   IconButton(
                     icon: const Icon(Icons.arrow_upward, size: 16),
