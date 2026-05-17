@@ -40,6 +40,10 @@ class PiRpcClient:
         buf = b""
         try:
             while self._running and self._proc and self._proc.stdout:
+                if self._proc.stdout.at_eof():
+                    break
+                if self._proc.returncode is not None:
+                    break
                 chunk = await self._proc.stdout.read(65536)
                 if not chunk:
                     break
