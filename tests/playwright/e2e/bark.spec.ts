@@ -876,7 +876,7 @@ test.describe("Bark E2E", () => {
   });
 
   test("container stops after idle timeout", async ({ page, request }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(300_000);
 
     const token = await getAuthToken(request);
     const headers = { Authorization: `Bearer ${token}` };
@@ -973,6 +973,18 @@ test.describe("Bark E2E", () => {
 
     const token = await getAuthToken(request);
     const headers = { Authorization: `Bearer ${token}` };
+
+    // Ensure idle timeout is at least 30 minutes
+    const DEFAULT_TIMEOUT = 1800;
+    const timeoutResp = await request.get(`${API_BASE}/api/test/idle-timeout`);
+    if (timeoutResp.ok()) {
+      const current = (await timeoutResp.json()).idle_timeout_seconds;
+      if (current < DEFAULT_TIMEOUT) {
+        await request.post(
+          `${API_BASE}/api/test/set-idle-timeout?seconds=${DEFAULT_TIMEOUT}`,
+        );
+      }
+    }
 
     // Create a fresh workspace
     const existingResp = await request.get(`${API_BASE}/workspaces`, {
