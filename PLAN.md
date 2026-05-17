@@ -420,7 +420,7 @@ GitHub Actions run automatically on PRs and pushes to main (all also support `wo
 
 - **Backend tests** (`.github/workflows/backend-tests.yml`) — triggered by changes to `backend/`, `tests/unit/backend/`, or `pytest.ini`
 - **Frontend tests** (`.github/workflows/frontend-tests.yml`) — triggered by changes to `frontend/lib/`, `frontend/test/`, or `frontend/pubspec.yaml`
-- **E2E tests** (`.github/workflows/e2e-tests.yml`) — triggered by changes to `backend/`, `frontend/`, `docker/`, `tests/playwright/`, `devenv.nix`, or `devenv.yaml`. Requires `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` secrets. Uses Nix/devenv to build and run the full stack, then runs Playwright against the running server. Uploads test results as artifacts on failure.
+- **E2E tests** (`.github/workflows/e2e-tests.yml`) — runs on a schedule (twice daily at 8am/8pm UTC) and via manual `workflow_dispatch`. Requires `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` secrets. Uses Nix/devenv to build and run the full stack, then runs Playwright against the running server. Uploads test results as artifacts on failure.
 
 ### Plugin System
 

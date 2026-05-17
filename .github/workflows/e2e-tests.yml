@@ -2,25 +2,9 @@ name: E2E Tests
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "docker/**"
-      - "tests/playwright/**"
-      - "devenv.nix"
-      - "devenv.yaml"
-      - ".github/workflows/e2e-tests.yml"
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "docker/**"
-      - "tests/playwright/**"
-      - "devenv.nix"
-      - "devenv.yaml"
-      - ".github/workflows/e2e-tests.yml"
+  schedule:
+    # Twice daily: 8am and 8pm UTC
+    - cron: "0 8,20 * * *"
 
 jobs:
   test:
