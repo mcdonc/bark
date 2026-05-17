@@ -7,7 +7,7 @@ import 'package:http/testing.dart';
 import 'package:bark_frontend/agui/agui_client.dart';
 import 'package:bark_frontend/agui/agui_events.dart';
 import 'package:bark_frontend/file_viewer/file_viewer_panel.dart';
-import 'package:bark_frontend/utils/backend_url.dart';
+import 'package:bark_plugin_api/bark_plugin_api.dart';
 
 class _MockAguiClient extends AguiClient {
   final StreamController<AguiEvent> _controller =

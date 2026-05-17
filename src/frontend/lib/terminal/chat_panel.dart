@@ -6,7 +6,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_highlight/themes/monokai-sublime.dart';
 import 'package:highlight/highlight.dart' show highlight, Node;
 import 'package:http/http.dart' as http;
-import '../utils/backend_url.dart';
+import 'package:bark_plugin_api/bark_plugin_api.dart';
 import '../utils/web_helpers_stub.dart'
     if (dart.library.html) '../utils/web_helpers_web.dart';
 import '../agui/agui_client.dart';

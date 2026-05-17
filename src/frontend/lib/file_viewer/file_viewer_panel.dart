@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../agui/agui_client.dart';
-import '../utils/backend_url.dart';
+import 'package:bark_plugin_api/bark_plugin_api.dart';
 import '../utils/web_helpers_stub.dart'
     if (dart.library.html) '../utils/web_helpers_web.dart';
 import '../agui/agui_events.dart';

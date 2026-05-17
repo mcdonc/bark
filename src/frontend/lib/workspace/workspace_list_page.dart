@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../auth/auth_service.dart';
-import '../utils/backend_url.dart';
+import 'package:bark_plugin_api/bark_plugin_api.dart';
 import '../utils/page_title.dart';
 import '../widgets/bark_logo.dart';
 

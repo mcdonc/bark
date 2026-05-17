@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/backend_url.dart';
+import 'package:bark_plugin_api/bark_plugin_api.dart';
 
 class AuthService extends ChangeNotifier {
   static const _tokenKey = 'bark_jwt';

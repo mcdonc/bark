@@ -1,7 +1,7 @@
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../utils/backend_url.dart';
+import 'package:bark_plugin_api/bark_plugin_api.dart';
 
 class FileDropZone extends StatefulWidget {
   final String workspaceId;

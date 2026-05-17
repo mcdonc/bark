@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import '../agui/agui_client.dart';
 import '../agui/agui_events.dart';
 import '../auth/auth_service.dart';
-import '../utils/backend_url.dart';
+import 'package:bark_plugin_api/bark_plugin_api.dart';
 import '../utils/page_title.dart';
 import '../widgets/bark_logo.dart';
 import '../file_viewer/file_viewer_panel.dart';
@@ -15,7 +15,6 @@ import '../layout/ide_layout.dart';
 import '../output/output_panel.dart';
 import '../terminal/container_terminal.dart';
 import '../terminal/chat_panel.dart';
-import '../tools/tool_plugin.dart';
 import '../tools/plugins_generated.dart';
 
 class WorkspacePage extends StatefulWidget {
