@@ -219,6 +219,7 @@ bark/
 - Directory tree with file sizes
 - Click to view file contents (16pt JetBrains Mono, left-aligned)
 - Auto-refresh when Pi writes/edits files or runs file-creating/deleting bash commands
+- Auto-refresh when switching to the Files tab (refreshes in-place, preserving current directory)
 - Drag-and-drop upload for files and folders (preserves directory structure, progress indicator)
 - Uploads go into the currently viewed directory (not always root)
 - Duplicate detection: blocks upload if a file or folder with the same name already exists

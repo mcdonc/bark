@@ -30,6 +30,7 @@ class WorkspacePage extends StatefulWidget {
 class _WorkspacePageState extends State<WorkspacePage> {
   String get _baseUrl => baseUrl;
   final _terminalKey = GlobalKey<ContainerTerminalState>();
+  final _fileViewerKey = GlobalKey<FileViewerPanelState>();
   bool _connecting = true;
   String? _error;
   String _workspaceName = '';
@@ -251,12 +252,14 @@ class _WorkspacePageState extends State<WorkspacePage> {
               authToken: authToken,
             ),
             fileViewer: FileViewerPanel(
+              key: _fileViewerKey,
               aguiClient: aguiClient,
               workspaceId: widget.workspaceId,
               authToken: authToken,
             ),
             terminal: ContainerTerminal(key: _terminalKey, aguiClient: aguiClient),
             terminalKey: _terminalKey,
+            fileViewerKey: _fileViewerKey,
             output: OutputPanel(aguiClient: aguiClient),
           ),
           for (final plugin in _plugins)

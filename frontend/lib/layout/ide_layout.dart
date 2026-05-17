@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../terminal/container_terminal.dart';
+import '../file_viewer/file_viewer_panel.dart';
 
 const _bar3d = BoxDecoration(
   gradient: LinearGradient(
@@ -21,6 +22,7 @@ class IdeLayout extends StatefulWidget {
   final Widget fileViewer;
   final Widget terminal;
   final GlobalKey<ContainerTerminalState>? terminalKey;
+  final GlobalKey<FileViewerPanelState>? fileViewerKey;
   final Widget output;
 
   const IdeLayout({
@@ -29,6 +31,7 @@ class IdeLayout extends StatefulWidget {
     required this.fileViewer,
     required this.terminal,
     this.terminalKey,
+    this.fileViewerKey,
     required this.output,
   });
 
@@ -49,6 +52,8 @@ class _IdeLayoutState extends State<IdeLayout>
     _tabController.addListener(() {
       if (_tabController.index == 0) {
         widget.terminalKey?.currentState?.requestFocus();
+      } else if (_tabController.index == 1) {
+        widget.fileViewerKey?.currentState?.refresh();
       }
     });
   }

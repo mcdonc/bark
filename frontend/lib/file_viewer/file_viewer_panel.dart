@@ -22,10 +22,10 @@ class FileViewerPanel extends StatefulWidget {
   });
 
   @override
-  State<FileViewerPanel> createState() => _FileViewerPanelState();
+  State<FileViewerPanel> createState() => FileViewerPanelState();
 }
 
-class _FileViewerPanelState extends State<FileViewerPanel> {
+class FileViewerPanelState extends State<FileViewerPanel> {
   String get _baseUrl => baseUrl;
   List<Map<String, dynamic>> _entries = [];
   String _currentPath = '.';
@@ -33,6 +33,9 @@ class _FileViewerPanelState extends State<FileViewerPanel> {
   String? _fileContent;
   bool _loading = false;
   late final StreamSubscription<AguiEvent> _eventSub;
+
+  /// Refresh the file list for the current directory.
+  void refresh() => _loadFiles();
 
   @override
   void initState() {
