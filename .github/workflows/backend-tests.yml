@@ -29,4 +29,5 @@ jobs:
         run: pip install -e backend/
 
       - name: Run tests
-        run: python -m pytest tests/unit/backend -v
+        # -n auto: run tests in parallel across CPUs (pytest-xdist)
+        run: python -m pytest tests/unit/backend -v -n auto

@@ -4,12 +4,18 @@ import bcrypt
 
 import pytest
 
-# Pre-computed bcrypt hash for "testpass" with minimal rounds (4) to avoid
-# ~0.5s per test from the default 12 rounds.
+# Use fast bcrypt rounds (4 instead of default 12) for all tests.
+_original_gensalt = bcrypt.gensalt
+
+
+def _fast_gensalt(rounds=4, prefix=b"2b"):
+    return _original_gensalt(rounds=4, prefix=prefix)
+
+
+bcrypt.gensalt = _fast_gensalt
+
 _TEST_PASSWORD = "testpass"
-_TEST_PASSWORD_HASH = bcrypt.hashpw(
-    _TEST_PASSWORD.encode(), bcrypt.gensalt(rounds=4)
-).decode()
+_TEST_PASSWORD_HASH = bcrypt.hashpw(_TEST_PASSWORD.encode(), bcrypt.gensalt()).decode()
 
 
 @pytest.fixture(autouse=True)

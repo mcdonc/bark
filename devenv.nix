@@ -105,9 +105,10 @@
     python3 scripts/update_plugins.py "$@"
   '';
 
+  # -n auto: run tests in parallel across CPUs (pytest-xdist)
   scripts.test-backend.exec = ''
     cd $DEVENV_ROOT
-    exec python -m pytest tests/unit/backend -v "$@"
+    exec python -m pytest tests/unit/backend -v -n auto "$@"
   '';
 
   scripts.test-e2e.exec = ''
