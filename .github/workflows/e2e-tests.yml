@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
       OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
@@ -39,31 +39,34 @@ jobs:
         run: ./bootstrap --unattended
 
       - name: Start services and wait for server
+        shell: bash
         run: |
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
           # Start devenv in background within this step so the
           # process survives while we poll. Builds (Flutter + Docker)
           # run via execIfModified and can take several minutes.
-          devenv up --no-tui &
+          devenv up --no-tui > /tmp/devenv-up.log 2>&1 &
           DEVENV_PID=$!
+          echo "devenv up started as PID $DEVENV_PID"
+          # Poll for up to 10 minutes (builds can be slow on CI)
           for i in $(seq 1 120); do
             if ! kill -0 $DEVENV_PID 2>/dev/null; then
-              echo "devenv up exited unexpectedly"
-              cat /tmp/devenv-up.log 2>/dev/null || true
+              echo "devenv up exited unexpectedly, logs:"
+              cat /tmp/devenv-up.log
               exit 1
             fi
             code=$(curl -s -o /dev/null -w "%{http_code}" \
-              http://localhost:8997/ 2>/dev/null)
+              http://localhost:8997/ 2>/dev/null || true)
             if [ "$code" = "200" ]; then
               echo "Server ready (attempt $i)"
-              break
+              exit 0
             fi
+            echo "Waiting for server... (attempt $i, status=$code)"
             sleep 5
           done
-          if [ "$code" != "200" ]; then
-            echo "Server failed to start"
-            exit 1
-          fi
+          echo "Server failed to start after 10 minutes, logs:"
+          cat /tmp/devenv-up.log
+          exit 1
 
       - name: Install Playwright browsers
         run: |
