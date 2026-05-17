@@ -158,7 +158,7 @@ def uninstall(unattended=False):
         print("Nix not installed, skipping uninstall")
 
 
-def install(unattended=False, devenv_version="v2.1", cachix_version="v1.10.0"):
+def install(unattended=False, devenv_version="v2.1.2", cachix_version="v1.10.0"):
     if has_nix():
         print("Skipping installation of Nix, already installed")
     else:
@@ -245,8 +245,8 @@ if __name__ == "__main__":
     ap.add_argument(
         "--devenv-version",
         type=str,
-        help="devenv version to install (e.g. v2.1)",
-        default="v2.1",
+        help="devenv version to install (e.g. v2.1.2)",
+        default="v2.1.2",
     )
     ap.add_argument(
         "--cachix-version",
