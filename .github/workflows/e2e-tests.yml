@@ -80,6 +80,12 @@ jobs:
           cat /tmp/devenv-up.log
           exit 1
 
+      - name: Install Playwright browsers
+        run: |
+          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+          devenv shell -- bash -c \
+            "cd tests/playwright && npm run install-browsers"
+
       - name: Run E2E tests
         run: |
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
