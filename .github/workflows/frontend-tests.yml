@@ -27,6 +27,9 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Create stub bark_plugins package
+        run: bash scripts/stub_dart_plugins.sh
+
       - name: Install dependencies
         working-directory: src/frontend
         run: flutter pub get

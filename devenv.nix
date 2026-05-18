@@ -168,6 +168,10 @@
   enterShell = ''
     mkdir -p "$BARK_DATA_DIR"
 
+    # Ensure bark_plugins stub exists so flutter pub get works
+    # before plugins are fetched (first-time checkout / CI)
+    bash "$DEVENV_ROOT/scripts/stub_dart_plugins.sh"
+
     # Generate prettierignore (not committed)
     cat > "$DEVENV_ROOT/.prettierignore" <<'PRETTIER'
     node_modules/
