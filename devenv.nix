@@ -8,6 +8,7 @@
     npm.enable = true;
     npm.install.enable = true;
     directory = "./src/e2e_tests";
+    corepack.enable = false;
   };
   languages.python = {
     enable = true;
