@@ -9,18 +9,27 @@ if [ -f "$BARK_PLUGINS_DIR/plugins.yaml" ] && [ ! -f "$BARK_PLUGINS_DIR/plugins.
   python3 scripts/update_plugins.py
 fi
 
-# Collect plugin files into docker build context
-rm -rf src/dockerimage/extensions src/dockerimage/tools
-mkdir -p src/dockerimage/extensions src/dockerimage/tools
+# Stage plugin files outside the source tree
+STAGING="$BARK_PLUGINS_DIR/.docker"
+rm -rf "$STAGING"
+mkdir -p "$STAGING/extensions" "$STAGING/tools"
 for d in "$BARK_PLUGINS_DIR"/*/; do
   [ -d "$d" ] || continue
   name=$(basename "$d")
-  # TypeScript extensions
-  [ -f "$d/extension.ts" ] && cp "$d/extension.ts" "src/dockerimage/extensions/$name.ts"
-  # Server-side tools (any files in tools/ subdir)
-  [ -d "$d/tools" ] && cp -r "$d/tools/"* src/dockerimage/tools/ 2>/dev/null
+  [ -f "$d/extension.ts" ] && cp "$d/extension.ts" "$STAGING/extensions/$name.ts"
+  if [ -d "$d/tools" ]; then
+    mkdir -p "$STAGING/tools/$name"
+    cp -r "$d/tools/"* "$STAGING/tools/$name/" 2>/dev/null
+  fi
 done
 
 # Remove old containers before rebuilding so they get recreated from the new image
 docker ps -a --filter "label=bark.instance=${BARK_INSTANCE_ID}" -q | xargs -r docker rm -f
-docker build --platform linux/amd64 --build-arg BARK_UID="$(id -u)" --build-arg BARK_GID="$(id -g)" -t "${BARK_IMAGE_NAME}" "$@" src/dockerimage/
+
+# Build with named contexts for plugin extensions and tools
+docker build --platform linux/amd64 \
+  --build-arg BARK_UID="$(id -u)" \
+  --build-arg BARK_GID="$(id -g)" \
+  --build-context plugin-extensions="$STAGING/extensions" \
+  --build-context plugin-tools="$STAGING/tools" \
+  -t "${BARK_IMAGE_NAME}" "$@" src/dockerimage/

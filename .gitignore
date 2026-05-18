@@ -44,9 +44,6 @@ Thumbs.db
 # Bark data
 .bark/
 
-src/dockerimage/extensions/
-src/dockerimage/tools/
-
 # Claude
 .claude/
 .coverage

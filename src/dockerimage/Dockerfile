@@ -57,13 +57,13 @@ RUN EXISTING_USER=$(getent passwd $BARK_UID | cut -d: -f1) \
 RUN mkdir -p /workspace && chown bark:bark /workspace
 WORKDIR /workspace
 
-# Server-side tools
-COPY tools/ /usr/local/bin/bark-tools/
-RUN find /usr/local/bin/bark-tools/ -name '*.py' -exec chmod +x {} + 2>/dev/null || true
+# Server-side tools per plugin (from plugin-tools named build context)
+# Layout: /opt/bark/plugin-tools/<name>/<script>
+COPY --from=plugin-tools / /opt/bark/plugin-tools/
 
 # Pi extensions and entrypoint stored in /opt/bark (root-owned, read-only at runtime)
 RUN mkdir -p /opt/bark/pi-agent/extensions
-COPY extensions/ /opt/bark/pi-agent/extensions/
+COPY --from=plugin-extensions / /opt/bark/pi-agent/extensions/
 COPY builtin-extensions/ /opt/bark/pi-agent/extensions/
 COPY system-prompt.md /opt/bark/system-prompt.md
 COPY entrypoint.sh /opt/bark/entrypoint.sh
