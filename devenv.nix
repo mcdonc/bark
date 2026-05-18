@@ -87,8 +87,6 @@
   env.BARK_IMAGE_NAME = lib.mkOverride 1500 "bark-pi";
   env.BARK_INSTANCE_ID = lib.mkOverride 1500 "default";
   dotenv.enable = true;
-  # .env.e2e values override .env when present (used by E2E tests)
-  dotenv.filename = [".env" ".env.e2e"];
 
   scripts.flutterbuildweb.exec = ''exec bash "$DEVENV_ROOT/scripts/flutterbuildweb.sh" "$@"'';
   scripts.dockerbuild.exec = ''exec bash "$DEVENV_ROOT/scripts/dockerbuild.sh" "$@"'';

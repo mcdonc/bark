@@ -1,5 +1,4 @@
-import { execSync } from "child_process";
-import { rmSync, unlinkSync, existsSync } from "fs";
+import { rmSync } from "fs";
 import { join } from "path";
 
 async function globalTeardown() {
@@ -32,12 +31,6 @@ async function globalTeardown() {
         break; // dead
       }
     }
-  }
-
-  // Clean up .env.e2e
-  const envPath = join(projectRoot, ".env.e2e");
-  if (existsSync(envPath)) {
-    unlinkSync(envPath);
   }
 
   // Clean up temp data directory

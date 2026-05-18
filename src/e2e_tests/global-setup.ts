@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { mkdtempSync, writeFileSync } from "fs";
+import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -11,32 +11,26 @@ async function globalSetup() {
   const backendPort = process.env.BARK_E2E_PORT || "18997";
   const nginxPort = process.env.BARK_E2E_NGINX_PORT || "18995";
 
-  // Write .env.e2e which overrides .env via dotenv.filename config
-  const envPath = join(projectRoot, ".env.e2e");
-  writeFileSync(
-    envPath,
-    [
-      `BARK_PORT=${backendPort}`,
-      `BARK_NGINX_PORT=${nginxPort}`,
-      `BARK_DATA_DIR=${dataDir}`,
-      `BARK_JWT_SECRET=e2e-test-secret`,
-      `BARK_DEFAULT_USER=admin`,
-      `BARK_DEFAULT_PASSWORD=admin`,
-      `BARK_TEST_MODE=1`,
-      `OLLAMA_API_KEY=${process.env.OLLAMA_API_KEY || ""}`,
-      `OLLAMA_BASE_URL=${process.env.OLLAMA_BASE_URL || ""}`,
-      `OLLAMA_MODEL=${process.env.OLLAMA_MODEL || ""}`,
-    ].join("\n"),
-  );
-
   console.log(
     `Starting E2E server on port ${backendPort} ` +
       `with BARK_DATA_DIR=${dataDir}`,
   );
 
+  // Pass E2E overrides as env vars directly to the devenv process
+  // instead of writing a .env.e2e file.
   const devenvProcess = spawn("devenv", ["up", "--no-tui"], {
     cwd: projectRoot,
     stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      BARK_PORT: backendPort,
+      BARK_NGINX_PORT: nginxPort,
+      BARK_DATA_DIR: dataDir,
+      BARK_JWT_SECRET: "e2e-test-secret",
+      BARK_DEFAULT_USER: "admin",
+      BARK_DEFAULT_PASSWORD: "admin",
+      BARK_TEST_MODE: "1",
+    },
   });
 
   process.env.BARK_E2E_PID = String(devenvProcess.pid);
