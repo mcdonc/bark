@@ -1,0 +1,30 @@
+name: Build Base Docker Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/dockerimage/Dockerfile.base"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push base image
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg BARK_UID=1000 \
+            --build-arg BARK_GID=1000 \
+            -f src/dockerimage/Dockerfile.base \
+            -t ghcr.io/${{ github.repository }}/bark-pi-base:latest \
+            src/dockerimage/
+          docker push ghcr.io/${{ github.repository }}/bark-pi-base:latest

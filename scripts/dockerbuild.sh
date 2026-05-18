@@ -26,10 +26,8 @@ done
 # Remove old containers before rebuilding so they get recreated from the new image
 docker ps -a --filter "label=bark.instance=${BARK_INSTANCE_ID}" -q | xargs -r docker rm -f
 
-# Build with named contexts for plugin extensions and tools
+# Build workspace image on top of the base
 docker build --platform linux/amd64 \
-  --build-arg BARK_UID="$(id -u)" \
-  --build-arg BARK_GID="$(id -g)" \
   --build-context plugin-extensions="$STAGING/extensions" \
   --build-context plugin-tools="$STAGING/tools" \
   -t "${BARK_IMAGE_NAME}" "$@" src/dockerimage/
