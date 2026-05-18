@@ -9,36 +9,38 @@ async function globalSetup() {
 
   const projectRoot = join(__dirname, "..", "..");
   const backendPort = process.env.BARK_E2E_PORT || "18997";
-  const nginxPort = process.env.BARK_E2E_NGINX_PORT || "18995";
 
   console.log(
     `Starting E2E server on port ${backendPort} ` +
       `with BARK_DATA_DIR=${dataDir}`,
   );
 
-  // Pass E2E overrides as env vars directly to the devenv process
-  // instead of writing a .env.e2e file.
-  const devenvProcess = spawn("devenv", ["up", "--no-tui"], {
-    cwd: projectRoot,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      BARK_PORT: backendPort,
-      BARK_NGINX_PORT: nginxPort,
-      BARK_DATA_DIR: dataDir,
-      BARK_JWT_SECRET: "e2e-test-secret",
-      BARK_DEFAULT_USER: "admin",
-      BARK_DEFAULT_PASSWORD: "admin",
-      BARK_TEST_MODE: "1",
+  // Start uvicorn directly with E2E overrides as env vars.
+  // No devenv up or nginx needed — just the backend server.
+  const backendProcess = spawn(
+    "uvicorn",
+    ["bark_backend.main:app", "--host", "0.0.0.0", "--port", backendPort],
+    {
+      cwd: join(projectRoot, "src", "backend"),
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        BARK_PORT: backendPort,
+        BARK_DATA_DIR: dataDir,
+        BARK_JWT_SECRET: "e2e-test-secret",
+        BARK_DEFAULT_USER: "admin",
+        BARK_DEFAULT_PASSWORD: "admin",
+        BARK_TEST_MODE: "1",
+      },
     },
-  });
+  );
 
-  process.env.BARK_E2E_PID = String(devenvProcess.pid);
+  process.env.BARK_E2E_PID = String(backendProcess.pid);
 
-  devenvProcess.stdout?.on("data", (data: Buffer) => {
+  backendProcess.stdout?.on("data", (data: Buffer) => {
     process.stdout.write(`[bark] ${data}`);
   });
-  devenvProcess.stderr?.on("data", (data: Buffer) => {
+  backendProcess.stderr?.on("data", (data: Buffer) => {
     process.stderr.write(`[bark] ${data}`);
   });
 

@@ -26,7 +26,7 @@
 
   tasks = {
     "bark:flutter-build" = {
-      exec = "flutterbuildweb";
+      exec = ''exec bash "$DEVENV_ROOT/scripts/flutterbuildweb.sh"'';
       showOutput = true;
       execIfModified = [
         "scripts/flutterbuildweb.sh"
@@ -39,7 +39,7 @@
       ];
     };
     "bark:docker-build" = {
-      exec = "dockerbuild";
+      exec = ''exec bash "$DEVENV_ROOT/scripts/dockerbuild.sh"'';
       showOutput = true;
       execIfModified = [
         "scripts/dockerbuild.sh"
@@ -88,14 +88,13 @@
   env.BARK_INSTANCE_ID = lib.mkOverride 1500 "default";
   dotenv.enable = true;
 
-  scripts.flutterbuildweb.exec = ''exec bash "$DEVENV_ROOT/scripts/flutterbuildweb.sh" "$@"'';
-  scripts.dockerbuild.exec = ''exec bash "$DEVENV_ROOT/scripts/dockerbuild.sh" "$@"'';
+  scripts.flutterbuildweb.exec = ''exec devenv tasks run bark:flutter-build --refresh-task-cache "$@"'';
+  scripts.dockerbuild.exec = ''exec devenv tasks run bark:docker-build --refresh-task-cache "$@"'';
 
   scripts.rebuild.exec = ''
-    echo "Rebuilding Bark..."
-    echo "==> Docker image"
+    echo "Rebuilding Docker image..."
     dockerbuild
-    echo "==> Flutter web"
+    echo "Rebuilding Flutter..."
     flutterbuildweb
     echo "==> Done"
   '';

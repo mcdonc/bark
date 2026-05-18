@@ -83,32 +83,10 @@ jobs:
       - name: Install devenv
         run: ./bootstrap --unattended
 
-      - name: Start services and wait for server
-        shell: bash
+      - name: Build Docker image and Flutter web
         run: |
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          devenv up --no-tui > /tmp/devenv-up.log 2>&1 &
-          DEVENV_PID=$!
-          echo "devenv up started as PID $DEVENV_PID"
-          for i in $(seq 1 300); do
-            if ! kill -0 $DEVENV_PID 2>/dev/null; then
-              echo "devenv up exited unexpectedly, logs:"
-              cat /tmp/devenv-up.log
-              exit 1
-            fi
-            code=$(curl -s -o /dev/null -w "%{http_code}" \
-              http://localhost:8997/ 2>/dev/null || true)
-            if [ "$code" = "200" ]; then
-              echo "Server ready (attempt $i)"
-              exit 0
-            fi
-            echo "Waiting for server... (attempt $i, status=$code), last line from devenv-up.log was"
-            echo -e "\033[32m$(tail -1 /tmp/devenv-up.log 2>/dev/null)\033[0m"
-            sleep 2
-          done
-          echo "Server failed to start after 10 minutes, logs:"
-          cat /tmp/devenv-up.log
-          exit 1
+          devenv tasks run bark:docker-build bark:flutter-build
 
       - name: Install Playwright browsers
         run: |

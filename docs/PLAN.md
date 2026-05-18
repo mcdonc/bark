@@ -344,7 +344,9 @@ To force rebuild the Docker image and Flutter web app:
 devenv shell -- rebuild
 ```
 
-Then restart the processes. On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
+The `dockerbuild` and `flutterbuildweb` commands run the corresponding devenv tasks (`bark:docker-build`, `bark:flutter-build`) with `--refresh-task-cache` to force a rebuild regardless of `execIfModified` state. The `rebuild` command runs both.
+
+On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
 
 - **Flutter**: `src/frontend/lib`, `src/frontend/web`, `src/frontend/pubspec.yaml`, `src/frontend/pubspec.lock`, `$BARK_PLUGINS_DIR/**/*.dart`, `$BARK_PLUGINS_DIR/plugins.lock`
 - **Docker**: `src/dockerimage/Dockerfile`, `src/dockerimage/entrypoint.sh`, `src/dockerimage/*.md`, `src/dockerimage/builtin-extensions/*.ts`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
@@ -388,7 +390,7 @@ devenv shell -- test-e2e --headed
 devenv shell -- test-e2e --reporter=list
 ```
 
-E2E tests start their own isolated Bark server via `globalSetup` — no need to start one manually. The test server uses non-default ports (18997/18995) and a temp `BARK_DATA_DIR` so it doesn't conflict with a running dev server. Config is passed as env vars directly to the `devenv up` subprocess. The temp directory is cleaned up in `globalTeardown`. Each test creates its own workspace and cleans it up, so tests are independent and can run in any order. Flutter Web renders to canvas, so UI interaction uses coordinate-based clicks on `<flutter-view>`. LLM-dependent tests require `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` in `.env` or the process environment.
+E2E tests start their own isolated Bark server via `globalSetup` — no need to start one manually. The test server spawns uvicorn directly (no `devenv up` or nginx) on a non-default port (18997) with a temp `BARK_DATA_DIR` so it doesn't conflict with a running dev server. Config is passed as env vars to the uvicorn subprocess. The temp directory is cleaned up in `globalTeardown`. Each test creates its own workspace and cleans it up, so tests are independent and can run in any order. Flutter Web renders to canvas, so UI interaction uses coordinate-based clicks on `<flutter-view>`. LLM-dependent tests require `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` in `.env` or the process environment.
 
 **Frontend unit tests** (Dart/Flutter, no browser required):
 
