@@ -83,6 +83,7 @@ jobs:
       - name: Install devenv
         run: |
           ./bootstrap --unattended
+          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
           devenv shell --true
 
       - name: Build Docker image and Flutter web
