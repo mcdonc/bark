@@ -62,8 +62,9 @@ bark/
     update_plugins.py          # Fetches plugins from git repos, writes plugins.lock
     stub_dart_plugins.sh       # Creates minimal bark_plugins stub for first-time checkout / CI
     flutterbuildweb.sh         # Flutter build: plugin auto-fetch, codegen, flutter build web
-    dockerbuild.sh             # Docker build: pull latest base image, plugin staging, container cleanup, workspace image build (named build contexts)
+    dockerbuild.sh             # Docker build: plugin staging, container cleanup, workspace image build (named build contexts)
     dockerbuild-base.sh        # Build and push base Docker image to GHCR
+    pull-base-image.sh         # Pull latest base image from GHCR (if changed)
     nginx.sh                   # nginx reverse proxy: config generation and exec
 
   src/dockerimage/
@@ -350,7 +351,7 @@ To force rebuild the Docker image and Flutter web app:
 devenv shell -- rebuild
 ```
 
-The `dockerbuild` and `flutterbuildweb` commands run the corresponding devenv tasks (`bark:docker-build`, `bark:flutter-build`) with `--refresh-task-cache` to force a rebuild regardless of `execIfModified` state. The `rebuild` command runs both.
+The `dockerbuild` and `flutterbuildweb` commands run the corresponding devenv tasks (`bark:docker-build`, `bark:flutter-build`) with `--refresh-task-cache` to force a rebuild regardless of `execIfModified` state. The `rebuild` command runs both. The `pull-base-image` command pulls the latest base image from GHCR (run this after CI rebuilds the base image).
 
 On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
 
