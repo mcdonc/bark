@@ -2,8 +2,8 @@ name: Cleanup Skipped Runs
 
 on:
   schedule:
-    # Daily at 3am UTC
-    - cron: "0 3 * * *"
+    # 5am and 5pm UTC
+    - cron: "0 5,17 * * *"
   workflow_dispatch:
 
 jobs:
