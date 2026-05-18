@@ -726,32 +726,13 @@ test.describe("Bark E2E", () => {
   test("simple prompt returns assistant message", async ({ page, request }) => {
     test.setTimeout(120_000);
 
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
-
-    // Create a fresh workspace
-    const existingResp = await request.get(`${API_BASE}/workspaces`, {
-      headers,
-    });
-    for (const ws of await existingResp.json()) {
-      if (ws.name === "e2e-simple-prompt") {
-        await request.delete(`${API_BASE}/workspaces/${ws.id}`, { headers });
-      }
-    }
-    const createResp = await request.post(
-      `${API_BASE}/workspaces?name=e2e-simple-prompt`,
-      { headers },
+    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+      page,
+      request,
+      "e2e-simple-prompt",
     );
-    expect(createResp.ok()).toBeTruthy();
-    const workspace = await createResp.json();
-    const workspaceId = workspace.id;
 
     try {
-      await login(page);
-      await page.goto(`#/workspace/${workspaceId}`);
-      await page.waitForTimeout(10000);
-
-      // Type a simple prompt
       const { height } = vp(page);
       const f = fv(page);
       await f.click({ position: { x: 240, y: height - 30 }, force: true });
@@ -760,7 +741,6 @@ test.describe("Bark E2E", () => {
       await page.waitForTimeout(300);
       await page.keyboard.press("Enter");
 
-      // Poll for an assistant message
       let found = false;
       for (let i = 0; i < 30; i++) {
         await page.waitForTimeout(3000);
@@ -770,10 +750,12 @@ test.describe("Bark E2E", () => {
         );
         if (msgResp.ok()) {
           const messages = await msgResp.json();
-          const assistantMsg = messages.find(
-            (m: any) => m.entry_type === "assistant" && m.content.includes("4"),
-          );
-          if (assistantMsg) {
+          if (
+            messages.some(
+              (m: any) =>
+                m.entry_type === "assistant" && m.content.includes("4"),
+            )
+          ) {
             found = true;
             break;
           }
@@ -781,9 +763,7 @@ test.describe("Bark E2E", () => {
       }
       expect(found).toBeTruthy();
     } finally {
-      await request.delete(`${API_BASE}/workspaces/${workspaceId}`, {
-        headers,
-      });
+      await cleanup();
     }
   });
 
@@ -885,34 +865,18 @@ test.describe("Bark E2E", () => {
   test("container stops after idle timeout", async ({ page, request }) => {
     test.setTimeout(300_000);
 
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
-
     // Check if test mode is enabled
-    const getResp = await request.get(`${API_BASE}/api/test/idle-timeout`, {
-      headers,
-    });
+    const getResp = await request.get(`${API_BASE}/api/test/idle-timeout`);
     if (!getResp.ok()) {
       test.skip(true, "BARK_TEST_MODE not enabled");
       return;
     }
 
-    // Create a workspace first, then set per-workspace idle timeout
-    const existingResp = await request.get(`${API_BASE}/workspaces`, {
-      headers,
-    });
-    for (const ws of await existingResp.json()) {
-      if (ws.name === "e2e-idle-test") {
-        await request.delete(`${API_BASE}/workspaces/${ws.id}`, { headers });
-      }
-    }
-    const createResp = await request.post(
-      `${API_BASE}/workspaces?name=e2e-idle-test`,
-      { headers },
+    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+      page,
+      request,
+      "e2e-idle-test",
     );
-    expect(createResp.ok()).toBeTruthy();
-    const workspace = await createResp.json();
-    const workspaceId = workspace.id;
 
     // Set a short idle timeout for this workspace only
     await request.post(
@@ -921,10 +885,6 @@ test.describe("Bark E2E", () => {
     );
 
     try {
-      await login(page);
-      await page.goto(`#/workspace/${workspaceId}`);
-      await page.waitForTimeout(10000);
-
       // Wait for the container to idle out (5s timeout + check interval)
       await page.waitForTimeout(15000);
 
@@ -957,9 +917,7 @@ test.describe("Bark E2E", () => {
       }
       expect(found).toBeTruthy();
     } finally {
-      await request.delete(`${API_BASE}/workspaces/${workspaceId}`, {
-        headers,
-      });
+      await cleanup();
     }
   });
 
@@ -1144,32 +1102,13 @@ test.describe("Bark E2E", () => {
   test("abort stops a running agent", async ({ page, request }) => {
     test.setTimeout(120_000);
 
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
-
-    // Create a fresh workspace
-    const existingResp = await request.get(`${API_BASE}/workspaces`, {
-      headers,
-    });
-    for (const ws of await existingResp.json()) {
-      if (ws.name === "e2e-abort-test") {
-        await request.delete(`${API_BASE}/workspaces/${ws.id}`, { headers });
-      }
-    }
-    const createResp = await request.post(
-      `${API_BASE}/workspaces?name=e2e-abort-test`,
-      { headers },
+    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+      page,
+      request,
+      "e2e-abort-test",
     );
-    expect(createResp.ok()).toBeTruthy();
-    const workspace = await createResp.json();
-    const workspaceId = workspace.id;
 
     try {
-      await login(page);
-      await page.goto(`#/workspace/${workspaceId}`);
-      await page.waitForTimeout(10000);
-
-      // Send a long-running prompt
       const { height } = vp(page);
       const f = fv(page);
       await f.click({ position: { x: 240, y: height - 30 }, force: true });
@@ -1185,24 +1124,16 @@ test.describe("Bark E2E", () => {
 
       // Click the abort button (red stop_circle icon, to the right of
       // the chat input). It's at the send button position.
-      const sendBtnX = 460;
-      const sendBtnY = height - 30;
-      await f.click({
-        position: { x: sendBtnX, y: sendBtnY },
-        force: true,
-      });
+      await f.click({ position: { x: 460, y: height - 30 }, force: true });
       await page.waitForTimeout(3000);
 
-      // Verify the agent stopped — check that messages contain a
-      // user prompt but the assistant response is incomplete or
-      // the run finished
+      // Verify the agent stopped — check that messages contain the user prompt
       const msgResp = await request.get(
         `${API_BASE}/workspaces/${workspaceId}/messages`,
         { headers },
       );
       expect(msgResp.ok()).toBeTruthy();
       const messages = await msgResp.json();
-      // Should have at least the user prompt
       expect(
         messages.some(
           (m: any) =>
@@ -1210,9 +1141,7 @@ test.describe("Bark E2E", () => {
         ),
       ).toBeTruthy();
     } finally {
-      await request.delete(`${API_BASE}/workspaces/${workspaceId}`, {
-        headers,
-      });
+      await cleanup();
     }
   });
 
@@ -1222,31 +1151,13 @@ test.describe("Bark E2E", () => {
   }) => {
     test.setTimeout(180_000);
 
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
-
-    // Create a fresh workspace
-    const existingResp = await request.get(`${API_BASE}/workspaces`, {
-      headers,
-    });
-    for (const ws of await existingResp.json()) {
-      if (ws.name === "e2e-queue-test") {
-        await request.delete(`${API_BASE}/workspaces/${ws.id}`, { headers });
-      }
-    }
-    const createResp = await request.post(
-      `${API_BASE}/workspaces?name=e2e-queue-test`,
-      { headers },
+    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+      page,
+      request,
+      "e2e-queue-test",
     );
-    expect(createResp.ok()).toBeTruthy();
-    const workspace = await createResp.json();
-    const workspaceId = workspace.id;
 
     try {
-      await login(page);
-      await page.goto(`#/workspace/${workspaceId}`);
-      await page.waitForTimeout(10000);
-
       const { height } = vp(page);
       const f = fv(page);
       const chatX = 240;
@@ -1289,9 +1200,7 @@ test.describe("Bark E2E", () => {
       expect(foundFirst).toBeTruthy();
       expect(foundSecond).toBeTruthy();
     } finally {
-      await request.delete(`${API_BASE}/workspaces/${workspaceId}`, {
-        headers,
-      });
+      await cleanup();
     }
   });
 });
