@@ -49,16 +49,34 @@ class TestConfig:
 
 
 class TestAuthRoutes:
-    async def test_register(self, client):
+    async def test_register(self, client, user):
+        login_resp = await client.post(
+            "/auth/login", json={"username": "testuser", "password": "testpass"}
+        )
+        token = login_resp.json()["access_token"]
         resp = await client.post(
-            "/auth/register", json={"username": "newuser", "password": "newpass"}
+            "/auth/register",
+            json={"username": "newuser", "password": "newpass"},
+            headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 200
         assert "access_token" in resp.json()
 
-    async def test_register_duplicate(self, client, user):
+    async def test_register_requires_auth(self, client):
         resp = await client.post(
-            "/auth/register", json={"username": "testuser", "password": "pass"}
+            "/auth/register", json={"username": "newuser", "password": "newpass"}
+        )
+        assert resp.status_code == 401
+
+    async def test_register_duplicate(self, client, user):
+        login_resp = await client.post(
+            "/auth/login", json={"username": "testuser", "password": "testpass"}
+        )
+        token = login_resp.json()["access_token"]
+        resp = await client.post(
+            "/auth/register",
+            json={"username": "testuser", "password": "pass"},
+            headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 400
 

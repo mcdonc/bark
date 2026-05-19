@@ -55,7 +55,12 @@ async def get_config():
 
 
 @router.post("/auth/register", response_model=auth.TokenResponse)
-async def register(req: auth.RegisterRequest):
+async def register(
+    req: auth.RegisterRequest,
+    user: dict | None = Depends(auth.get_current_user_optional),
+):
+    if user is None and not os.environ.get("BARK_TEST_MODE"):
+        raise HTTPException(status_code=401, detail="Authentication required")
     return await auth.register(req)
 
 

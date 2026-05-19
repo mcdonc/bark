@@ -107,7 +107,7 @@ jobs:
             || echo /usr/bin/google-chrome-stable)
           devenv shell -- bash -c \
             "cd src/e2e_tests && \
-             BARK_E2E_WORKERS=1 CHROME_PATH=$CHROME npx playwright test"
+             BARK_E2E_WORKERS=4 CHROME_PATH=$CHROME npx playwright test"
 
       - name: Upload test results
         if: failure()

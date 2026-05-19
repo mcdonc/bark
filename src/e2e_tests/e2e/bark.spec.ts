@@ -2,18 +2,48 @@ import { test, expect, Page, APIRequestContext } from "@playwright/test";
 import AdmZip from "adm-zip";
 import { execSync } from "child_process";
 
-const USER = process.env.BARK_TEST_USER || "admin";
-const PASS = process.env.BARK_TEST_PASS || "admin";
+// Each test registers its own user and creates its own workspace. This ensures
+// tests are fully isolated — logout in one test can't kill another test's
+// containers, and parallel execution is safe because no state is shared.
+
 const BACKEND_PORT = process.env.BARK_E2E_PORT || "18997";
 const API_BASE = `http://localhost:${BACKEND_PORT}`;
+const TEST_PASSWORD = "testpass";
 
-async function getAuthToken(request: APIRequestContext): Promise<string> {
-  const resp = await request.post(`${API_BASE}/auth/login`, {
-    data: { username: USER, password: PASS },
+/** Register a new user via API (test mode allows unauthenticated registration).
+ *  Returns { token, headers }. */
+async function registerUser(
+  request: APIRequestContext,
+  username: string,
+): Promise<{ token: string; headers: Record<string, string> }> {
+  const resp = await request.post(`${API_BASE}/auth/register`, {
+    data: { username, password: TEST_PASSWORD },
   });
   expect(resp.ok()).toBeTruthy();
   const data = await resp.json();
-  return data.access_token;
+  const token = data.access_token;
+  return { token, headers: { Authorization: `Bearer ${token}` } };
+}
+
+/** Log in via the UI by typing credentials into the Flutter login form. */
+async function loginViaUI(page: Page, username: string, password: string) {
+  await page.goto("");
+  await waitForFlutter(page);
+
+  const { width, height } = vp(page);
+  const cx = width / 2;
+  const f = fv(page);
+
+  await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
+  await page.waitForTimeout(300);
+  await page.keyboard.type(username);
+
+  await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
+  await page.waitForTimeout(300);
+  await page.keyboard.type(password);
+
+  await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
+  await expect(page).toHaveTitle(/Workspaces/i, { timeout: 15_000 });
 }
 
 // Flutter Web renders to <canvas> inside <flutter-view>, so standard DOM
@@ -78,45 +108,16 @@ async function terminalType(
   await page.keyboard.press("Enter");
 }
 
-async function login(page: Page) {
-  await page.goto("");
-  await waitForFlutter(page);
-
-  const { width, height } = vp(page);
-  const cx = width / 2;
-  const f = fv(page);
-
-  // Username field
-  await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
-  await page.waitForTimeout(300);
-  await page.keyboard.type(USER);
-
-  // Password field
-  await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
-  await page.waitForTimeout(300);
-  await page.keyboard.type(PASS);
-
-  // Login button
-  await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
-
-  await expect(page).toHaveTitle(/Workspaces/i, { timeout: 15_000 });
-}
-
-/** Create a unique workspace, log in, and navigate to it. */
-async function createAndOpenWorkspace(
-  page: Page,
+/** Create a workspace via API. Returns workspace ID and cleanup function. */
+async function createWorkspace(
   request: APIRequestContext,
+  headers: Record<string, string>,
   namePrefix: string,
 ): Promise<{
   workspaceId: string;
-  token: string;
-  headers: Record<string, string>;
   cleanup: () => Promise<void>;
 }> {
-  const token = await getAuthToken(request);
-  const headers = { Authorization: `Bearer ${token}` };
   const name = `${namePrefix}-${Date.now()}`;
-
   const createResp = await request.post(
     `${API_BASE}/workspaces?name=${encodeURIComponent(name)}`,
     { headers },
@@ -130,35 +131,66 @@ async function createAndOpenWorkspace(
   const workspace = await createResp.json();
   const workspaceId = workspace.id;
 
-  await login(page);
-  await page.goto(`#/workspace/${workspaceId}`);
-
-  // Wait for container to be ready by polling the files API
-  for (let i = 0; i < 60; i++) {
-    try {
-      const resp = await request.get(
-        `${API_BASE}/workspaces/${workspaceId}/files?path=.`,
-        { headers },
-      );
-      if (resp.ok()) break;
-    } catch {
-      // Not ready yet
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  // Extra settle time for the UI to render after container ready
-  await page.waitForTimeout(2000);
-
   return {
     workspaceId,
-    token,
-    headers,
     cleanup: async () => {
       await request.delete(`${API_BASE}/workspaces/${workspaceId}`, {
         headers,
       });
     },
   };
+}
+
+/** Open a workspace in the browser and wait for the container to be ready. */
+async function openWorkspace(
+  page: Page,
+  username: string,
+  workspaceId: string,
+) {
+  // Set up WebSocket listener before any navigation so we don't miss it
+  const readyPromise = new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error("Container did not become ready within 60s")),
+      60_000,
+    );
+    page.on("websocket", (ws) => {
+      ws.on("framereceived", (frame) => {
+        if (frame.payload.toString().includes("container_ready")) {
+          clearTimeout(timeout);
+          resolve();
+        }
+      });
+    });
+  });
+
+  await loginViaUI(page, username, TEST_PASSWORD);
+  await page.goto(`#/workspace/${workspaceId}`);
+  await readyPromise;
+
+  // Extra settle time for the UI to render after container ready
+  await page.waitForTimeout(2000);
+}
+
+/** Convenience: register user, create workspace, open it. */
+async function createAndOpenWorkspace(
+  page: Page,
+  request: APIRequestContext,
+  namePrefix: string,
+): Promise<{
+  workspaceId: string;
+  token: string;
+  headers: Record<string, string>;
+  cleanup: () => Promise<void>;
+}> {
+  const username = `${namePrefix}-${Date.now()}`;
+  const { token, headers } = await registerUser(request, username);
+  const { workspaceId, cleanup } = await createWorkspace(
+    request,
+    headers,
+    namePrefix,
+  );
+  await openWorkspace(page, username, workspaceId);
+  return { workspaceId, token, headers, cleanup };
 }
 
 function dockerContainersForWorkspace(workspaceId: string): string[] {
@@ -178,31 +210,10 @@ function dockerContainersForWorkspace(workspaceId: string): string[] {
 // Back button: x ~25, y ~28
 
 test.describe("Bark E2E", () => {
-  test("login with default credentials", async ({ page }) => {
-    await login(page);
-    await expect(page).toHaveTitle(/Workspaces/i);
-  });
-
-  test("login with wrong password fails", async ({ page }) => {
-    await page.goto("");
-    await waitForFlutter(page);
-
-    const { width, height } = vp(page);
-    const cx = width / 2;
-    const f = fv(page);
-
-    await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
-    await page.waitForTimeout(300);
-    await page.keyboard.type(USER);
-
-    await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
-    await page.waitForTimeout(300);
-    await page.keyboard.type("wrongpassword");
-
-    await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
-    await page.waitForTimeout(3000);
-
-    // Should still be on the login page
+  test("login with wrong password fails", async ({ page, request }) => {
+    const username = `wrong-pw-${Date.now()}`;
+    await registerUser(request, username);
+    await expect(loginViaUI(page, username, "wrongpassword")).rejects.toThrow();
     await expect(page).toHaveTitle(/Login/i);
   });
 
@@ -334,8 +345,10 @@ test.describe("Bark E2E", () => {
   });
 
   test("create and delete workspace", async ({ request }) => {
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
+    const { token, headers } = await registerUser(
+      request,
+      `crud-ws-${Date.now()}`,
+    );
     const wsName = "e2e-test-workspace";
 
     // Clean up any leftover workspace with the same name
@@ -412,8 +425,10 @@ test.describe("Bark E2E", () => {
   });
 
   test("file upload, rename, and delete", async ({ request }) => {
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
+    const { token, headers } = await registerUser(
+      request,
+      `file-ops-${Date.now()}`,
+    );
     const wsResp = await request.post(
       `${API_BASE}/workspaces?name=e2e-file-ops-${Date.now()}`,
       { headers },
@@ -493,8 +508,10 @@ test.describe("Bark E2E", () => {
   });
 
   test("folder upload and zip download round-trip", async ({ request }) => {
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
+    const { token, headers } = await registerUser(
+      request,
+      `folder-${Date.now()}`,
+    );
     const wsResp = await request.post(
       `${API_BASE}/workspaces?name=e2e-folder-${Date.now()}`,
       { headers },
@@ -648,9 +665,11 @@ test.describe("Bark E2E", () => {
     }
   });
 
-  test("logout returns to login page", async ({ page }) => {
+  test("logout returns to login page", async ({ page, request }) => {
     test.setTimeout(60_000);
-    await login(page);
+    const username = `logout-${Date.now()}`;
+    await registerUser(request, username);
+    await loginViaUI(page, username, TEST_PASSWORD);
 
     const { width } = vp(page);
     const f = fv(page);
@@ -927,32 +946,20 @@ test.describe("Bark E2E", () => {
   }) => {
     test.setTimeout(120_000);
 
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
-
-    // Create a fresh workspace
-    const existingResp = await request.get(`${API_BASE}/workspaces`, {
+    const username = `lifecycle-${Date.now()}`;
+    const { token, headers } = await registerUser(request, username);
+    const { workspaceId, cleanup } = await createWorkspace(
+      request,
       headers,
-    });
-    for (const ws of await existingResp.json()) {
-      if (ws.name === "e2e-container-lifecycle") {
-        await request.delete(`${API_BASE}/workspaces/${ws.id}`, { headers });
-      }
-    }
-    const createResp = await request.post(
-      `${API_BASE}/workspaces?name=e2e-container-lifecycle`,
-      { headers },
+      "e2e-container-lifecycle",
     );
-    expect(createResp.ok()).toBeTruthy();
-    const workspace = await createResp.json();
-    const workspaceId = workspace.id;
 
     try {
       // Before opening: no running container for this workspace
       expect(dockerContainersForWorkspace(workspaceId)).toHaveLength(0);
 
       // Open the workspace — this starts a container
-      await login(page);
+      await loginViaUI(page, username, TEST_PASSWORD);
       await page.goto(`#/workspace/${workspaceId}`);
 
       // Wait for container to start (poll up to 60s)
@@ -981,15 +988,15 @@ test.describe("Bark E2E", () => {
       }
       expect(stopped).toBeTruthy();
     } finally {
-      await request.delete(`${API_BASE}/workspaces/${workspaceId}`, {
-        headers,
-      });
+      await cleanup();
     }
   });
 
   test("two workspaces are independent", async ({ request }) => {
-    const token = await getAuthToken(request);
-    const headers = { Authorization: `Bearer ${token}` };
+    const { token, headers } = await registerUser(
+      request,
+      `two-ws-${Date.now()}`,
+    );
 
     // Clean up any leftovers
     const existing = await request.get(`${API_BASE}/workspaces`, { headers });
