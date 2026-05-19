@@ -290,15 +290,16 @@ async def _cleanup_idle_containers() -> None:
         if _workspace_idle_timeouts:
             min_timeout = min(_workspace_idle_timeouts.values())
             interval = max(2, min_timeout // 2)
-            # Use Event-based wait so set_workspace_idle_timeout can wake us
-            wake = _get_cleanup_wake()
-            wake.clear()
-            try:
-                await asyncio.wait_for(wake.wait(), timeout=interval)
-            except asyncio.TimeoutError:
-                pass
         else:
-            await asyncio.sleep(CHECK_INTERVAL_SECONDS)
+            interval = CHECK_INTERVAL_SECONDS
+        # Use Event-based wait so set_workspace_idle_timeout can wake us
+        # immediately, even if we're in the middle of a long default sleep.
+        wake = _get_cleanup_wake()
+        wake.clear()
+        try:
+            await asyncio.wait_for(wake.wait(), timeout=interval)
+        except asyncio.TimeoutError:
+            pass
         now = time.time()
         to_stop = []
         for cid, info in list(_containers.items()):

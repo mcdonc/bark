@@ -573,10 +573,12 @@ class TestCleanupIdleContainers:
     def setup_method(self):
         container_manager._containers.clear()
         container_manager._idle_callbacks.clear()
+        container_manager._cleanup_wake = None
 
     def teardown_method(self):
         container_manager._containers.clear()
         container_manager._idle_callbacks.clear()
+        container_manager._cleanup_wake = None
 
     async def test_idle_container_stopped(self):
         mock_docker = _mock_docker()
@@ -590,12 +592,16 @@ class TestCleanupIdleContainers:
         }
 
         with patch.object(container_manager, "get_docker", return_value=mock_docker):
-            # Patch sleep to break the infinite loop after one iteration
-            with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
-                try:
-                    await container_manager._cleanup_idle_containers()
-                except asyncio.CancelledError:
-                    pass
+            task = asyncio.create_task(container_manager._cleanup_idle_containers())
+            # Let the task enter the Event wait, then wake it
+            await asyncio.sleep(0.05)
+            container_manager._get_cleanup_wake().set()
+            await asyncio.sleep(0.05)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         mock_c.stop.assert_awaited()
         assert "cid" not in container_manager._containers
 
@@ -608,11 +614,15 @@ class TestCleanupIdleContainers:
         }
 
         with patch.object(container_manager, "get_docker", return_value=mock_docker):
-            with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
-                try:
-                    await container_manager._cleanup_idle_containers()
-                except asyncio.CancelledError:
-                    pass
+            task = asyncio.create_task(container_manager._cleanup_idle_containers())
+            await asyncio.sleep(0.05)
+            container_manager._get_cleanup_wake().set()
+            await asyncio.sleep(0.05)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         # Container should still be tracked
         assert "cid" in container_manager._containers
 
@@ -634,11 +644,15 @@ class TestCleanupIdleContainers:
         container_manager.on_idle_stop("ws-1", on_idle)
 
         with patch.object(container_manager, "get_docker", return_value=mock_docker):
-            with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
-                try:
-                    await container_manager._cleanup_idle_containers()
-                except asyncio.CancelledError:
-                    pass
+            task = asyncio.create_task(container_manager._cleanup_idle_containers())
+            await asyncio.sleep(0.05)
+            container_manager._get_cleanup_wake().set()
+            await asyncio.sleep(0.05)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         assert callback_called == ["ws-1"]
 
     async def test_idle_callback_error_handled(self):
@@ -657,11 +671,15 @@ class TestCleanupIdleContainers:
         container_manager.on_idle_stop("ws-1", bad_callback)
 
         with patch.object(container_manager, "get_docker", return_value=mock_docker):
-            with patch("asyncio.sleep", side_effect=[None, asyncio.CancelledError]):
-                try:
-                    await container_manager._cleanup_idle_containers()
-                except asyncio.CancelledError:
-                    pass
+            task = asyncio.create_task(container_manager._cleanup_idle_containers())
+            await asyncio.sleep(0.05)
+            container_manager._get_cleanup_wake().set()
+            await asyncio.sleep(0.05)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         # Container should still be stopped despite callback error
         mock_c.stop.assert_awaited()
 
