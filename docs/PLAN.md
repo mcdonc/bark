@@ -378,17 +378,14 @@ devenv shell -- test-backend -k 'test_login_success'
 
 100% line coverage across all backend modules. Tests use real SQLite databases in pytest temp directories (no mocking of the database layer). Docker and subprocess interactions are mocked. Each test gets its own isolated temp directory — multiple test processes can run in parallel without conflicts. Coverage report is printed automatically.
 
-**E2E tests** (Playwright, requires running devenv processes):
+**E2E tests** (Playwright, Chromium + Firefox + WebKit):
 
 ```bash
-# Install browsers (first time only)
-devenv shell -- bash -c "cd src/e2e_tests && npm run install-browsers"
-
-# Run all tests (devenv script)
+# Run all tests (devenv script — installs npm deps, runs each browser sequentially)
 devenv shell -- test-e2e
 
 # Run a single test by name
-devenv shell -- test-e2e -g 'login with default credentials'
+devenv shell -- test-e2e -g 'navigate to workspace'
 
 # Run with headed browser (visible) — useful for debugging coordinate-based clicks
 devenv shell -- test-e2e --headed
@@ -397,7 +394,7 @@ devenv shell -- test-e2e --headed
 devenv shell -- test-e2e --reporter=list
 ```
 
-E2E tests start their own isolated Bark server via `globalSetup` — no need to start one manually. The test server spawns uvicorn directly (no `devenv up` or nginx) on a non-default port (18997) with a temp `BARK_DATA_DIR` so it doesn't conflict with a running dev server. Config is passed as env vars to the uvicorn subprocess. Backend output is written to `src/e2e_tests/backend.log` to keep Playwright output clean. The temp directory is cleaned up in `globalTeardown`. Each test creates its own workspace and cleans it up, so tests are independent and can run in any order. Flutter Web renders to canvas, so UI interaction uses coordinate-based clicks on `<flutter-view>`. LLM-dependent tests require `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` in `.env` or the process environment.
+E2E tests run against Chromium, Firefox, and WebKit using browsers from `pkgs.playwright-driver.browsers` (NixOS-patched, no manual browser install needed). The `@playwright/test` npm version must match `pkgs.playwright-driver.version` exactly (currently 1.59.1). Browsers run sequentially (one at a time) to avoid memory pressure from multiple browser engines — within each browser, tests run in parallel with 2 workers (default; set `BARK_E2E_WORKERS=4` locally for faster runs). Each test registers its own unique user and creates its own workspace, so tests are fully isolated. The idle timeout test is wrapped in a `describe` with `retries: 3` since it is timing-sensitive and occasionally flaky. The test server spawns uvicorn directly (no `devenv up` or nginx) on a non-default port (18997) with a temp `BARK_DATA_DIR` so it doesn't conflict with a running dev server. Container readiness is detected via WebSocket `container_ready` events (no polling). Flutter Web renders to canvas, so UI interaction uses coordinate-based clicks on `<flutter-view>`. LLM-dependent tests require `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` in `.env` or the process environment.
 
 **Frontend unit tests** (Dart/Flutter, no browser required):
 
@@ -430,7 +427,7 @@ GitHub Actions run automatically on PRs and pushes to main (all also support `wo
 
 - **Backend tests** (`.github/workflows/backend-tests.yml`) — triggered by changes to `src/backend/` or `pytest.ini`
 - **Frontend tests** (`.github/workflows/frontend-tests.yml`) — triggered by changes to `src/frontend/lib/`, `src/frontend/test/`, or `src/frontend/pubspec.yaml`. Uses `stub_dart_plugins.sh` to create a minimal `bark_plugins` package so `flutter pub get` works without the full plugin codegen.
-- **E2E tests** (`.github/workflows/e2e-tests.yml`) — runs hourly via schedule (skips if no commits in the last hour) and via manual `workflow_dispatch`. Requires `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` secrets. Uses Nix/devenv to build and run the full stack, then runs Playwright against the running server. Uploads test results as artifacts on failure. Nix store cached via FlakeHub (OIDC) and `magic-nix-cache-action`.
+- **E2E tests** (`.github/workflows/e2e-tests.yml`) — runs hourly via schedule (skips if no commits in the last hour) and via manual `workflow_dispatch`. Requires `OLLAMA_API_KEY`, `OLLAMA_BASE_URL`, and `OLLAMA_MODEL` secrets. Runs Playwright against Chromium, Firefox, and WebKit sequentially (browsers from `playwright-driver.browsers` in nixpkgs, 2 parallel workers per browser). Uploads test results as artifacts on failure. Nix store cached via `magic-nix-cache-action`.
 
 ### Plugin System
 
@@ -576,6 +573,7 @@ arctor nginx (443)
 - **Container resource limits**: Add CPU/memory limits to containers to prevent runaway processes.
 - **Container network isolation**: Restrict container network access to prevent use as an attack platform. Use a custom Docker network with limited egress — allow only the Ollama API endpoint (cloud or self-hosted) and block all other outbound traffic. Consider using `--network=none` with a proxy sidecar for allowlisted domains only.
 - **Syntax highlighting language detection**: Improve code block language detection for unlabeled blocks.
+- **Terminal focus requires precise click target**: In Firefox, the terminal only receives keyboard focus when clicking very specific areas of the terminal pane. Clicking elsewhere in the pane does nothing — the cursor doesn't appear and typing has no effect. The entire terminal pane should grant focus on click.
 - **Strip env vars from terminal session**: Currently `docker exec -e VAR=` blanks sensitive env vars (API keys, BARK_RESUME_SESSION) but they still appear in `env` output as empty strings. Investigate using `env -u` inside the exec command or wrapping the shell invocation to fully unset them rather than just blanking.
 - **Same-workspace multi-window**: Opening the same workspace in two browser windows simultaneously has undefined behavior — both WebSocket connections share one Pi container/session, and prompts from either window could collide or interleave unpredictably. Consider either locking a workspace to one connection at a time, or multiplexing both windows onto the same event stream.
 - **User roles and API authorization**: Add a `roles` table and a `user_roles` junction table (with CASCADE delete on both FKs so deleting a role removes it from all users, and deleting a user removes their role assignments). Use roles to guard API endpoints — e.g., restrict test/debug endpoints, user management, and system settings to admin role, while keeping workspace CRUD and file operations available to all authenticated users. Include roles in the JWT claims and check via a FastAPI dependency.
@@ -593,4 +591,5 @@ arctor nginx (443)
 - **Backend busy loop during Pi/WS comms**: The backend occasionally goes into a busy loop during Pi RPC or WebSocket communication. Investigate and fix the root cause.
 - **E2E: use UI instead of API for setup/teardown**: E2E tests currently use the API directly to upload files, delete workspaces, etc. These should use the UI instead to better test real user flows and catch UI-level regressions.
 
+- **devenv MCP memory leak**: The `devenv mcp` process grows to ~18GB virtual memory over time. Investigate root cause — may be in devenv itself or in the MCP server implementation.
 - **E2E: cache Docker image build in CI**: The Docker image is rebuilt from scratch on every CI run. Options: (A) Push to GHCR (`ghcr.io/<repo>/bark-pi:<hash>`) keyed on a hash of Dockerfile + entrypoint + system-prompt + builtin-extensions + plugins — pull if exists, build and push if not. Requires `packages: write` permission but handles large images well. (B) Use GitHub Actions cache with `docker save`/`docker load` — simpler, no registry auth, but the 10 GB total cache limit is tight for a ~2-3 GB compressed tar. (C) Modify `dockerbuild.sh` to check a registry when `BARK_DOCKER_REGISTRY` is set — works for CI and anyone with registry access but couples the build script to a registry. Cache key should hash: `src/dockerimage/Dockerfile`, `src/dockerimage/entrypoint.sh`, `src/dockerimage/*.md`, `src/dockerimage/builtin-extensions/*.ts`, and `plugins/` contents.

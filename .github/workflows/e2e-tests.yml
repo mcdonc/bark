@@ -93,21 +93,10 @@ jobs:
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
           devenv tasks run bark:docker-build bark:flutter-build
 
-      - name: Install Playwright browsers
-        run: |
-          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          devenv shell -- bash -c \
-            "cd src/e2e_tests && npm run install-browsers"
-
       - name: Run E2E tests
         run: |
           . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          CHROME=$(which google-chrome-stable 2>/dev/null \
-            || which chromium-browser 2>/dev/null \
-            || echo /usr/bin/google-chrome-stable)
-          devenv shell -- bash -c \
-            "cd src/e2e_tests && \
-             BARK_E2E_WORKERS=4 CHROME_PATH=$CHROME npx playwright test"
+          devenv shell -- test-e2e
 
       - name: Upload test results
         if: failure()

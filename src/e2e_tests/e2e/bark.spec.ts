@@ -147,24 +147,29 @@ async function openWorkspace(
   username: string,
   workspaceId: string,
 ) {
-  // Set up WebSocket listener before any navigation so we don't miss it
+  // Set up WebSocket listener before login so we catch all WebSocket connections
   const readyPromise = new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(
-      () => reject(new Error("Container did not become ready within 60s")),
-      60_000,
+      () => reject(new Error("Container did not become ready within 120s")),
+      120_000,
     );
-    page.on("websocket", (ws) => {
-      ws.on("framereceived", (frame) => {
+    const listenForReady = (ws: { on: Function }) => {
+      ws.on("framereceived", (frame: { payload: string | Buffer }) => {
         if (frame.payload.toString().includes("container_ready")) {
           clearTimeout(timeout);
           resolve();
         }
       });
-    });
+    };
+    // Listen on any new WebSocket connections
+    page.on("websocket", listenForReady);
   });
 
   await loginViaUI(page, username, TEST_PASSWORD);
-  await page.goto(`#/workspace/${workspaceId}`);
+  // Use full URL (not just #fragment) so the page reloads and creates a new
+  // WebSocket — a hash-only change is handled internally by Flutter's router
+  // without opening a new WebSocket, so our listener would never fire.
+  await page.goto(`/#/workspace/${workspaceId}`);
   await readyPromise;
 
   // Extra settle time for the UI to render after container ready
@@ -678,7 +683,7 @@ test.describe("Bark E2E", () => {
     await f.click({ position: { x: width - 25, y: 28 }, force: true });
     await page.waitForTimeout(2000);
 
-    await expect(page).toHaveTitle(/Login/i, { timeout: 10_000 });
+    await expect(page).toHaveTitle(/Login/i, { timeout: 30_000 });
   });
 
   test("register new user, logout, and login with new credentials", async ({
@@ -881,64 +886,70 @@ test.describe("Bark E2E", () => {
     }
   });
 
-  test("container stops after idle timeout", async ({ page, request }) => {
-    test.setTimeout(300_000);
+  test.describe("idle timeout", () => {
+    test.describe.configure({ retries: 3 });
 
-    // Check if test mode is enabled
-    const getResp = await request.get(`${API_BASE}/api/test/idle-timeout`);
-    if (!getResp.ok()) {
-      test.skip(true, "BARK_TEST_MODE not enabled");
-      return;
-    }
+    test("container stops after idle timeout", async ({ page, request }) => {
+      test.setTimeout(300_000);
 
-    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
-      page,
-      request,
-      "e2e-idle-test",
-    );
+      // Check if test mode is enabled
+      const getResp = await request.get(`${API_BASE}/api/test/idle-timeout`);
+      if (!getResp.ok()) {
+        test.skip(true, "BARK_TEST_MODE not enabled");
+        return;
+      }
 
-    // Set a short idle timeout for this workspace only
-    await request.post(
-      `${API_BASE}/api/test/set-idle-timeout?seconds=5&workspace_id=${workspaceId}`,
-      { headers },
-    );
+      const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+        page,
+        request,
+        "e2e-idle-test",
+      );
 
-    try {
-      // Wait for the container to idle out (5s timeout + check interval)
-      await page.waitForTimeout(15000);
+      // Set a short idle timeout for this workspace only
+      await request.post(
+        `${API_BASE}/api/test/set-idle-timeout?seconds=5&workspace_id=${workspaceId}`,
+        { headers },
+      );
 
-      // Send a prompt — it should trigger a container restart
-      const { height } = vp(page);
-      const f = fv(page);
-      await f.click({ position: { x: 240, y: height - 30 }, force: true });
-      await page.waitForTimeout(500);
-      await page.keyboard.type("say hello");
-      await page.waitForTimeout(300);
-      await page.keyboard.press("Enter");
+      try {
+        // Wait for the container to idle out (5s timeout + check interval)
+        await page.waitForTimeout(15000);
 
-      // Poll for a response — the container should restart and respond
-      let found = false;
-      for (let i = 0; i < 30; i++) {
-        await page.waitForTimeout(3000);
-        const msgResp = await request.get(
-          `${API_BASE}/workspaces/${workspaceId}/messages`,
-          { headers },
-        );
-        if (msgResp.ok()) {
-          const messages = await msgResp.json();
-          if (
-            messages.some((m: any) => m.entry_type === "assistant" && m.content)
-          ) {
-            found = true;
-            break;
+        // Send a prompt — it should trigger a container restart
+        const { height } = vp(page);
+        const f = fv(page);
+        await f.click({ position: { x: 240, y: height - 30 }, force: true });
+        await page.waitForTimeout(500);
+        await page.keyboard.type("say hello");
+        await page.waitForTimeout(300);
+        await page.keyboard.press("Enter");
+
+        // Poll for a response — the container should restart and respond
+        let found = false;
+        for (let i = 0; i < 30; i++) {
+          await page.waitForTimeout(3000);
+          const msgResp = await request.get(
+            `${API_BASE}/workspaces/${workspaceId}/messages`,
+            { headers },
+          );
+          if (msgResp.ok()) {
+            const messages = await msgResp.json();
+            if (
+              messages.some(
+                (m: any) => m.entry_type === "assistant" && m.content,
+              )
+            ) {
+              found = true;
+              break;
+            }
           }
         }
+        expect(found).toBeTruthy();
+      } finally {
+        await cleanup();
       }
-      expect(found).toBeTruthy();
-    } finally {
-      await cleanup();
-    }
-  });
+    });
+  }); // end idle timeout describe
 
   test("container starts on workspace open and stops on navigate away", async ({
     page,

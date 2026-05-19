@@ -29,6 +29,9 @@
     git # HM for "error: Failed to find git" during devenv:git-hooks:install
   ];
 
+  env.PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers;
+  env.PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+
   tasks = {
     "bark:flutter-build" = {
       exec = ''exec bash "$DEVENV_ROOT/scripts/flutterbuildweb.sh"'';
@@ -118,7 +121,13 @@
 
   scripts.test-e2e.exec = ''
     cd $DEVENV_ROOT/src/e2e_tests
-    exec npx playwright test "$@"
+    npm install --silent
+    rc=0
+    for browser in chromium firefox webkit; do
+      echo "==> Running $browser tests"
+      npx playwright test --project=$browser "$@" || rc=1
+    done
+    exit $rc
   '';
 
   scripts.test-frontend.exec = ''

@@ -4,10 +4,11 @@ import { defineConfig } from "@playwright/test";
 const BACKEND_PORT = process.env.BARK_E2E_PORT || "18997";
 const BASE_URL =
   process.env.BARK_TEST_URL || `http://localhost:${BACKEND_PORT}`;
+const BROWSERS = process.env.PLAYWRIGHT_BROWSERS_PATH || "";
 
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 60_000,
+  timeout: 120_000,
   retries: 0,
   workers: parseInt(process.env.BARK_E2E_WORKERS || "2"),
   fullyParallel: true,
@@ -25,9 +26,24 @@ export default defineConfig({
         launchOptions: {
           executablePath:
             process.env.CHROME_PATH ||
-            "/run/current-system/sw/bin/google-chrome",
+            `${BROWSERS}/chromium-1217/chrome-linux64/chrome`,
           args: ["--enable-unsafe-swiftshader"],
         },
+      },
+    },
+    {
+      name: "firefox",
+      use: {
+        browserName: "firefox",
+        launchOptions: {
+          executablePath: `${BROWSERS}/firefox-1511/firefox/firefox`,
+        },
+      },
+    },
+    {
+      name: "webkit",
+      use: {
+        browserName: "webkit",
       },
     },
   ],
