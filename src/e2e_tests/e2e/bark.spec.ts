@@ -19,7 +19,10 @@ async function registerUser(
   const resp = await request.post(`${API_BASE}/auth/register`, {
     data: { username, password: TEST_PASSWORD },
   });
-  expect(resp.ok()).toBeTruthy();
+  if (!resp.ok()) {
+    const body = await resp.text();
+    throw new Error(`Register failed: ${resp.status()} ${body}`);
+  }
   const data = await resp.json();
   const token = data.access_token;
   return { token, headers: { Authorization: `Bearer ${token}` } };
@@ -120,6 +123,10 @@ async function sendPrompt(
   const typeAndSend = async () => {
     await flutterClick(page, 240, height - 30);
     await page.waitForTimeout(500);
+    // Select all + delete to clear any leftover text from a failed attempt
+    await page.keyboard.press("Control+a");
+    await page.keyboard.press("Backspace");
+    await page.waitForTimeout(200);
     await page.keyboard.type(text);
     await page.waitForTimeout(300);
     await page.keyboard.press("Enter");
@@ -1033,26 +1040,14 @@ test.describe("Bark E2E", () => {
       // Before opening: no running container for this workspace
       expect(dockerContainersForWorkspace(workspaceId)).toHaveLength(0);
 
-      // Open the workspace — this starts a container.
-      // Use full URL (not just #fragment) so the page reloads and creates
-      // a new WebSocket — a hash-only change may not trigger reconnection.
-      await loginViaUI(page, username, TEST_PASSWORD);
-      await page.goto(`/#/workspace/${workspaceId}`);
-      await waitForFlutter(page);
+      // Open the workspace — openWorkspace handles WebSocket lifecycle
+      // and waits for container_ready, so the container is guaranteed
+      // to be running when it returns.
+      await openWorkspace(page, username, workspaceId);
 
-      // Wait for container to start (poll up to 60s)
-      let started = false;
-      for (let i = 0; i < 60; i++) {
-        if (dockerContainersForWorkspace(workspaceId).length > 0) {
-          started = true;
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      expect(started).toBeTruthy();
-
-      // Let the workspace UI fully render after container start
-      await page.waitForTimeout(3000);
+      expect(dockerContainersForWorkspace(workspaceId).length).toBeGreaterThan(
+        0,
+      );
 
       // Navigate away (click back button)
       await flutterClick(page, 25, 28);
