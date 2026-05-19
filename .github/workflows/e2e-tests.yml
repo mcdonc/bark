@@ -81,13 +81,12 @@ jobs:
         run: |
           ./bootstrap --unattended --cachix-version v1.11.1
 
-      - name: Configure Cachix
-        run: |
-          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          cachix authtoken "$CACHIX_AUTH_TOKEN"
-          cachix use mcdonc
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - uses: cachix/cachix-action@v15
+        with:
+          name: mcdonc
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+          installCommand: "true"
+          cachixBin: /home/runner/.nix-profile/bin/cachix
 
       - name: Prepare bark devenv
         run: |
