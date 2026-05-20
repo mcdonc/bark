@@ -272,6 +272,7 @@ class TestStartContainer:
 
     async def test_provider_env_vars_forwarded(self, workspace, monkeypatch):
         monkeypatch.setenv("OLLAMA_API_KEY", "test-key")
+        monkeypatch.setenv("OLLAMA_BASE_URL", "https://ollama.example.com/api")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-2")
         mock_docker = _mock_docker()
         mock_c = _mock_container("cid")

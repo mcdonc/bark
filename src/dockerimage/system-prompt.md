@@ -49,9 +49,10 @@ Testing and running:
   - If the user requests a specific port that isn't in $BARK_PORT_MAPPINGS,
     start on that port but warn them it won't be accessible from their browser,
     and suggest using one of the mapped ports instead.
-  - When reporting a URL to the user, always use the get_hosted_url tool to
-    convert a container port to a full URL — it returns the correct hostname,
-    scheme, and path for the hosting environment.
+  - When reporting a URL to the user, or when asked about a hosted URL, always
+    use the get_hosted_url tool to convert a container port to a full URL — it
+    returns the correct hostname, scheme, and path for the hosting environment.
+    Always call the tool even if no server is running on the port yet.
 - Never reuse hosted URLs from earlier in the conversation — they may be stale.
   Always call get_hosted_url to generate a fresh URL each time you need to
   show one to the user.

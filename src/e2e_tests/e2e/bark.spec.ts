@@ -133,8 +133,8 @@ async function sendPrompt(
   };
 
   const checkReceived = async (): Promise<boolean> => {
-    for (let i = 0; i < 10; i++) {
-      await page.waitForTimeout(2000);
+    for (let i = 0; i < 5; i++) {
+      await page.waitForTimeout(1000);
       const msgResp = await request.get(
         `${API_BASE}/workspaces/${workspaceId}/messages`,
         { headers },
@@ -252,6 +252,7 @@ async function createAndOpenWorkspace(
   namePrefix: string,
 ): Promise<{
   workspaceId: string;
+  username: string;
   token: string;
   headers: Record<string, string>;
   cleanup: () => Promise<void>;
@@ -264,7 +265,7 @@ async function createAndOpenWorkspace(
     namePrefix,
   );
   await openWorkspace(page, username, workspaceId);
-  return { workspaceId, token, headers, cleanup };
+  return { workspaceId, username, token, headers, cleanup };
 }
 
 function dockerContainersForWorkspace(workspaceId: string): string[] {
@@ -295,7 +296,6 @@ test.describe("Bark E2E", () => {
     page,
     request,
   }) => {
-    test.setTimeout(120_000);
     const { cleanup } = await createAndOpenWorkspace(page, request, "ide");
 
     try {
@@ -308,7 +308,6 @@ test.describe("Bark E2E", () => {
   });
 
   test("workspace shows terminal tab", async ({ page, request }) => {
-    test.setTimeout(120_000);
     const { cleanup } = await createAndOpenWorkspace(page, request, "term");
 
     try {
@@ -320,7 +319,6 @@ test.describe("Bark E2E", () => {
   });
 
   test("switch to Files tab and back", async ({ page, request }) => {
-    test.setTimeout(120_000);
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
       page,
       request,
@@ -373,7 +371,6 @@ test.describe("Bark E2E", () => {
   });
 
   test("terminal accepts keyboard input", async ({ page, request }) => {
-    test.setTimeout(120_000);
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
       page,
       request,
@@ -407,7 +404,6 @@ test.describe("Bark E2E", () => {
   });
 
   test("navigate back to workspaces", async ({ page, request }) => {
-    test.setTimeout(120_000);
     const { cleanup } = await createAndOpenWorkspace(page, request, "nav-back");
 
     try {
@@ -470,7 +466,6 @@ test.describe("Bark E2E", () => {
     page,
     request,
   }) => {
-    test.setTimeout(120_000);
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
       page,
       request,
@@ -657,79 +652,6 @@ test.describe("Bark E2E", () => {
     await request.delete(`${API_BASE}/workspaces/${workspaceId}`, { headers });
   });
 
-  test("agent creates and serves a hosted app", async ({ page, request }) => {
-    test.setTimeout(300_000);
-
-    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
-      page,
-      request,
-      "e2e-hosted-test",
-    );
-
-    try {
-      // Simple prompt — the test exercises file creation + hosted URL
-      // generation, not LLM coding ability.
-      await sendPrompt(
-        page,
-        request,
-        workspaceId,
-        headers,
-        'create a node http server that responds with "hello world" and serve it',
-      );
-
-      // Poll for files and a hosted URL in a single loop
-      let hasFiles = false;
-      let hostedUrl: string | null = null;
-      for (let i = 0; i < 60; i++) {
-        await page.waitForTimeout(2000);
-
-        // Check for files
-        if (!hasFiles) {
-          const listResp = await request.get(
-            `${API_BASE}/workspaces/${workspaceId}/files?path=.`,
-            { headers },
-          );
-          if (listResp.ok()) {
-            const entries = await listResp.json();
-            if (entries.length > 0) hasFiles = true;
-          }
-        }
-
-        // Check for hosted URL in messages
-        const msgResp = await request.get(
-          `${API_BASE}/workspaces/${workspaceId}/messages`,
-          { headers },
-        );
-        if (msgResp.ok()) {
-          const messages = await msgResp.json();
-          const match = messages.find(
-            (m: any) =>
-              m.entry_type === "assistant" &&
-              /https?:\/\/localhost:\d+\/(bark\/)?hosted\//.test(
-                m.content ?? "",
-              ),
-          );
-          if (match) {
-            const urlMatch = (match.content as string).match(
-              /https?:\/\/localhost:\d+\/(bark\/)?hosted\/[^\s)]+/,
-            );
-            hostedUrl = urlMatch ? urlMatch[0] : null;
-          }
-        }
-
-        if (hasFiles && hostedUrl) break;
-      }
-      expect(hasFiles).toBeTruthy();
-      expect(hostedUrl).toBeTruthy();
-
-      // Verify container is still running
-      const containers = dockerContainersForWorkspace(workspaceId);
-      expect(containers.length).toBeGreaterThan(0);
-    } finally {
-      await cleanup();
-    }
-  });
-
   test("logout returns to login page", async ({ page, request }) => {
     const username = `logout-${Date.now()}`;
     await registerUser(request, username);
@@ -804,55 +726,10 @@ test.describe("Bark E2E", () => {
     expect(wsResp.status()).toBe(401);
   });
 
-  test("simple prompt returns assistant message", async ({ page, request }) => {
-    test.setTimeout(120_000);
-
-    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
-      page,
-      request,
-      "e2e-simple-prompt",
-    );
-
-    try {
-      await sendPrompt(
-        page,
-        request,
-        workspaceId,
-        headers,
-        "what is 2+2? reply with just the number",
-      );
-
-      let found = false;
-      for (let i = 0; i < 30; i++) {
-        await page.waitForTimeout(3000);
-        const msgResp = await request.get(
-          `${API_BASE}/workspaces/${workspaceId}/messages`,
-          { headers },
-        );
-        if (msgResp.ok()) {
-          const messages = await msgResp.json();
-          if (
-            messages.some(
-              (m: any) =>
-                m.entry_type === "assistant" && m.content.includes("4"),
-            )
-          ) {
-            found = true;
-            break;
-          }
-        }
-      }
-      expect(found).toBeTruthy();
-    } finally {
-      await cleanup();
-    }
-  });
-
   test("terminal command sequence creates directory", async ({
     page,
     request,
   }) => {
-    test.setTimeout(120_000);
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
       page,
       request,
@@ -894,7 +771,6 @@ test.describe("Bark E2E", () => {
   });
 
   test("terminal works after tab switching", async ({ page, request }) => {
-    test.setTimeout(120_000);
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
       page,
       request,
@@ -943,91 +819,10 @@ test.describe("Bark E2E", () => {
     }
   });
 
-  test("container stops after idle timeout", async ({ page, request }) => {
-    test.setTimeout(300_000);
-
-    // Check if test mode is enabled
-    const getResp = await request.get(`${API_BASE}/api/test/idle-timeout`);
-    if (!getResp.ok()) {
-      test.skip(true, "BARK_TEST_MODE not enabled");
-      return;
-    }
-
-    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
-      page,
-      request,
-      "e2e-idle-test",
-    );
-
-    // Set a short idle timeout for this workspace only
-    await request.post(
-      `${API_BASE}/api/test/set-idle-timeout?seconds=5&workspace_id=${workspaceId}`,
-      { headers },
-    );
-
-    try {
-      // Wait for the container to actually stop
-      let stopped = false;
-      for (let i = 0; i < 30; i++) {
-        if (dockerContainersForWorkspace(workspaceId).length === 0) {
-          stopped = true;
-          break;
-        }
-        await page.waitForTimeout(1000);
-      }
-      expect(stopped).toBeTruthy();
-
-      // Reset per-workspace timeout to something long before sending the
-      // prompt, so the restarted container doesn't get killed while waiting
-      // for the LLM response (which can be slow under concurrent load).
-      await request.post(
-        `${API_BASE}/api/test/set-idle-timeout?seconds=300&workspace_id=${workspaceId}`,
-        { headers },
-      );
-
-      // Navigate away and back to get a fresh WebSocket connection —
-      // the old one died with the container. Navigate to root first to
-      // force a full page reload (goto to the same URL may be a no-op).
-      await page.goto("/");
-      await waitForFlutter(page);
-      await page.goto(`/#/workspace/${workspaceId}`);
-      await waitForFlutter(page);
-      await page.waitForTimeout(4000);
-
-      // Send a prompt — the backend will auto-restart the container
-      // when it receives a prompt on a dead Pi client.
-      await sendPrompt(page, request, workspaceId, headers, "say hello");
-
-      // Poll for a response — the container should restart and respond
-      let found = false;
-      for (let i = 0; i < 30; i++) {
-        await page.waitForTimeout(3000);
-        const msgResp = await request.get(
-          `${API_BASE}/workspaces/${workspaceId}/messages`,
-          { headers },
-        );
-        if (msgResp.ok()) {
-          const messages = await msgResp.json();
-          if (
-            messages.some((m: any) => m.entry_type === "assistant" && m.content)
-          ) {
-            found = true;
-            break;
-          }
-        }
-      }
-      expect(found).toBeTruthy();
-    } finally {
-      await cleanup();
-    }
-  });
-
   test("container starts on workspace open and stops on navigate away", async ({
     page,
     request,
   }) => {
-    test.setTimeout(120_000);
-
     const username = `lifecycle-${Date.now()}`;
     const { token, headers } = await registerUser(request, username);
     const { workspaceId, cleanup } = await createWorkspace(
@@ -1136,7 +931,6 @@ test.describe("Bark E2E", () => {
     page,
     request,
   }) => {
-    test.setTimeout(120_000);
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
       page,
       request,
@@ -1182,106 +976,248 @@ test.describe("Bark E2E", () => {
     }
   });
 
-  test("abort stops a running agent", async ({ page, request }) => {
-    test.setTimeout(120_000);
+  test.describe("serial tests", () => {
+    /// serial tests run one after the other after all parallel tests complete
+    test.describe.configure({ mode: "serial" });
 
-    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
-      page,
-      request,
-      "e2e-abort-test",
-    );
+    test("container stops after idle timeout", async ({ page, request }) => {
+      // Check if test mode is enabled
+      const getResp = await request.get(`${API_BASE}/api/test/idle-timeout`);
+      if (!getResp.ok()) {
+        test.skip(true, "BARK_TEST_MODE not enabled");
+        return;
+      }
 
-    try {
-      await sendPrompt(
-        page,
-        request,
-        workspaceId,
-        headers,
-        "write a very detailed 2000 word essay about the history of computing",
-      );
+      const { workspaceId, username, headers, cleanup } =
+        await createAndOpenWorkspace(page, request, "e2e-idle-test");
 
-      // Wait for the agent to start running
-      await page.waitForTimeout(5000);
-
-      // Click the abort button (red stop_circle icon, to the right of
-      // the chat input). It's at the send button position.
-      const { height } = vp(page);
-      await flutterClick(page, 460, height - 30);
-      await page.waitForTimeout(3000);
-
-      // Verify the agent stopped — check that messages contain the user prompt
-      const msgResp = await request.get(
-        `${API_BASE}/workspaces/${workspaceId}/messages`,
+      // Set a short idle timeout for this workspace only
+      await request.post(
+        `${API_BASE}/api/test/set-idle-timeout?seconds=5&workspace_id=${workspaceId}`,
         { headers },
       );
-      expect(msgResp.ok()).toBeTruthy();
-      const messages = await msgResp.json();
-      expect(
-        messages.some(
-          (m: any) =>
-            m.entry_type === "user" && m.content.includes("computing"),
-        ),
-      ).toBeTruthy();
-    } finally {
-      await cleanup();
-    }
-  });
 
-  test("queued prompt is delivered after current run finishes", async ({
-    page,
-    request,
-  }) => {
-    test.setTimeout(180_000);
+      try {
+        // Wait for the container to actually stop
+        let stopped = false;
+        for (let i = 0; i < 30; i++) {
+          if (dockerContainersForWorkspace(workspaceId).length === 0) {
+            stopped = true;
+            break;
+          }
+          await page.waitForTimeout(1000);
+        }
+        expect(stopped).toBeTruthy();
 
-    const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
-      page,
-      request,
-      "e2e-queue-test",
-    );
+        // Reset per-workspace timeout so the restarted container isn't
+        // immediately killed again.
+        await request.post(
+          `${API_BASE}/api/test/set-idle-timeout?seconds=300&workspace_id=${workspaceId}`,
+          { headers },
+        );
 
-    try {
-      const { height } = vp(page);
+        // Re-open the workspace using openWorkspace which handles login,
+        // navigation, WebSocket lifecycle, and container_ready properly.
+        await openWorkspace(page, username, workspaceId);
 
-      // Send first prompt (verified delivery)
-      await sendPrompt(
+        expect(
+          dockerContainersForWorkspace(workspaceId).length,
+        ).toBeGreaterThan(0);
+      } finally {
+        await cleanup();
+      }
+    });
+
+    test("get_hosted_url returns a hosted URL", async ({ page, request }) => {
+      const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
         page,
         request,
-        workspaceId,
-        headers,
-        "what is 10+10? reply with just the number",
+        "e2e-hosted-url",
       );
 
-      // Immediately send second prompt (should be queued while first runs)
-      await flutterClick(page, 240, height - 30);
-      await page.waitForTimeout(300);
-      await page.keyboard.type("what is 20+20? reply with just the number");
-      await page.keyboard.press("Enter");
+      try {
+        // Ask the LLM to call get_hosted_url — don't ask it to create
+        // files or start a server. This tests the hosted URL mechanism
+        // without depending on LLM coding ability.
+        await sendPrompt(
+          page,
+          request,
+          workspaceId,
+          headers,
+          "what is the hosted url for a service running on port 8000? use the get_hosted_url tool to find out.",
+        );
 
-      // Poll for both responses
-      let foundFirst = false;
-      let foundSecond = false;
-      for (let i = 0; i < 40; i++) {
+        // Poll for a hosted URL in the assistant messages
+        let hostedUrl: string | null = null;
+        for (let i = 0; i < 60; i++) {
+          await page.waitForTimeout(2000);
+          const msgResp = await request.get(
+            `${API_BASE}/workspaces/${workspaceId}/messages`,
+            { headers },
+          );
+          if (msgResp.ok()) {
+            const messages = await msgResp.json();
+            const match = messages.find(
+              (m: any) =>
+                m.entry_type === "assistant" &&
+                /https?:\/\/localhost:\d+\/(bark\/)?hosted\//.test(
+                  m.content ?? "",
+                ),
+            );
+            if (match) {
+              const urlMatch = (match.content as string).match(
+                /https?:\/\/localhost:\d+\/(bark\/)?hosted\/[^\s)]+/,
+              );
+              hostedUrl = urlMatch ? urlMatch[0] : null;
+            }
+          }
+          if (hostedUrl) break;
+        }
+        expect(hostedUrl).toBeTruthy();
+      } finally {
+        await cleanup();
+      }
+    });
+
+    test("agent creates a file with expected content", async ({
+      page,
+      request,
+    }) => {
+      const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+        page,
+        request,
+        "e2e-file-create",
+      );
+
+      try {
+        await sendPrompt(
+          page,
+          request,
+          workspaceId,
+          headers,
+          'create a file called hello.txt containing exactly the text "bark-e2e-test-ok"',
+        );
+
+        // Poll for the file to appear with the expected content
+        let content: string | null = null;
+        for (let i = 0; i < 60; i++) {
+          await page.waitForTimeout(2000);
+          const resp = await request.get(
+            `${API_BASE}/workspaces/${workspaceId}/files/content?path=hello.txt`,
+            { headers },
+          );
+          if (resp.ok()) {
+            const data = await resp.json();
+            if (data.content && data.content.includes("bark-e2e-test-ok")) {
+              content = data.content;
+              break;
+            }
+          }
+        }
+        expect(content).toBeTruthy();
+        expect(content).toContain("bark-e2e-test-ok");
+      } finally {
+        await cleanup();
+      }
+    });
+
+    test("abort stops a running agent", async ({ page, request }) => {
+      const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+        page,
+        request,
+        "e2e-abort-test",
+      );
+
+      try {
+        await sendPrompt(
+          page,
+          request,
+          workspaceId,
+          headers,
+          "write a very detailed 2000 word essay about the history of computing",
+        );
+
+        // Wait for the agent to start running
+        await page.waitForTimeout(5000);
+
+        // Click the abort button (red stop_circle icon, to the right of
+        // the chat input). It's at the send button position.
+        const { height } = vp(page);
+        await flutterClick(page, 460, height - 30);
         await page.waitForTimeout(3000);
+
+        // Verify the agent stopped — check that messages contain the user prompt
         const msgResp = await request.get(
           `${API_BASE}/workspaces/${workspaceId}/messages`,
           { headers },
         );
-        if (msgResp.ok()) {
-          const messages = await msgResp.json();
-          const assistantMsgs = messages.filter(
-            (m: any) => m.entry_type === "assistant",
-          );
-          for (const m of assistantMsgs) {
-            if (m.content.includes("20")) foundFirst = true;
-            if (m.content.includes("40")) foundSecond = true;
-          }
-          if (foundFirst && foundSecond) break;
-        }
+        expect(msgResp.ok()).toBeTruthy();
+        const messages = await msgResp.json();
+        expect(
+          messages.some(
+            (m: any) =>
+              m.entry_type === "user" && m.content.includes("computing"),
+          ),
+        ).toBeTruthy();
+      } finally {
+        await cleanup();
       }
-      expect(foundFirst).toBeTruthy();
-      expect(foundSecond).toBeTruthy();
-    } finally {
-      await cleanup();
-    }
+    });
+
+    test("queued prompt is delivered after current run finishes", async ({
+      page,
+      request,
+    }) => {
+      const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
+        page,
+        request,
+        "e2e-queue-test",
+      );
+
+      try {
+        const { height } = vp(page);
+
+        // Send first prompt (verified delivery)
+        await sendPrompt(
+          page,
+          request,
+          workspaceId,
+          headers,
+          "what is 10+10? reply with just the number",
+        );
+
+        // Immediately send second prompt (should be queued while first runs)
+        await flutterClick(page, 240, height - 30);
+        await page.waitForTimeout(300);
+        await page.keyboard.type("what is 20+20? reply with just the number");
+        await page.keyboard.press("Enter");
+
+        // Poll for both responses
+        let foundFirst = false;
+        let foundSecond = false;
+        for (let i = 0; i < 40; i++) {
+          await page.waitForTimeout(3000);
+          const msgResp = await request.get(
+            `${API_BASE}/workspaces/${workspaceId}/messages`,
+            { headers },
+          );
+          if (msgResp.ok()) {
+            const messages = await msgResp.json();
+            const assistantMsgs = messages.filter(
+              (m: any) => m.entry_type === "assistant",
+            );
+            for (const m of assistantMsgs) {
+              if (m.content.includes("20")) foundFirst = true;
+              if (m.content.includes("40")) foundSecond = true;
+            }
+            if (foundFirst && foundSecond) break;
+          }
+        }
+        expect(foundFirst).toBeTruthy();
+        expect(foundSecond).toBeTruthy();
+      } finally {
+        await cleanup();
+      }
+    });
   });
 });

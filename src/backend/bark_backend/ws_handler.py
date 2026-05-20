@@ -291,6 +291,7 @@ async def _handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
         await _send_error(ws, "Not connected to a workspace")
         return
 
+    logger.info("Prompt received for workspace %s: %s", workspace_id, text[:80])
     # Try to send prompt, auto-restart container if it's dead
     pi_client: PiRpcClient | None = state.get("pi_client")
     try:
@@ -329,6 +330,7 @@ async def _handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
             logger.info("Agent busy, queued as follow_up: %s", text[:50])
         else:
             await pi_client.prompt(text)
+            logger.info("Prompt sent to Pi for workspace %s", workspace_id)
     except (RuntimeError, OSError, ConnectionError) as e:
         logger.info(
             "Prompt failed (%s), auto-restarting container for workspace %s",
@@ -596,8 +598,17 @@ async def _forward_events(
     current_tool_args = ""
     current_tool_output = ""
 
+    event_count = 0
     try:
         async for pi_event in pi_client.events():
+            event_count += 1
+            if event_count <= 3:
+                logger.info(
+                    "Pi event #%d for %s: %s",
+                    event_count,
+                    workspace_id,
+                    pi_event.get("type", "unknown"),
+                )
             agui_events = translate_event(pi_event, workspace_id)
             for agui_event in agui_events:
                 await ws.send_json({"type": "event", "event": agui_event})
@@ -643,7 +654,11 @@ async def _forward_events(
                         agui_event.get("message", "Unknown error"),
                     )
     except (OSError, WebSocketDisconnect, RuntimeError, ConnectionError) as e:
-        logger.error("Event forwarding error: %s", e)
+        logger.error("Event forwarding error for %s: %s", workspace_id, e)
+    finally:
+        logger.info(
+            "Event forwarding ended for %s after %d events", workspace_id, event_count
+        )
 
 
 async def _cleanup_connection(ws: WebSocket, state: dict) -> None:

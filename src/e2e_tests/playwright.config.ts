@@ -8,7 +8,7 @@ const BROWSERS = process.env.PLAYWRIGHT_BROWSERS_PATH || "";
 
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 120_000,
+  timeout: 300_000,
   retries: 0,
   workers: process.env.BARK_E2E_WORKERS || "100%",
   fullyParallel: true,

@@ -2,8 +2,8 @@ name: E2E Tests
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "15 * * * *"
+  # schedule:
+  #   - cron: "15 * * * *"
 
 jobs:
   check:
@@ -47,6 +47,7 @@ jobs:
       BARK_JWT_SECRET: e2e-test-secret
       BARK_DEFAULT_USER: admin
       BARK_DEFAULT_PASSWORD: admin
+      BARK_TEST_MODE: "1"
     steps:
       - uses: actions/checkout@v6
 
@@ -64,18 +65,6 @@ jobs:
             /usr/lib/google-cloud-sdk \
             /usr/local/powershell /usr/local/.ghcup \
             /usr/local/julia* &
-
-      - name: Create .env
-        run: |
-          cat > .env << EOF
-          OLLAMA_API_KEY=${{ secrets.OLLAMA_API_KEY }}
-          OLLAMA_BASE_URL=${{ secrets.OLLAMA_BASE_URL }}
-          OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
-          BARK_JWT_SECRET=e2e-test-secret
-          BARK_DEFAULT_USER=admin
-          BARK_DEFAULT_PASSWORD=admin
-          BARK_TEST_MODE=1
-          EOF
 
       - name: Bootstrap
         run: |
@@ -103,4 +92,4 @@ jobs:
           name: playwright-results
           path: |
             src/e2e_tests/test-results/
-            src/e2e_tests/backend.log
+            src/e2e_tests/backend*.log

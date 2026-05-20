@@ -10,6 +10,39 @@ async function globalSetup() {
   const projectRoot = join(__dirname, "..", "..");
   const backendPort = process.env.BARK_E2E_PORT || "18997";
 
+  // Warm up Ollama before starting the server to force model loading.
+  // Cold model loads on first request can take 30+ seconds.
+  const ollamaUrl = process.env.OLLAMA_BASE_URL;
+  const ollamaModel = process.env.OLLAMA_MODEL;
+  const ollamaKey = process.env.OLLAMA_API_KEY;
+  if (ollamaUrl && ollamaModel) {
+    console.log("Warming up Ollama...");
+    const warmupStart = Date.now();
+    try {
+      const warmupResp = await fetch(`${ollamaUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(ollamaKey ? { Authorization: `Bearer ${ollamaKey}` } : {}),
+        },
+        body: JSON.stringify({
+          model: ollamaModel,
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 1,
+        }),
+      });
+      if (warmupResp.ok) {
+        console.log(
+          `Ollama warm (${((Date.now() - warmupStart) / 1000).toFixed(1)}s)`,
+        );
+      } else {
+        console.warn(`Ollama warmup failed: ${warmupResp.status}`);
+      }
+    } catch (e) {
+      console.warn(`Ollama warmup error: ${e}`);
+    }
+  }
+
   console.log(
     `Starting E2E server on port ${backendPort} ` +
       `with BARK_DATA_DIR=${dataDir}`,
@@ -38,8 +71,15 @@ async function globalSetup() {
 
   process.env.BARK_E2E_PID = String(backendProcess.pid);
 
-  // Write backend output to a log file to keep Playwright output clean
-  const logPath = join(projectRoot, "src", "e2e_tests", "backend.log");
+  // Write backend output to a per-run log file so logs aren't overwritten
+  // when test-e2e runs each browser sequentially.
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const logPath = join(
+    projectRoot,
+    "src",
+    "e2e_tests",
+    `backend-${timestamp}.log`,
+  );
   const logStream = createWriteStream(logPath);
   process.env.BARK_E2E_LOG = logPath;
   backendProcess.stdout?.pipe(logStream);
