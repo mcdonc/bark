@@ -27,8 +27,14 @@ async def _seed_default_user() -> None:
     existing = await user_store.get_user_by_username(username)
     if existing is None:
         password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-        await user_store.create_user(username, password_hash)
-        logger.info("Created default user '%s'", username)
+        user = await user_store.create_user(username, password_hash)
+        await user_store.ensure_role("admin")
+        await user_store.assign_role(user["id"], "admin")
+        logger.info("Created default user '%s' with admin role", username)
+    else:
+        # Ensure existing default user has admin role
+        await user_store.ensure_role("admin")
+        await user_store.assign_role(existing["id"], "admin")
 
 
 @asynccontextmanager

@@ -32,7 +32,7 @@ async def init_db() -> None:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS workspaces (
                 id TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL REFERENCES users(id),
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
                 container_id TEXT,
                 num_ports INTEGER NOT NULL DEFAULT 5,  -- see container_manager.DEFAULT_PORTS_PER_WORKSPACE
@@ -44,6 +44,18 @@ async def init_db() -> None:
             CREATE TABLE IF NOT EXISTS port_allocations (
                 port INTEGER PRIMARY KEY,
                 workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS roles (
+                name TEXT PRIMARY KEY
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS user_roles (
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                role_name TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
+                PRIMARY KEY (user_id, role_name)
             )
         """)
         await db.execute("""
@@ -88,6 +100,42 @@ async def create_user(username: str, password_hash: str) -> dict:
         await db.close()
 
 
+async def ensure_role(name: str) -> None:
+    """Create a role if it doesn't exist."""
+    db = await _get_db()
+    try:
+        await db.execute("INSERT OR IGNORE INTO roles (name) VALUES (?)", (name,))
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def assign_role(user_id: str, role_name: str) -> None:
+    """Assign a role to a user (idempotent)."""
+    db = await _get_db()
+    try:
+        await db.execute(
+            "INSERT OR IGNORE INTO user_roles (user_id, role_name) VALUES (?, ?)",
+            (user_id, role_name),
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def get_user_roles(user_id: str) -> list[str]:
+    """Get all roles for a user."""
+    db = await _get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT role_name FROM user_roles WHERE user_id = ?", (user_id,)
+        )
+        rows = await cursor.fetchall()
+        return [row["role_name"] for row in rows]
+    finally:
+        await db.close()
+
+
 async def get_user_by_username(username: str) -> dict | None:
     db = await _get_db()
     try:
@@ -103,6 +151,82 @@ async def get_user_by_username(username: str) -> dict | None:
             "username": row["username"],
             "password_hash": row["password_hash"],
         }
+    finally:
+        await db.close()
+
+
+async def list_users() -> list[dict]:
+    """List all users with their roles."""
+    db = await _get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT id, username, created_at FROM users ORDER BY created_at"
+        )
+        users = []
+        for row in await cursor.fetchall():
+            role_cursor = await db.execute(
+                "SELECT role_name FROM user_roles WHERE user_id = ?", (row["id"],)
+            )
+            roles = [r["role_name"] for r in await role_cursor.fetchall()]
+            users.append(
+                {
+                    "id": row["id"],
+                    "username": row["username"],
+                    "created_at": row["created_at"],
+                    "roles": roles,
+                }
+            )
+        return users
+    finally:
+        await db.close()
+
+
+async def delete_user(user_id: str) -> bool:
+    """Delete a user. Returns True if deleted, False if not found."""
+    db = await _get_db()
+    try:
+        cursor = await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
+async def remove_role(user_id: str, role_name: str) -> bool:
+    """Remove a role from a user. Returns True if removed."""
+    db = await _get_db()
+    try:
+        cursor = await db.execute(
+            "DELETE FROM user_roles WHERE user_id = ? AND role_name = ?",
+            (user_id, role_name),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
+async def update_username(user_id: str, username: str) -> None:
+    """Update a user's username."""
+    db = await _get_db()
+    try:
+        await db.execute(
+            "UPDATE users SET username = ? WHERE id = ?", (username, user_id)
+        )
+        await db.commit()
+    finally:
+        await db.close()
+
+
+async def update_password(user_id: str, password_hash: str) -> None:
+    """Update a user's password hash."""
+    db = await _get_db()
+    try:
+        await db.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (password_hash, user_id),
+        )
+        await db.commit()
     finally:
         await db.close()
 

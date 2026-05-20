@@ -22,6 +22,28 @@ class AuthService extends ChangeNotifier {
   bool get loading => _loading;
   bool get initialized => _initialized;
 
+  /// Decode the JWT payload to extract roles.
+  List<String> get roles {
+    if (_token == null) return [];
+    try {
+      final parts = _token!.split('.');
+      if (parts.length != 3) return [];
+      final payload = parts[1];
+      // Add padding if needed
+      final padded = payload.padRight(
+        payload.length + (4 - payload.length % 4) % 4,
+        '=',
+      );
+      final decoded = utf8.decode(base64Url.decode(padded));
+      final data = jsonDecode(decoded) as Map<String, dynamic>;
+      return List<String>.from(data['roles'] ?? []);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  bool get isAdmin => roles.contains('admin');
+
   AuthService() {
     _loadToken();
   }
@@ -113,6 +135,16 @@ class AuthService extends ChangeNotifier {
 
   Future<http.Response> authPost(String path, {String? body}) async {
     final response = await _client.post(
+      Uri.parse('$_baseUrl$path'),
+      headers: _authHeaders,
+      body: body,
+    );
+    if (response.statusCode == 401) await _clearToken();
+    return response;
+  }
+
+  Future<http.Response> authPatch(String path, {String? body}) async {
+    final response = await _client.patch(
       Uri.parse('$_baseUrl$path'),
       headers: _authHeaders,
       body: body,

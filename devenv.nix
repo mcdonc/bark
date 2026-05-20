@@ -25,7 +25,9 @@
   packages = with pkgs; [
     docker-client
     flutter
+    gnutar
     nginx
+    xz
     git # HM for "error: Failed to find git" during devenv:git-hooks:install
   ];
 

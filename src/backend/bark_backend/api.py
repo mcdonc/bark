@@ -59,8 +59,13 @@ async def register(
     req: auth.RegisterRequest,
     user: dict | None = Depends(auth.get_current_user_optional),
 ):
-    if user is None and not os.environ.get("BARK_TEST_MODE"):
+    if os.environ.get("BARK_TEST_MODE"):
+        # Test mode: allow unauthenticated registration
+        return await auth.register(req)
+    if user is None:
         raise HTTPException(status_code=401, detail="Authentication required")
+    if "admin" not in user.get("roles", []):
+        raise HTTPException(status_code=403, detail="Admin role required")
     return await auth.register(req)
 
 
@@ -247,3 +252,76 @@ async def upload_file(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"path": saved_path, "status": "uploaded"}
+
+
+# --- Admin endpoints (require admin role) ---
+
+
+@router.get("/admin/users")
+async def list_users(admin: dict = Depends(auth.require_role("admin"))):
+    return await user_store.list_users()
+
+
+@router.delete("/admin/users/{user_id}")
+async def delete_user(user_id: str, admin: dict = Depends(auth.require_role("admin"))):
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    user = await user_store.get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Stop all containers for this user before deleting
+    await container_manager.stop_user_containers(user_id)
+    # Archive workspace data before deletion
+    await workspace_manager.archive_user_data(user_id, user["username"])
+    deleted = await user_store.delete_user(user_id)
+    if not deleted:  # pragma: no cover — race between get and delete
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "deleted"}
+
+
+@router.post("/admin/users/{user_id}/roles/{role_name}")
+async def add_user_role(
+    user_id: str,
+    role_name: str,
+    admin: dict = Depends(auth.require_role("admin")),
+):
+    user = await user_store.get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    await user_store.ensure_role(role_name)
+    await user_store.assign_role(user_id, role_name)
+    return {"status": "assigned", "user_id": user_id, "role": role_name}
+
+
+@router.delete("/admin/users/{user_id}/roles/{role_name}")
+async def remove_user_role(
+    user_id: str,
+    role_name: str,
+    admin: dict = Depends(auth.require_role("admin")),
+):
+    removed = await user_store.remove_role(user_id, role_name)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Role assignment not found")
+    return {"status": "removed", "user_id": user_id, "role": role_name}
+
+
+class UpdateUserRequest(auth.BaseModel):
+    username: str | None = None
+    password: str | None = None
+
+
+@router.patch("/admin/users/{user_id}")
+async def update_user(
+    user_id: str,
+    req: UpdateUserRequest,
+    admin: dict = Depends(auth.require_role("admin")),
+):
+    user = await user_store.get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if req.username is not None:
+        await user_store.update_username(user_id, req.username)
+    if req.password is not None:
+        password_hash = auth._hash_password(req.password)
+        await user_store.update_password(user_id, password_hash)
+    return {"status": "updated"}

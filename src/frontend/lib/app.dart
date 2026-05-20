@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'utils/web_helpers_stub.dart'
     if (dart.library.html) 'utils/web_helpers_web.dart';
 import 'auth/auth_service.dart';
+import 'admin/admin_users_page.dart';
 import 'auth/login_page.dart';
 import 'workspace/workspace_list_page.dart';
 import 'workspace/workspace_page.dart';
@@ -80,6 +81,10 @@ class _BarkAppState extends State<BarkApp> {
           builder: (context, state) => WorkspacePage(
             workspaceId: state.pathParameters['id']!,
           ),
+        ),
+        GoRoute(
+          path: '/admin/users',
+          builder: (context, state) => const AdminUsersPage(),
         ),
       ],
     );

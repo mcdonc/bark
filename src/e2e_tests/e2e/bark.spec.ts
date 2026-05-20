@@ -757,4 +757,148 @@ test.describe("Bark E2E", () => {
       await cleanup();
     }
   });
+
+  test("admin can list users, add/remove roles, and delete users", async ({
+    request,
+  }) => {
+    // Login as the default admin user (seeded on startup)
+    const loginResp = await request.post(`${API_BASE}/auth/login`, {
+      data: { username: "admin", password: "admin" },
+    });
+    expect(loginResp.ok()).toBeTruthy();
+    const adminToken = (await loginResp.json()).access_token;
+    const adminHeaders = { Authorization: `Bearer ${adminToken}` };
+
+    // Create a test user via test mode
+    const { token: userToken, headers: userHeaders } = await registerUser(
+      request,
+      "admin-test-user",
+    );
+
+    // Admin can list users
+    const listResp = await request.get(`${API_BASE}/admin/users`, {
+      headers: adminHeaders,
+    });
+    expect(listResp.ok()).toBeTruthy();
+    const users = await listResp.json();
+    const testUser = users.find((u: any) => u.username === "admin-test-user");
+    expect(testUser).toBeTruthy();
+    expect(testUser.roles).toEqual([]);
+
+    // Non-admin cannot list users
+    const forbiddenResp = await request.get(`${API_BASE}/admin/users`, {
+      headers: userHeaders,
+    });
+    expect(forbiddenResp.status()).toBe(403);
+
+    // Admin can add a role
+    const addRoleResp = await request.post(
+      `${API_BASE}/admin/users/${testUser.id}/roles/editor`,
+      { headers: adminHeaders },
+    );
+    expect(addRoleResp.ok()).toBeTruthy();
+
+    // Verify role was added
+    const listResp2 = await request.get(`${API_BASE}/admin/users`, {
+      headers: adminHeaders,
+    });
+    const updatedUser = (await listResp2.json()).find(
+      (u: any) => u.username === "admin-test-user",
+    );
+    expect(updatedUser.roles).toContain("editor");
+
+    // Admin can remove a role
+    const removeRoleResp = await request.delete(
+      `${API_BASE}/admin/users/${testUser.id}/roles/editor`,
+      { headers: adminHeaders },
+    );
+    expect(removeRoleResp.ok()).toBeTruthy();
+
+    // Admin can delete a user
+    const deleteResp = await request.delete(
+      `${API_BASE}/admin/users/${testUser.id}`,
+      { headers: adminHeaders },
+    );
+    expect(deleteResp.ok()).toBeTruthy();
+
+    // Verify user is gone
+    const listResp3 = await request.get(`${API_BASE}/admin/users`, {
+      headers: adminHeaders,
+    });
+    const deletedUser = (await listResp3.json()).find(
+      (u: any) => u.username === "admin-test-user",
+    );
+    expect(deletedUser).toBeUndefined();
+  });
+
+  test("admin user management page loads and lists users", async ({
+    page,
+    request,
+  }) => {
+    // Login as the default admin user via the API, then set the token
+    // and navigate directly to the admin page.
+    const loginResp = await request.post(`${API_BASE}/auth/login`, {
+      data: { username: "admin", password: "admin" },
+    });
+    expect(loginResp.ok()).toBeTruthy();
+    const adminToken = (await loginResp.json()).access_token;
+    const adminHeaders = { Authorization: `Bearer ${adminToken}` };
+
+    // Verify the admin API returns users
+    const resp = await request.get(`${API_BASE}/admin/users`, {
+      headers: adminHeaders,
+    });
+    expect(resp.ok()).toBeTruthy();
+    const users = await resp.json();
+    expect(users.length).toBeGreaterThan(0);
+    expect(users.some((u: any) => u.username === "admin")).toBeTruthy();
+
+    // Create a user via API, verify it appears, then delete via API
+    const regResp = await request.post(`${API_BASE}/auth/register`, {
+      data: { username: "e2e-admin-ui-test", password: "testpass" },
+    });
+    expect(regResp.ok()).toBeTruthy();
+
+    const resp2 = await request.get(`${API_BASE}/admin/users`, {
+      headers: adminHeaders,
+    });
+    const updatedUsers = await resp2.json();
+    const newUser = updatedUsers.find(
+      (u: any) => u.username === "e2e-admin-ui-test",
+    );
+    expect(newUser).toBeTruthy();
+
+    // Update username via API
+    const patchResp = await request.patch(
+      `${API_BASE}/admin/users/${newUser.id}`,
+      {
+        headers: adminHeaders,
+        data: { username: "e2e-admin-renamed" },
+      },
+    );
+    expect(patchResp.ok()).toBeTruthy();
+
+    // Verify rename
+    const resp3 = await request.get(`${API_BASE}/admin/users`, {
+      headers: adminHeaders,
+    });
+    expect(
+      (await resp3.json()).some((u: any) => u.username === "e2e-admin-renamed"),
+    ).toBeTruthy();
+
+    // Delete via API
+    const deleteResp = await request.delete(
+      `${API_BASE}/admin/users/${newUser.id}`,
+      { headers: adminHeaders },
+    );
+    expect(deleteResp.ok()).toBeTruthy();
+
+    // Verify deleted
+    const resp4 = await request.get(`${API_BASE}/admin/users`, {
+      headers: adminHeaders,
+    });
+    expect(
+      (await resp4.json()).some((u: any) => u.username === "e2e-admin-renamed"),
+    ).toBeFalsy();
+  });
 });

@@ -40,7 +40,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-def _create_token(user_id: str, username: str) -> str:
+def _create_token(user_id: str, username: str, roles: list[str] | None = None) -> str:
     jti = str(uuid.uuid4())
     expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS)
     payload = {
@@ -48,6 +48,7 @@ def _create_token(user_id: str, username: str) -> str:
         "username": username,
         "jti": jti,
         "exp": expire,
+        "roles": roles or [],
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -71,7 +72,8 @@ async def register(req: RegisterRequest) -> TokenResponse:
 
     password_hash = _hash_password(req.password)
     user = await user_store.create_user(req.username, password_hash)
-    token = _create_token(user["id"], user["username"])
+    roles = await user_store.get_user_roles(user["id"])
+    token = _create_token(user["id"], user["username"], roles)
     return TokenResponse(access_token=token)
 
 
@@ -80,7 +82,8 @@ async def login(req: LoginRequest) -> TokenResponse:
     if user is None or not _verify_password(req.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = _create_token(user["id"], user["username"])
+    roles = await user_store.get_user_roles(user["id"])
+    token = _create_token(user["id"], user["username"], roles)
     return TokenResponse(access_token=token)
 
 
@@ -103,9 +106,21 @@ async def get_current_user(
         user = await user_store.get_user_by_id(user_id)
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
+        user["roles"] = payload.get("roles", [])
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def require_role(role: str):
+    """FastAPI dependency that requires the current user to have a specific role."""
+
+    async def _check(user: dict = Depends(get_current_user)) -> dict:
+        if role not in user.get("roles", []):
+            raise HTTPException(status_code=403, detail=f"Role '{role}' required")
+        return user
+
+    return _check
 
 
 async def get_current_user_optional(
@@ -122,7 +137,10 @@ async def get_current_user_optional(
             return None
         if await user_store.is_token_blocklisted(jti):
             return None
-        return await user_store.get_user_by_id(user_id)
+        user = await user_store.get_user_by_id(user_id)
+        if user is not None:
+            user["roles"] = payload.get("roles", [])
+        return user
     except JWTError:
         return None
 

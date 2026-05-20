@@ -163,6 +163,13 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
           ],
         ),
         actions: [
+          if (context.read<AuthService>().isAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings,
+                  color: Color(0xFF1A237E)),
+              tooltip: 'User Management',
+              onPressed: () => context.go('/admin/users'),
+            ),
           IconButton(
             icon: const Icon(Icons.logout, color: Color(0xFF1A237E)),
             tooltip: 'Logout',

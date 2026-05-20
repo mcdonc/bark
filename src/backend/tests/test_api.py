@@ -6,10 +6,10 @@ import zipfile
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from httpx import AsyncClient, ASGITransport
 
-from bark_backend import api, container_manager, user_store
+from bark_backend import api, auth, container_manager, user_store, workspace_manager
 
 
 @pytest.fixture
@@ -49,9 +49,9 @@ class TestConfig:
 
 
 class TestAuthRoutes:
-    async def test_register(self, client, user):
+    async def test_register(self, client, admin_user):
         login_resp = await client.post(
-            "/auth/login", json={"username": "testuser", "password": "testpass"}
+            "/auth/login", json={"username": "testadmin", "password": "testpass"}
         )
         token = login_resp.json()["access_token"]
         resp = await client.post(
@@ -62,20 +62,42 @@ class TestAuthRoutes:
         assert resp.status_code == 200
         assert "access_token" in resp.json()
 
+    async def test_register_test_mode(self, client, db, monkeypatch):
+        """In test mode, unauthenticated registration is allowed."""
+        monkeypatch.setenv("BARK_TEST_MODE", "1")
+        resp = await client.post(
+            "/auth/register", json={"username": "newuser", "password": "newpass"}
+        )
+        assert resp.status_code == 200
+        assert "access_token" in resp.json()
+
     async def test_register_requires_auth(self, client):
         resp = await client.post(
             "/auth/register", json={"username": "newuser", "password": "newpass"}
         )
         assert resp.status_code == 401
 
-    async def test_register_duplicate(self, client, user):
+    async def test_register_requires_admin_role(self, client, user):
+        """Non-admin authenticated user cannot register new users."""
         login_resp = await client.post(
             "/auth/login", json={"username": "testuser", "password": "testpass"}
         )
         token = login_resp.json()["access_token"]
         resp = await client.post(
             "/auth/register",
-            json={"username": "testuser", "password": "pass"},
+            json={"username": "newuser", "password": "newpass"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 403
+
+    async def test_register_duplicate(self, client, admin_user):
+        login_resp = await client.post(
+            "/auth/login", json={"username": "testadmin", "password": "testpass"}
+        )
+        token = login_resp.json()["access_token"]
+        resp = await client.post(
+            "/auth/register",
+            json={"username": "testadmin", "password": "pass"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 400
@@ -509,3 +531,300 @@ class TestSetIdleTimeout:
             )
         finally:
             container_manager._workspace_idle_timeouts.clear()
+
+
+# --- Roles ---
+
+
+class TestRoles:
+    async def test_require_role_passes(self, admin_user):
+        """require_role dependency passes when user has the role."""
+        checker = auth.require_role("admin")
+        user = {"id": admin_user["id"], "username": "testadmin", "roles": ["admin"]}
+        result = await checker(user)
+        assert result == user
+
+    async def test_require_role_fails(self, user):
+        """require_role dependency raises 403 when user lacks the role."""
+        checker = auth.require_role("admin")
+        user_dict = {"id": user["id"], "username": "testuser", "roles": []}
+        with pytest.raises(HTTPException) as exc_info:
+            await checker(user_dict)
+        assert exc_info.value.status_code == 403
+
+    async def test_ensure_role(self, db):
+        await user_store.ensure_role("editor")
+        # Idempotent
+        await user_store.ensure_role("editor")
+
+    async def test_assign_and_get_roles(self, user):
+        await user_store.ensure_role("admin")
+        await user_store.ensure_role("editor")
+        await user_store.assign_role(user["id"], "admin")
+        await user_store.assign_role(user["id"], "editor")
+        roles = await user_store.get_user_roles(user["id"])
+        assert set(roles) == {"admin", "editor"}
+
+    async def test_assign_role_idempotent(self, user):
+        await user_store.ensure_role("admin")
+        await user_store.assign_role(user["id"], "admin")
+        await user_store.assign_role(user["id"], "admin")
+        roles = await user_store.get_user_roles(user["id"])
+        assert roles == ["admin"]
+
+    async def test_get_roles_empty(self, user):
+        roles = await user_store.get_user_roles(user["id"])
+        assert roles == []
+
+    async def test_roles_in_jwt(self, user):
+        await user_store.ensure_role("admin")
+        await user_store.assign_role(user["id"], "admin")
+        token = auth._create_token(user["id"], "testuser", ["admin"])
+        payload = auth._decode_token(token)
+        assert payload["roles"] == ["admin"]
+
+    async def test_login_includes_roles(self, client, admin_user):
+        resp = await client.post(
+            "/auth/login",
+            json={"username": "testadmin", "password": "testpass"},
+        )
+        assert resp.status_code == 200
+        token = resp.json()["access_token"]
+        payload = auth._decode_token(token)
+        assert "admin" in payload["roles"]
+
+    async def test_login_no_roles(self, client, user):
+        resp = await client.post(
+            "/auth/login",
+            json={"username": "testuser", "password": "testpass"},
+        )
+        assert resp.status_code == 200
+        token = resp.json()["access_token"]
+        payload = auth._decode_token(token)
+        assert payload["roles"] == []
+
+    async def test_cascade_delete_user(self, db):
+        """Deleting a user cascades to user_roles."""
+        user = await user_store.create_user("delme", "hash")
+        await user_store.ensure_role("admin")
+        await user_store.assign_role(user["id"], "admin")
+        assert await user_store.get_user_roles(user["id"]) == ["admin"]
+        db_conn = await user_store._get_db()
+        try:
+            await db_conn.execute("DELETE FROM users WHERE id = ?", (user["id"],))
+            await db_conn.commit()
+        finally:
+            await db_conn.close()
+        assert await user_store.get_user_roles(user["id"]) == []
+
+    async def test_cascade_delete_role(self, user):
+        """Deleting a role cascades to user_roles."""
+        await user_store.ensure_role("temp")
+        await user_store.assign_role(user["id"], "temp")
+        assert "temp" in await user_store.get_user_roles(user["id"])
+        db_conn = await user_store._get_db()
+        try:
+            await db_conn.execute("DELETE FROM roles WHERE name = ?", ("temp",))
+            await db_conn.commit()
+        finally:
+            await db_conn.close()
+        assert "temp" not in await user_store.get_user_roles(user["id"])
+
+
+# --- Admin API endpoints ---
+
+
+class TestAdminEndpoints:
+    async def _admin_headers(self, client):
+        resp = await client.post(
+            "/auth/login", json={"username": "testadmin", "password": "testpass"}
+        )
+        return {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+    async def test_list_users(self, client, admin_user, user):
+        headers = await self._admin_headers(client)
+        resp = await client.get("/admin/users", headers=headers)
+        assert resp.status_code == 200
+        users = resp.json()
+        assert len(users) >= 2
+        usernames = [u["username"] for u in users]
+        assert "testadmin" in usernames
+        assert "testuser" in usernames
+        # Admin user should have roles
+        admin = next(u for u in users if u["username"] == "testadmin")
+        assert "admin" in admin["roles"]
+
+    async def test_list_users_requires_admin(self, client, user):
+        login_resp = await client.post(
+            "/auth/login", json={"username": "testuser", "password": "testpass"}
+        )
+        headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
+        resp = await client.get("/admin/users", headers=headers)
+        assert resp.status_code == 403
+
+    async def test_delete_user(self, client, admin_user, user):
+        headers = await self._admin_headers(client)
+        with (
+            patch.object(
+                container_manager, "stop_user_containers", new_callable=AsyncMock
+            ),
+            patch.object(
+                workspace_manager, "archive_user_data", new_callable=AsyncMock
+            ),
+        ):
+            resp = await client.delete(f"/admin/users/{user['id']}", headers=headers)
+        assert resp.status_code == 200
+        # Verify user is gone
+        resp = await client.get("/admin/users", headers=headers)
+        usernames = [u["username"] for u in resp.json()]
+        assert "testuser" not in usernames
+
+    async def test_delete_self_forbidden(self, client, admin_user):
+        headers = await self._admin_headers(client)
+        resp = await client.delete(f"/admin/users/{admin_user['id']}", headers=headers)
+        assert resp.status_code == 400
+
+    async def test_delete_nonexistent_user(self, client, admin_user):
+        headers = await self._admin_headers(client)
+        resp = await client.delete("/admin/users/nonexistent-id", headers=headers)
+        assert resp.status_code == 404
+
+    async def test_delete_user_cascades_workspaces(self, client, admin_user, user):
+        """Deleting a user cascades to their workspaces."""
+        headers = await self._admin_headers(client)
+        # Create a workspace for the user
+        user_login = await client.post(
+            "/auth/login", json={"username": "testuser", "password": "testpass"}
+        )
+        user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
+        ws_resp = await client.post("/workspaces?name=to-delete", headers=user_headers)
+        assert ws_resp.status_code == 200
+        # Delete the user
+        with patch.object(
+            container_manager, "stop_user_containers", new_callable=AsyncMock
+        ):
+            resp = await client.delete(f"/admin/users/{user['id']}", headers=headers)
+        assert resp.status_code == 200
+        # Workspace should be gone (CASCADE)
+        ws_list = await user_store.get_user_workspaces_with_containers(user["id"])
+        assert len(ws_list) == 0
+
+    async def test_add_role(self, client, admin_user, user):
+        headers = await self._admin_headers(client)
+        resp = await client.post(
+            f"/admin/users/{user['id']}/roles/editor", headers=headers
+        )
+        assert resp.status_code == 200
+        roles = await user_store.get_user_roles(user["id"])
+        assert "editor" in roles
+
+    async def test_add_role_nonexistent_user(self, client, admin_user):
+        headers = await self._admin_headers(client)
+        resp = await client.post(
+            "/admin/users/nonexistent-id/roles/admin", headers=headers
+        )
+        assert resp.status_code == 404
+
+    async def test_remove_role(self, client, admin_user, user):
+        headers = await self._admin_headers(client)
+        # First assign a role
+        await user_store.ensure_role("editor")
+        await user_store.assign_role(user["id"], "editor")
+        # Then remove it
+        resp = await client.delete(
+            f"/admin/users/{user['id']}/roles/editor", headers=headers
+        )
+        assert resp.status_code == 200
+        roles = await user_store.get_user_roles(user["id"])
+        assert "editor" not in roles
+
+    async def test_update_username(self, client, admin_user, user):
+        headers = await self._admin_headers(client)
+        resp = await client.patch(
+            f"/admin/users/{user['id']}",
+            json={"username": "renamed"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        updated = await user_store.get_user_by_id(user["id"])
+        assert updated["username"] == "renamed"
+
+    async def test_update_password(self, client, admin_user, user):
+        headers = await self._admin_headers(client)
+        resp = await client.patch(
+            f"/admin/users/{user['id']}",
+            json={"password": "newpass123"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        # Verify can login with new password
+        login_resp = await client.post(
+            "/auth/login", json={"username": "testuser", "password": "newpass123"}
+        )
+        assert login_resp.status_code == 200
+
+    async def test_update_nonexistent_user(self, client, admin_user):
+        headers = await self._admin_headers(client)
+        resp = await client.patch(
+            "/admin/users/nonexistent-id",
+            json={"username": "x"},
+            headers=headers,
+        )
+        assert resp.status_code == 404
+
+    async def test_remove_role_not_assigned(self, client, admin_user, user):
+        headers = await self._admin_headers(client)
+        resp = await client.delete(
+            f"/admin/users/{user['id']}/roles/nonexistent", headers=headers
+        )
+        assert resp.status_code == 404
+
+
+class TestArchiveUserData:
+    async def test_archive_creates_tarball(self, temp_data_dir, user):
+        """Archive creates a .tar.xz file and removes the original dir."""
+        # Create some workspace data
+        user_dir = workspace_manager.WORKSPACES_ROOT / user["id"]
+        data_dir = user_dir / "data" / "ws1"
+        data_dir.mkdir(parents=True)
+        (data_dir / "hello.txt").write_text("test content")
+
+        result = await workspace_manager.archive_user_data(user["id"], user["username"])
+        assert result is not None
+        assert result.exists()
+        assert result.name == f"{user['id']}-{user['username']}.tar.xz"
+        # Original directory should be removed
+        assert not user_dir.exists()
+
+    async def test_archive_no_data_dir(self, temp_data_dir, user):
+        """Returns None if user has no data directory."""
+        result = await workspace_manager.archive_user_data(user["id"], user["username"])
+        assert result is None
+
+    async def test_archive_tar_nonzero_exit(self, temp_data_dir, user):
+        """Returns None if tar exits with non-zero status."""
+        user_dir = workspace_manager.WORKSPACES_ROOT / user["id"]
+        user_dir.mkdir(parents=True)
+
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(return_value=(b"", b"tar: error"))
+        mock_proc.returncode = 1
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+            result = await workspace_manager.archive_user_data(
+                user["id"], user["username"]
+            )
+        assert result is None
+
+    async def test_archive_tar_oserror(self, temp_data_dir, user):
+        """Returns None if tar fails to start."""
+        user_dir = workspace_manager.WORKSPACES_ROOT / user["id"]
+        user_dir.mkdir(parents=True)
+
+        with patch("asyncio.create_subprocess_exec", side_effect=OSError("no tar")):
+            result = await workspace_manager.archive_user_data(
+                user["id"], user["username"]
+            )
+        assert result is None
+        # Original directory should still exist (not deleted on failure)
+        assert user_dir.exists()

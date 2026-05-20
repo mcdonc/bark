@@ -52,6 +52,17 @@ async def user(db):
 
 
 @pytest.fixture
+async def admin_user(db):
+    """Create a test user with admin role and return it."""
+    import bark_backend.user_store as us
+
+    user = await us.create_user("testadmin", _TEST_PASSWORD_HASH)
+    await us.ensure_role("admin")
+    await us.assign_role(user["id"], "admin")
+    return user
+
+
+@pytest.fixture
 async def workspace(user):
     """Create a test workspace (without port allocation)."""
     import bark_backend.user_store as us
