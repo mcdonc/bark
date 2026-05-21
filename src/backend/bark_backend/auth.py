@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -26,12 +27,12 @@ def _verify_password(password: str, hashed: str) -> bool:
 
 
 class RegisterRequest(BaseModel):
-    username: str
+    email: str
     password: str
 
 
 class LoginRequest(BaseModel):
-    username: str
+    email: str
     password: str
 
 
@@ -40,12 +41,12 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-def _create_token(user_id: str, username: str, roles: list[str] | None = None) -> str:
+def _create_token(user_id: str, email: str, roles: list[str] | None = None) -> str:
     jti = str(uuid.uuid4())
     expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS)
     payload = {
         "sub": user_id,
-        "username": username,
+        "email": email,
         "jti": jti,
         "exp": expire,
         "roles": roles or [],
@@ -57,34 +58,73 @@ def _decode_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 
-async def register(req: RegisterRequest) -> TokenResponse:
-    existing = await user_store.get_user_by_username(req.username)
+class RegisterResult(BaseModel):
+    user_id: str
+    email: str
+    access_token: str | None = None
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def validate_email(email: str) -> None:
+    """Raise HTTPException if the email is not valid."""
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="Must be a valid email address")
+
+
+async def register(req: RegisterRequest, verified: bool = False) -> RegisterResult:
+    existing = await user_store.get_user_by_email(req.email)
     if existing is not None:
-        raise HTTPException(status_code=400, detail="Username already taken")
-    if len(req.username) < 3:
-        raise HTTPException(
-            status_code=400, detail="Username must be at least 3 characters"
-        )
+        raise HTTPException(status_code=400, detail="Registration failed")
+    validate_email(req.email)
     if len(req.password) < 4:
         raise HTTPException(
             status_code=400, detail="Password must be at least 4 characters"
         )
 
     password_hash = _hash_password(req.password)
-    user = await user_store.create_user(req.username, password_hash)
-    roles = await user_store.get_user_roles(user["id"])
-    token = _create_token(user["id"], user["username"], roles)
-    return TokenResponse(access_token=token)
+    user = await user_store.create_user(req.email, password_hash, verified=verified)
+    token = None
+    if verified:
+        roles = await user_store.get_user_roles(user["id"])
+        token = _create_token(user["id"], user["email"], roles)
+    return RegisterResult(user_id=user["id"], email=user["email"], access_token=token)
 
 
 async def login(req: LoginRequest) -> TokenResponse:
-    user = await user_store.get_user_by_username(req.username)
+    user = await user_store.get_user_by_email(req.email)
     if user is None or not _verify_password(req.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user.get("verified"):
+        raise HTTPException(
+            status_code=403, detail="Account not verified. Check your email."
+        )
 
     roles = await user_store.get_user_roles(user["id"])
-    token = _create_token(user["id"], user["username"], roles)
+    token = _create_token(user["id"], user["email"], roles)
     return TokenResponse(access_token=token)
+
+
+VERIFY_TOKEN_EXPIRE_HOURS = 72
+
+
+def create_verification_token(user_id: str) -> str:
+    """Create a JWT token for email verification."""
+    expire = datetime.now(timezone.utc) + timedelta(hours=VERIFY_TOKEN_EXPIRE_HOURS)
+    payload = {"sub": user_id, "purpose": "verify", "exp": expire}
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_verification_token(token: str) -> str | None:
+    """Decode a verification token. Returns user_id or None if invalid."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "verify":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None
 
 
 async def get_current_user(

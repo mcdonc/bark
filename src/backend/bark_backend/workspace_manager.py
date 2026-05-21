@@ -11,18 +11,18 @@ _data_dir = Path(os.environ.get("BARK_DATA_DIR", str(Path.home() / ".bark" / "da
 WORKSPACES_ROOT = _data_dir / "workspaces"
 
 
-async def archive_user_data(user_id: str, username: str) -> Path | None:
+async def archive_user_data(user_id: str, email: str) -> Path | None:
     """Archive a user's workspace data to a tar.xz file before deletion.
 
     Returns the archive path, or None if the user had no data directory.
-    The archive is saved to $BARK_DATA_DIR/workspaces/{user_id}-{username}.tar.xz
+    The archive is saved to $BARK_DATA_DIR/workspaces/{user_id}-{email}.tar.xz
     """
     import asyncio
 
     user_dir = WORKSPACES_ROOT / user_id
     if not user_dir.exists():
         return None
-    archive_name = f"{user_id}-{username}.tar.xz"
+    archive_name = f"{user_id}-{email}.tar.xz"
     archive_path = WORKSPACES_ROOT / archive_name
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -39,16 +39,16 @@ async def archive_user_data(user_id: str, username: str) -> Path | None:
         if proc.returncode != 0:
             logger.error(
                 "tar failed for user %s: %s",
-                username,
+                email,
                 stderr.decode("utf-8", errors="replace"),
             )
             return None
-        logger.info("Archived user %s data to %s", username, archive_path)
+        logger.info("Archived user %s data to %s", email, archive_path)
         # Remove the original directory after successful archive
         shutil.rmtree(user_dir)
         return archive_path
     except (asyncio.TimeoutError, OSError) as e:
-        logger.error("Failed to archive user %s data: %s", username, e)
+        logger.error("Failed to archive user %s data: %s", email, e)
         return None
 
 

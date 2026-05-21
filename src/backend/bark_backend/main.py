@@ -28,25 +28,25 @@ async def _seed_default_user() -> None:
 
     import bcrypt
 
-    username = os.environ.get("BARK_DEFAULT_USER", "admin")
+    email = os.environ.get("BARK_DEFAULT_USER", "admin")
     password = os.environ.get("BARK_DEFAULT_PASSWORD")
-    existing = await user_store.get_user_by_username(username)
+    existing = await user_store.get_user_by_email(email)
     if existing is None:
         generated = password is None
         if generated:
             password = secrets.token_urlsafe(16)
         password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-        user = await user_store.create_user(username, password_hash)
+        user = await user_store.create_user(email, password_hash, verified=True)
         await user_store.ensure_role("admin")
         await user_store.assign_role(user["id"], "admin")
         if generated:
             logger.info(
                 "Created default admin user '%s' with generated password: %s",
-                username,
+                email,
                 password,
             )
         else:
-            logger.info("Created default user '%s' with admin role", username)
+            logger.info("Created default user '%s' with admin role", email)
     else:
         # Ensure existing default user has admin role
         await user_store.ensure_role("admin")

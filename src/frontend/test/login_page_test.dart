@@ -36,7 +36,7 @@ void main() {
       expect(find.text('Login'), findsWidgets); // button + title
     });
 
-    testWidgets('has username and password fields', (tester) async {
+    testWidgets('has email and password fields', (tester) async {
       await tester.pumpWidget(buildLoginPage());
       await tester.pumpAndSettle();
 
@@ -107,18 +107,74 @@ void main() {
       expect(find.text('Please log in to continue.'), findsNothing);
     });
 
-    testWidgets('username validation requires 3 chars', (tester) async {
+    testWidgets('login mode validates email format', (tester) async {
       await tester.pumpWidget(buildLoginPage());
       await tester.pumpAndSettle();
 
       final fields = find.byType(TextField);
-      await tester.enterText(fields.first, 'ab');
+      await tester.enterText(fields.first, 'notanemail');
       await tester.enterText(fields.last, 'password');
 
       await tester.tap(find.text('Login'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Min 3'), findsOneWidget);
+      expect(find.textContaining('valid email'), findsOneWidget);
+    });
+
+    testWidgets('register mode validates email format', (tester) async {
+      await tester.pumpWidget(buildLoginPage());
+      await tester.pumpAndSettle();
+
+      // Switch to register mode
+      await tester.tap(find.textContaining('Register'));
+      await tester.pumpAndSettle();
+
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.first, 'notanemail');
+      await tester.enterText(fields.last, 'password');
+
+      await tester.tap(find.text('Register'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('valid email'), findsOneWidget);
+    });
+
+    testWidgets('register mode accepts valid email', (tester) async {
+      await tester.pumpWidget(buildLoginPage());
+      await tester.pumpAndSettle();
+
+      // Switch to register mode
+      await tester.tap(find.textContaining('Register'));
+      await tester.pumpAndSettle();
+
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.first, 'user@example.com');
+      await tester.enterText(fields.last, 'pass');
+
+      // Tap an invalid password to trigger validation without a real HTTP call
+      await tester.enterText(fields.last, '');
+      await tester.tap(find.text('Register'));
+      await tester.pumpAndSettle();
+
+      // Email field should not show validation error
+      expect(find.textContaining('valid email'), findsNothing);
+    });
+
+    testWidgets('register mode shows Email label', (tester) async {
+      await tester.pumpWidget(buildLoginPage());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.textContaining('Register'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Email'), findsOneWidget);
+    });
+
+    testWidgets('login mode shows Email label', (tester) async {
+      await tester.pumpWidget(buildLoginPage());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Email'), findsOneWidget);
     });
   });
 }

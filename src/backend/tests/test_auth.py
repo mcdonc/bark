@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import jwt
 
-from bark_backend import auth
+from bark_backend import auth, user_store
 
 
 class TestPasswordHashing:
@@ -25,10 +25,10 @@ class TestPasswordHashing:
 
 class TestJWT:
     def test_create_and_decode_token(self):
-        token = auth._create_token("user-123", "alice")
+        token = auth._create_token("user-123", "alice@example.com")
         payload = auth._decode_token(token)
         assert payload["sub"] == "user-123"
-        assert payload["username"] == "alice"
+        assert payload["email"] == "alice@example.com"
         assert "jti" in payload
         assert "exp" in payload
 
@@ -42,32 +42,41 @@ class TestJWT:
 class TestRegister:
     async def test_register_success(self, db):
         result = await auth.register(
-            auth.RegisterRequest(username="newuser", password="pass1234")
+            auth.RegisterRequest(email="new@example.com", password="pass1234")
+        )
+        assert result.user_id
+        assert result.email == "new@example.com"
+        assert result.access_token is None  # unverified, no token
+
+    async def test_register_verified(self, db):
+        result = await auth.register(
+            auth.RegisterRequest(email="verified@example.com", password="pass1234"),
+            verified=True,
         )
         assert result.access_token
-        assert result.token_type == "bearer"
+        assert result.email == "verified@example.com"
 
-    async def test_register_duplicate_username(self, db):
+    async def test_register_duplicate_email(self, db):
         await auth.register(
-            auth.RegisterRequest(username="dupuser", password="pass1234")
+            auth.RegisterRequest(email="dup@example.com", password="pass1234")
         )
         with pytest.raises(HTTPException) as exc_info:
             await auth.register(
-                auth.RegisterRequest(username="dupuser", password="pass5678")
+                auth.RegisterRequest(email="dup@example.com", password="pass5678")
             )
         assert exc_info.value.status_code == 400
 
-    async def test_register_short_username(self, db):
+    async def test_register_invalid_email(self, db):
         with pytest.raises(HTTPException) as exc_info:
             await auth.register(
-                auth.RegisterRequest(username="ab", password="pass1234")
+                auth.RegisterRequest(email="not-an-email", password="pass1234")
             )
         assert exc_info.value.status_code == 400
 
     async def test_register_short_password(self, db):
         with pytest.raises(HTTPException) as exc_info:
             await auth.register(
-                auth.RegisterRequest(username="validuser", password="abc")
+                auth.RegisterRequest(email="valid@example.com", password="abc")
             )
         assert exc_info.value.status_code == 400
 
@@ -75,25 +84,75 @@ class TestRegister:
 class TestLogin:
     async def test_login_success(self, user):
         result = await auth.login(
-            auth.LoginRequest(username="testuser", password="testpass")
+            auth.LoginRequest(email="testuser@example.com", password="testpass")
         )
         assert result.access_token
         assert result.token_type == "bearer"
 
     async def test_login_wrong_password(self, user):
         with pytest.raises(HTTPException) as exc_info:
-            await auth.login(auth.LoginRequest(username="testuser", password="wrong"))
+            await auth.login(
+                auth.LoginRequest(email="testuser@example.com", password="wrong")
+            )
         assert exc_info.value.status_code == 401
+
+    async def test_login_unverified(self, db):
+        import bcrypt
+
+        password_hash = bcrypt.hashpw(b"testpass", bcrypt.gensalt()).decode()
+        await user_store.create_user(
+            "unverified@example.com", password_hash, verified=False
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            await auth.login(
+                auth.LoginRequest(email="unverified@example.com", password="testpass")
+            )
+        assert exc_info.value.status_code == 403
+        assert "not verified" in exc_info.value.detail
 
     async def test_login_nonexistent_user(self, db):
         with pytest.raises(HTTPException) as exc_info:
-            await auth.login(auth.LoginRequest(username="noone", password="pass"))
+            await auth.login(
+                auth.LoginRequest(email="noone@example.com", password="pass")
+            )
         assert exc_info.value.status_code == 401
+
+
+class TestVerification:
+    def test_create_and_decode_verification_token(self):
+        token = auth.create_verification_token("user-123")
+        user_id = auth.decode_verification_token(token)
+        assert user_id == "user-123"
+
+    def test_decode_invalid_token(self):
+        assert auth.decode_verification_token("garbage") is None
+
+    def test_decode_wrong_purpose(self):
+        # A regular auth token should not pass as a verification token
+        token = auth._create_token("user-123", "test")
+        assert auth.decode_verification_token(token) is None
+
+    async def test_verify_user(self, db):
+        import bcrypt
+
+        password_hash = bcrypt.hashpw(b"pass", bcrypt.gensalt()).decode()
+        user = await user_store.create_user(
+            "toverify@example.com", password_hash, verified=False
+        )
+        assert not user["verified"]
+        result = await user_store.verify_user(user["id"])
+        assert result is True
+        updated = await user_store.get_user_by_email("toverify@example.com")
+        assert updated["verified"] is True
+
+    async def test_verify_nonexistent_user(self, db):
+        result = await user_store.verify_user("nonexistent-id")
+        assert result is False
 
 
 class TestTokenValidation:
     async def test_get_user_from_valid_token(self, user):
-        token = auth._create_token(user["id"], user["username"])
+        token = auth._create_token(user["id"], user["email"])
         result = await auth.get_user_from_token(token)
         assert result is not None
         assert result["id"] == user["id"]
@@ -103,7 +162,7 @@ class TestTokenValidation:
         assert result is None
 
     async def test_blocklisted_token_rejected(self, user):
-        token = auth._create_token(user["id"], user["username"])
+        token = auth._create_token(user["id"], user["email"])
         # Token should work before blocklisting
         assert await auth.get_user_from_token(token) is not None
         # Blocklist it
@@ -114,7 +173,7 @@ class TestTokenValidation:
     async def test_get_user_from_token_missing_sub(self, db):
         """Token with no 'sub' claim returns None."""
         token = jwt.encode(
-            {"username": "x", "jti": "j1", "exp": 9999999999},
+            {"email": "x", "jti": "j1", "exp": 9999999999},
             auth.SECRET_KEY,
             algorithm=auth.ALGORITHM,
         )
@@ -123,7 +182,7 @@ class TestTokenValidation:
     async def test_get_user_from_token_missing_jti(self, db):
         """Token with no 'jti' claim returns None."""
         token = jwt.encode(
-            {"sub": "uid", "username": "x", "exp": 9999999999},
+            {"sub": "uid", "email": "x", "exp": 9999999999},
             auth.SECRET_KEY,
             algorithm=auth.ALGORITHM,
         )
@@ -131,13 +190,13 @@ class TestTokenValidation:
 
     async def test_get_user_from_token_deleted_user(self, user):
         """Token for a user that no longer exists returns None."""
-        token = auth._create_token("nonexistent-id", "ghost")
+        token = auth._create_token("nonexistent-id", "ghost@example.com")
         assert await auth.get_user_from_token(token) is None
 
 
 class TestGetCurrentUser:
     async def test_valid_credentials(self, user):
-        token = auth._create_token(user["id"], user["username"])
+        token = auth._create_token(user["id"], user["email"])
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         result = await auth.get_current_user(creds)
         assert result["id"] == user["id"]
@@ -157,7 +216,7 @@ class TestGetCurrentUser:
 
     async def test_missing_sub_in_token(self, db):
         token = jwt.encode(
-            {"username": "x", "jti": "j1", "exp": 9999999999},
+            {"email": "x", "jti": "j1", "exp": 9999999999},
             auth.SECRET_KEY,
             algorithm=auth.ALGORITHM,
         )
@@ -167,7 +226,7 @@ class TestGetCurrentUser:
         assert exc_info.value.status_code == 401
 
     async def test_blocklisted_token(self, user):
-        token = auth._create_token(user["id"], user["username"])
+        token = auth._create_token(user["id"], user["email"])
         await auth.logout(token)
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         with pytest.raises(HTTPException) as exc_info:
@@ -175,7 +234,7 @@ class TestGetCurrentUser:
         assert exc_info.value.status_code == 401
 
     async def test_deleted_user(self, user):
-        token = auth._create_token("nonexistent-id", "ghost")
+        token = auth._create_token("nonexistent-id", "ghost@example.com")
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         with pytest.raises(HTTPException) as exc_info:
             await auth.get_current_user(creds)
@@ -184,7 +243,7 @@ class TestGetCurrentUser:
 
 class TestGetCurrentUserOptional:
     async def test_valid_credentials(self, user):
-        token = auth._create_token(user["id"], user["username"])
+        token = auth._create_token(user["id"], user["email"])
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         result = await auth.get_current_user_optional(creds)
         assert result is not None
@@ -201,7 +260,7 @@ class TestGetCurrentUserOptional:
 
     async def test_missing_sub(self, db):
         token = jwt.encode(
-            {"username": "x", "jti": "j1", "exp": 9999999999},
+            {"email": "x", "jti": "j1", "exp": 9999999999},
             auth.SECRET_KEY,
             algorithm=auth.ALGORITHM,
         )
@@ -210,14 +269,14 @@ class TestGetCurrentUserOptional:
         assert result is None
 
     async def test_blocklisted_token(self, user):
-        token = auth._create_token(user["id"], user["username"])
+        token = auth._create_token(user["id"], user["email"])
         await auth.logout(token)
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         result = await auth.get_current_user_optional(creds)
         assert result is None
 
     async def test_deleted_user(self, user):
-        token = auth._create_token("nonexistent-id", "ghost")
+        token = auth._create_token("nonexistent-id", "ghost@example.com")
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         result = await auth.get_current_user_optional(creds)
         assert result is None

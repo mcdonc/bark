@@ -6,10 +6,18 @@ import os
 import sqlite3
 import zipfile
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
-from . import auth, container_manager, file_service, user_store, workspace_manager
+from . import (
+    auth,
+    container_manager,
+    email_service,
+    file_service,
+    ws_handler,
+    user_store,
+    workspace_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,19 +62,69 @@ async def get_config():
 # --- Auth endpoints ---
 
 
-@router.post("/auth/register", response_model=auth.TokenResponse)
+@router.post("/auth/register")
 async def register(
     req: auth.RegisterRequest,
-    user: dict | None = Depends(auth.get_current_user_optional),
+    request: Request,
 ):
     if os.environ.get("BARK_TEST_MODE"):
-        # Test mode: allow unauthenticated registration
-        return await auth.register(req)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    if "admin" not in user.get("roles", []):
-        raise HTTPException(status_code=403, detail="Admin role required")
-    return await auth.register(req)
+        # Test mode: auto-verify so E2E tests get immediate access
+        result = await auth.register(req, verified=True)
+        return result
+    import uuid
+
+    logger.info("Registering user: %s", req.email)
+    auth.validate_email(req.email)
+    existing = await user_store.get_user_by_email(req.email)
+    if existing is not None:
+        raise HTTPException(status_code=400, detail="Registration failed")
+    if len(req.password) < 4:
+        raise HTTPException(
+            status_code=400, detail="Password must be at least 4 characters"
+        )
+
+    password_hash = auth._hash_password(req.password)
+    user_id = str(uuid.uuid4())
+
+    hostname, proto, base_path = ws_handler.derive_hosting_info(request.headers)
+    logger.info(
+        "Hosting info: hostname=%s proto=%s base_path=%s", hostname, proto, base_path
+    )
+    verification_token = auth.create_verification_token(user_id)
+    verification_url = (
+        f"{proto}://{hostname}{base_path}/#/verify?token={verification_token}"
+    )
+    logger.info("Verification URL: %s", verification_url)
+
+    # Insert user and send email in a transaction — if the email fails,
+    # the user insert is rolled back so they can try again.
+    async with user_store.transaction() as db:
+        await db.execute(
+            "INSERT INTO users (id, email, password_hash, verified) VALUES (?, ?, ?, 0)",
+            (user_id, req.email, password_hash),
+        )
+        logger.info("User inserted (uncommitted): %s", req.email)
+        await email_service.send_verification_email(req.email, verification_url)
+        logger.info("Verification email sent, committing user: %s", req.email)
+
+    return {"status": "pending_verification", "email": req.email}
+
+
+@router.get("/auth/verify")
+async def verify_email(token: str):
+    """Verify a user's email via the token from the verification link."""
+    user_id = auth.decode_verification_token(token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired verification token"
+        )
+    updated = await user_store.verify_user(user_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    user = await user_store.get_user_by_id(user_id)
+    roles = await user_store.get_user_roles(user_id)
+    token = auth._create_token(user_id, user["email"], roles)
+    return {"status": "verified", "access_token": token}
 
 
 @router.post("/auth/login", response_model=auth.TokenResponse)
@@ -272,7 +330,7 @@ async def delete_user(user_id: str, admin: dict = Depends(auth.require_role("adm
     # Stop all containers for this user before deleting
     await container_manager.stop_user_containers(user_id)
     # Archive workspace data before deletion
-    await workspace_manager.archive_user_data(user_id, user["username"])
+    await workspace_manager.archive_user_data(user_id, user["email"])
     deleted = await user_store.delete_user(user_id)
     if not deleted:  # pragma: no cover — race between get and delete
         raise HTTPException(status_code=404, detail="User not found")
@@ -306,7 +364,7 @@ async def remove_user_role(
 
 
 class UpdateUserRequest(auth.BaseModel):
-    username: str | None = None
+    email: str | None = None
     password: str | None = None
 
 
@@ -319,8 +377,8 @@ async def update_user(
     user = await user_store.get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if req.username is not None:
-        await user_store.update_username(user_id, req.username)
+    if req.email is not None:
+        await user_store.update_email(user_id, req.email)
     if req.password is not None:
         password_hash = auth._hash_password(req.password)
         await user_store.update_password(user_id, password_hash)

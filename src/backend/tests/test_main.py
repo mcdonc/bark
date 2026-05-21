@@ -16,7 +16,7 @@ class TestSeedDefaultUser:
         monkeypatch.setenv("BARK_DEFAULT_USER", "seed-test")
         monkeypatch.setenv("BARK_DEFAULT_PASSWORD", "seed-pass")
         await main._seed_default_user()
-        user = await user_store.get_user_by_username("seed-test")
+        user = await user_store.get_user_by_email("seed-test")
         assert user is not None
 
     async def test_skips_existing_user(self, db, monkeypatch):
@@ -25,14 +25,14 @@ class TestSeedDefaultUser:
         await main._seed_default_user()
         # Call again — should not raise
         await main._seed_default_user()
-        user = await user_store.get_user_by_username("seed-test")
+        user = await user_store.get_user_by_email("seed-test")
         assert user is not None
 
     async def test_generates_password_when_not_set(self, db, monkeypatch):
         monkeypatch.setenv("BARK_DEFAULT_USER", "gen-test")
         monkeypatch.delenv("BARK_DEFAULT_PASSWORD", raising=False)
         await main._seed_default_user()
-        user = await user_store.get_user_by_username("gen-test")
+        user = await user_store.get_user_by_email("gen-test")
         assert user is not None
         # Password was generated, so we can't know it, but user exists
         # and has admin role

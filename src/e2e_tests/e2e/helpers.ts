@@ -13,10 +13,10 @@ export const TEST_PASSWORD = "testpass";
  *  Returns { token, headers }. */
 export async function registerUser(
   request: APIRequestContext,
-  username: string,
+  email: string,
 ): Promise<{ token: string; headers: Record<string, string> }> {
   const resp = await request.post(`${API_BASE}/auth/register`, {
-    data: { username, password: TEST_PASSWORD },
+    data: { email, password: TEST_PASSWORD },
   });
   if (!resp.ok()) {
     const body = await resp.text();
@@ -28,11 +28,7 @@ export async function registerUser(
 }
 
 /** Log in via the UI by typing credentials into the Flutter login form. */
-export async function loginViaUI(
-  page: Page,
-  username: string,
-  password: string,
-) {
+export async function loginViaUI(page: Page, email: string, password: string) {
   await page.goto("/");
   await waitForFlutter(page);
 
@@ -42,7 +38,7 @@ export async function loginViaUI(
 
   await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
   await page.waitForTimeout(200);
-  await page.keyboard.type(username);
+  await page.keyboard.type(email);
 
   await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
   await page.waitForTimeout(200);
@@ -187,7 +183,7 @@ export async function createWorkspace(
   workspaceId: string;
   cleanup: () => Promise<void>;
 }> {
-  const name = `${namePrefix}-${Date.now()}`;
+  const name = `${namePrefix}-${Date.now()}@test.example.com`;
   const createResp = await request.post(
     `${API_BASE}/workspaces?name=${encodeURIComponent(name)}`,
     { headers },
@@ -214,7 +210,7 @@ export async function createWorkspace(
 /** Open a workspace in the browser and wait for the container to be ready. */
 export async function openWorkspace(
   page: Page,
-  username: string,
+  email: string,
   workspaceId: string,
 ) {
   // Set up WebSocket listener before login so we catch all WebSocket connections
@@ -235,7 +231,7 @@ export async function openWorkspace(
     page.on("websocket", listenForReady);
   });
 
-  await loginViaUI(page, username, TEST_PASSWORD);
+  await loginViaUI(page, email, TEST_PASSWORD);
   // Use full URL (not just #fragment) so the page reloads and creates a new
   // WebSocket — a hash-only change is handled internally by Flutter's router
   // without opening a new WebSocket, so our listener would never fire.
@@ -255,20 +251,20 @@ export async function createAndOpenWorkspace(
   namePrefix: string,
 ): Promise<{
   workspaceId: string;
-  username: string;
+  email: string;
   token: string;
   headers: Record<string, string>;
   cleanup: () => Promise<void>;
 }> {
-  const username = `${namePrefix}-${Date.now()}`;
-  const { token, headers } = await registerUser(request, username);
+  const email = `${namePrefix}-${Date.now()}@test.example.com`;
+  const { token, headers } = await registerUser(request, email);
   const { workspaceId, cleanup } = await createWorkspace(
     request,
     headers,
     namePrefix,
   );
-  await openWorkspace(page, username, workspaceId);
-  return { workspaceId, username, token, headers, cleanup };
+  await openWorkspace(page, email, workspaceId);
+  return { workspaceId, email, token, headers, cleanup };
 }
 
 export function dockerContainersForWorkspace(workspaceId: string): string[] {

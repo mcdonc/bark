@@ -47,7 +47,9 @@ async def user(db):
     """Create a test user and return it."""
     import bark_backend.user_store as us
 
-    user = await us.create_user("testuser", _TEST_PASSWORD_HASH)
+    user = await us.create_user(
+        "testuser@example.com", _TEST_PASSWORD_HASH, verified=True
+    )
     return user
 
 
@@ -56,7 +58,9 @@ async def admin_user(db):
     """Create a test user with admin role and return it."""
     import bark_backend.user_store as us
 
-    user = await us.create_user("testadmin", _TEST_PASSWORD_HASH)
+    user = await us.create_user(
+        "testadmin@example.com", _TEST_PASSWORD_HASH, verified=True
+    )
     await us.ensure_role("admin")
     await us.assign_role(user["id"], "admin")
     return user

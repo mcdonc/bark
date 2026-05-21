@@ -94,7 +94,7 @@ async def handle_websocket(ws: WebSocket) -> None:
                 await _send_error(ws, f"Unknown command: {cmd}")
 
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected for user %s", user["username"])
+        logger.info("WebSocket disconnected for user %s", user["email"])
     except Exception as e:
         logger.error("WebSocket error: %s", e)
     finally:
@@ -105,31 +105,37 @@ async def handle_websocket(ws: WebSocket) -> None:
 
 
 def _derive_hosting_info(ws: WebSocket) -> tuple[str, str, str]:
-    """Derive hosting hostname, proto, and base path from env vars or WebSocket headers.
+    """Derive hosting hostname, proto, and base path from WebSocket headers."""
+    return derive_hosting_info(ws.headers)
+
+
+def derive_hosting_info(headers) -> tuple[str, str, str]:
+    """Derive hosting hostname, proto, and base path from env vars or request headers.
 
     Returns (hostname, proto, base_path). Env vars take precedence over headers.
+    Works with both Request.headers and WebSocket.headers.
     """
     hostname = os.environ.get("BARK_HOSTING_HOSTNAME")
     proto = os.environ.get("BARK_HOSTING_PROTO")
     base_path = os.environ.get("BARK_HOSTING_BASE_PATH")
     if not hostname:
-        forwarded_host = ws.headers.get("x-forwarded-host")
+        forwarded_host = headers.get("x-forwarded-host")
         if forwarded_host:
             # Behind an external reverse proxy — trust its hostname as-is
             hostname = forwarded_host
         else:
             # Direct access (local dev) — use nginx port for hosted app URLs
             nginx_port = os.environ.get("BARK_NGINX_PORT")
-            host = ws.headers.get("host") or "localhost"
+            host = headers.get("host") or "localhost"
             if nginx_port:
                 host_no_port = host.split(":")[0]
                 hostname = f"{host_no_port}:{nginx_port}"
             else:
                 hostname = host
     if not proto:
-        proto = ws.headers.get("x-forwarded-proto") or "http"
+        proto = headers.get("x-forwarded-proto") or "http"
     if base_path is None:
-        base_path = ws.headers.get("x-forwarded-prefix") or ""
+        base_path = headers.get("x-forwarded-prefix") or ""
     return hostname, proto, base_path
 
 
@@ -259,7 +265,7 @@ async def _handle_workspace_connect(ws: WebSocket, state: dict, msg: dict) -> No
     state["pending_status_msg"] = status_msg
     logger.info(
         "User %s connected to workspace %s (ports %s)",
-        state["user"]["username"],
+        state["user"]["email"],
         workspace_id,
         ports,
     )

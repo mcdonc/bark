@@ -29,7 +29,7 @@ OLLAMA_MODEL=gemma4:31b                     # any model available on your Ollama
 
 # Bark configuration
 BARK_JWT_SECRET=change-this-to-a-random-secret
-BARK_DEFAULT_USER=admin
+BARK_DEFAULT_USER=admin@example.com
 # BARK_DEFAULT_PASSWORD=admin  # omit to generate a random password on first run
 
 EOF
@@ -42,7 +42,7 @@ EOF
 devenv processes up
 ```
 
-Open [http://localhost:8995](http://localhost:8995) (nginx) and log in with the default admin user. If you set `BARK_DEFAULT_PASSWORD` in `.env`, use that password. Otherwise, check the server log output for the generated password. The default user has the admin role and can manage other users at `/admin/users`.
+Open [http://localhost:8995](http://localhost:8995) (nginx) and log in with `admin@example.com` (or whatever you set `BARK_DEFAULT_USER` to). If you set `BARK_DEFAULT_PASSWORD` in `.env`, use that password. Otherwise, check the server log output for the generated password. The default user has the admin role and can manage other users at `/admin/users`.
 
 ### What You Can Do
 
@@ -70,7 +70,7 @@ All settings can be overridden in `.env`. Defaults are provided in `devenv.nix` 
 | `OLLAMA_BASE_URL`       |                   | Ollama API URL (cloud or self-hosted)                              |
 | `OLLAMA_MODEL`          |                   | LLM model name                                                     |
 | `BARK_JWT_SECRET`       |                   | JWT signing secret                                                 |
-| `BARK_DEFAULT_USER`     |                   | Auto-seeded user on startup                                        |
+| `BARK_DEFAULT_USER`     |                   | Auto-seeded admin email on startup                                 |
 | `BARK_DEFAULT_PASSWORD` |                   | Auto-seeded password on startup (omit to generate random)          |
 
 ### Ports

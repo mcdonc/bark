@@ -80,8 +80,9 @@ bark/
     bark_backend/
       main.py                   # FastAPI app, lifespan, default user seeding, static file serving
       api.py                    # API route handlers (auth, workspaces, files, messages, admin) via APIRouter
-      auth.py                   # Register/login/logout, JWT with roles, bcrypt, require_role() dependency
-      user_store.py             # SQLite: users, workspaces, roles, user_roles, token blocklist, message history
+      auth.py                   # Register/login/logout, JWT with roles, bcrypt, require_role(), email validation, verification tokens
+      email_service.py          # Email sending via SMTP or sendmail (verification emails)
+      user_store.py             # SQLite: users (with verified flag), workspaces, roles, user_roles, token blocklist, message history
       workspace_manager.py      # Workspace CRUD + host directory management + user data archival
       container_manager.py      # Docker lifecycle, port allocation, idle timeout, session resume env, shutdown cleanup
       pi_rpc_client.py          # docker attach subprocess for Pi stdin/stdout JSON-RPC (chunked reads for large events)
@@ -107,7 +108,8 @@ bark/
       (Plugin registration is in the bark_plugins package at $BARK_PLUGINS_DIR/.dart/)
       auth/
         auth_service.dart       # JWT storage, login/register/logout, async init, roles/isAdmin from JWT payload
-        login_page.dart         # Login/register form
+        login_page.dart         # Login/register form with email validation
+        verify_page.dart        # Email verification page (auto-login on success)
       admin/
         admin_users_page.dart   # Admin user management: list, add, edit, delete users, toggle roles
       workspace/
@@ -139,13 +141,17 @@ bark/
 
 ### Authentication
 
-- Username/password with bcrypt hashing
+- Email/password with bcrypt hashing, email validated at registration
+- Email verification: registration sends a verification email with a signed token link; user must click to activate account and is auto-logged-in on verification
+- Email sent via SMTP (`BARK_SMTP_HOST/PORT/USER/PASSWORD/FROM`) or local sendmail (default, configurable via `BARK_SENDMAIL_PATH`)
 - JWT tokens (24hr expiry, secret configurable via BARK_JWT_SECRET) with token blocklist for logout, roles claim in JWT payload
 - Role-based access control: `roles` and `user_roles` tables, `require_role()` FastAPI dependency for endpoint protection
 - Default user auto-seeded on startup with admin role (configurable via BARK_DEFAULT_USER/PASSWORD in .env)
 - Admin user management: list/add/edit/delete users, toggle roles, user data archived to tar.xz on deletion, self-deletion prevented
-- Registration restricted to admin users (except in test mode)
+- Open registration with email verification (test mode auto-verifies for E2E tests)
+- Login rejects unverified accounts
 - Session persists across page reloads (async token loading before routing)
+- Deep link preservation: unauthenticated visits to protected URLs redirect to login, then return to the original URL after successful login
 
 ### Workspaces
 
@@ -299,7 +305,7 @@ OLLAMA_API_KEY=your-api-key-here
 OLLAMA_BASE_URL=https://ollama.com/v1       # or http://localhost:11434/v1 for self-hosted
 OLLAMA_MODEL=gemma4:31b                     # any model available on your Ollama instance
 BARK_JWT_SECRET=change-this-to-a-random-secret
-BARK_DEFAULT_USER=admin
+BARK_DEFAULT_USER=admin@example.com
 # BARK_DEFAULT_PASSWORD=admin  # omit to generate a random password on first run
 EOF
 
@@ -341,8 +347,15 @@ All settings can be overridden in `.env`. Defaults (where appropriate) are provi
 | `OLLAMA_BASE_URL`           |                                      | Ollama API URL (cloud or self-hosted)                                                                                                                     |
 | `OLLAMA_MODEL`              |                                      | LLM model name                                                                                                                                            |
 | `BARK_JWT_SECRET`           |                                      | JWT signing secret                                                                                                                                        |
-| `BARK_DEFAULT_USER`         |                                      | Auto-seeded user on startup                                                                                                                               |
+| `BARK_DEFAULT_USER`         |                                      | Auto-seeded admin email on startup                                                                                                                        |
 | `BARK_DEFAULT_PASSWORD`     |                                      | Auto-seeded password on startup (omit to generate random)                                                                                                 |
+| `BARK_SMTP_HOST`            |                                      | SMTP server hostname (if set, uses SMTP; otherwise uses sendmail)                                                                                         |
+| `BARK_SMTP_PORT`            | `587`                                | SMTP server port                                                                                                                                          |
+| `BARK_SMTP_USER`            |                                      | SMTP auth username                                                                                                                                        |
+| `BARK_SMTP_PASSWORD`        |                                      | SMTP auth password                                                                                                                                        |
+| `BARK_SMTP_FROM`            |                                      | Email sender address (falls back to SMTP_USER, then noreply@localhost)                                                                                    |
+| `BARK_SMTP_USE_TLS`         | `true`                               | Use STARTTLS for SMTP                                                                                                                                     |
+| `BARK_SENDMAIL_PATH`        | `sendmail`                           | Path to sendmail binary (used when BARK_SMTP_HOST is not set)                                                                                             |
 
 ### Ports
 
@@ -593,8 +606,14 @@ arctor nginx (443)
 - **Investigate running Pi under bubblewrap**: Explore using [bubblewrap](https://github.com/containers/bubblewrap) (bwrap) as an alternative to Docker for sandboxing Pi. Bubblewrap is lighter-weight than Docker — no daemon, no image builds, no container overhead — and provides namespace-based isolation (mount, PID, network, user). This could significantly reduce startup time and resource usage. Trade-offs: no pre-built image caching, need to manage tool installations on the host, less isolation than full container. Could be offered as an alternative backend alongside Docker.
 - **Remove leading underscores from internal functions**: Functions like `_handle_prompt`, `_forward_events`, `_cleanup_connection`, `_derive_hosting_info`, etc. in `ws_handler.py` and helper functions in other modules use leading underscores to signal "module-private". Since these are now tested directly via imports, the underscores are unnecessary and make the test imports look odd. Rename to drop the underscores.
 - **Test workspace_page.dart, app.dart, and main.dart**: `workspace_page.dart` depends on the `bark_plugins` package (generated by `import_dart_plugins.py`), so tests require codegen to have run first. `app.dart` needs GoRouter/navigation mocking.
-- **E2E: use Flutter semantics tree for testability**: Enabling `RendererBinding.instance.ensureSemantics()` exposes real DOM elements (`<input aria-label="Username">`, `<flt-semantics role="button">Login</flt-semantics>`) that Playwright can interact with via standard selectors instead of coordinate clicks. However, the semantics overlay intercepts keyboard events globally, which breaks xterm.dart (terminal input never reaches the canvas). Investigated `ExcludeSemantics` on the terminal widget and on-demand enable/disable via the "Enable accessibility" button — both still break the terminal. Need a way to selectively disable the semantics overlay for the terminal area, or find an alternative approach to make Flutter canvas apps testable without coordinates.
-- **Email verification at registration**: When an admin creates a user, send an email with a callback URL that the user must click to complete registration (proves they have a valid email address). The user account should be created in a pending/unverified state and only become active after the email link is clicked. Requires adding an `email` column to the users table, SMTP configuration (`BARK_SMTP_HOST`, `BARK_SMTP_PORT`, `BARK_SMTP_USER`, `BARK_SMTP_PASSWORD`, `BARK_SMTP_FROM`), a JWT-signed verification token (no extra table needed), and a `/verify` frontend route.
+- **E2E: use Flutter semantics tree for testability**: Enabling `RendererBinding.instance.ensureSemantics()` exposes real DOM elements (`<input aria-label="Email">`, `<flt-semantics role="button">Login</flt-semantics>`) that Playwright can interact with via standard selectors instead of coordinate clicks. However, the semantics overlay intercepts keyboard events globally, which breaks xterm.dart (terminal input never reaches the canvas). Investigated `ExcludeSemantics` on the terminal widget and on-demand enable/disable via the "Enable accessibility" button — both still break the terminal. Need a way to selectively disable the semantics overlay for the terminal area, or find an alternative approach to make Flutter canvas apps testable without coordinates.
+- **Remove /auth/register endpoint**: With email verification, user creation in production goes through the admin endpoint (`/admin/users`). The `/auth/register` endpoint may no longer be needed — its only remaining use is the `BARK_TEST_MODE` bypass for E2E tests. Consider moving the test-mode registration to the admin endpoint or a dedicated test-only route.
+- **BARK_SMTP_PASSWORD_PATH**: Support `BARK_SMTP_PASSWORD_PATH` as an alternative to `BARK_SMTP_PASSWORD`, pointing to a file containing the SMTP password. This avoids storing secrets in `.env` and works with secret management tools like agenix/sops that write decrypted secrets to files at runtime.
+- **Test SMTP email delivery**: The email service has unit tests with mocked SMTP, but no integration test for real SMTP delivery. Add a manual test script or a health check endpoint that sends a test email via the configured SMTP/sendmail to verify the mail pipeline works end-to-end. Manually test SMTP mode on arctor by setting `BARK_SMTP_HOST=localhost` in `.env` (arctor's Postfix accepts `permit_mynetworks` without auth for localhost connections).
+- **Login/register form UX**: The login and register modes are visually indistinguishable — both show an Email field, Password field, and a button. Add visual differentiation (e.g., a heading, different button colors, or a card title) so users can tell which mode they're in.
+- **Forgot password flow**: Add a "Forgot password?" link on the login page that sends a password reset email with a signed token link. The reset page lets the user set a new password. Similar to the verification flow — JWT-signed token, 72h expiry, auto-login after reset.
+- **Resend verification email**: If the verification email is lost in transit or expires, users need a way to request a new one. Add a "Resend verification email" link on the login page (shown when login fails with "not verified") and/or an admin action to resend. Consider rate-limiting to prevent abuse.
+- **Self-service user settings**: Allow users to change their own email and password without admin involvement. Add a settings page accessible from the app bar. Email changes should require re-verification (send a confirmation link to the new address). Password changes should require the current password.
 - **Clipboard image paste in chat**: Investigate whether Pi supports image inputs and, if so, allow pasting images from the clipboard into the chat input field. Would need to intercept paste events, detect image MIME types, convert to a format Pi can accept (base64 or URL), and pass via the `images` parameter of `prompt()`.
 
 - **Hosted app URLs should respect external headers**: The `get_hosted_url` tool generates URLs using `BARK_HOSTING_*` env vars passed to the container. These are derived from `X-Forwarded-Host`/`X-Forwarded-Proto` headers at WebSocket connect time, but if the hosting environment changes (e.g., different reverse proxy), the container's cached values become stale. Consider re-deriving hosting info on each `get_hosted_url` call or providing a mechanism to update the container's env vars without restart.
@@ -605,4 +624,5 @@ arctor nginx (443)
 - **devenv MCP memory leak**: The `devenv mcp` process grows to ~18GB virtual memory over time. Investigate root cause — may be in devenv itself or in the MCP server implementation.
 - **Production Flutter asset serving**: Create a command/script that produces a directory of pre-built Flutter web assets ready to be served in production without running the build. The current `flutterbuildweb.sh` appends a content hash query string (`?v=<hash>`) to `flutter_bootstrap.js` in `index.html` for cache-busting, but this only works for the dev build. Production deployments (e.g., arctor) copy files rather than running the build, and need the same cache-busting applied.
 - **Containerize the backend**: Create a Docker image for the Bark backend (FastAPI + Flutter web assets + nginx) for production deployment. Currently the backend runs directly via devenv/uvicorn — a container image would simplify deployment, versioning, and scaling. The deployment platform must support Docker-in-Docker (or bind-mount the host Docker socket) since Bark spawns workspace containers via the Docker API.
+- **SQLite migration tooling**: Research SQLite migration tools (e.g., Alembic, yoyo-migrations) for when dropping and recreating the database is no longer feasible. Currently schema changes are handled by `CREATE TABLE IF NOT EXISTS` with manual `ALTER TABLE` fallbacks, which won't scale as the schema evolves.
 - **E2E: cache Docker image build in CI**: The Docker image is rebuilt from scratch on every CI run. Options: (A) Push to GHCR (`ghcr.io/<repo>/bark-pi:<hash>`) keyed on a hash of Dockerfile + entrypoint + system-prompt + builtin-extensions + plugins — pull if exists, build and push if not. Requires `packages: write` permission but handles large images well. (B) Use GitHub Actions cache with `docker save`/`docker load` — simpler, no registry auth, but the 10 GB total cache limit is tight for a ~2-3 GB compressed tar. (C) Modify `dockerbuild.sh` to check a registry when `BARK_DOCKER_REGISTRY` is set — works for CI and anyone with registry access but couples the build script to a registry. Cache key should hash: `src/dockerimage/Dockerfile`, `src/dockerimage/entrypoint.sh`, `src/dockerimage/*.md`, `src/dockerimage/builtin-extensions/*.ts`, and `plugins/` contents.

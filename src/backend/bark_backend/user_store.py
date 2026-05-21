@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 import aiosqlite
 import uuid
@@ -24,11 +25,19 @@ async def init_db() -> None:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
+                verified INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+        # Migration: add verified column if missing
+        try:
+            await db.execute(
+                "ALTER TABLE users ADD COLUMN verified INTEGER NOT NULL DEFAULT 0"
+            )
+        except Exception:
+            pass  # Column already exists
         await db.execute("""
             CREATE TABLE IF NOT EXISTS workspaces (
                 id TEXT PRIMARY KEY,
@@ -86,16 +95,50 @@ async def init_db() -> None:
         await db.close()
 
 
-async def create_user(username: str, password_hash: str) -> dict:
+@asynccontextmanager
+async def transaction():
+    """Async context manager with transaction semantics.
+
+    Commits on clean exit, rolls back on exception.
+    """
+    db = await _get_db()
+    try:
+        yield db
+        await db.commit()
+    except BaseException:
+        await db.rollback()
+        raise
+    finally:
+        await db.close()
+
+
+async def create_user(
+    email: str,
+    password_hash: str,
+    verified: bool = False,
+) -> dict:
     db = await _get_db()
     try:
         user_id = str(uuid.uuid4())
         await db.execute(
-            "INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)",
-            (user_id, username, password_hash),
+            "INSERT INTO users (id, email, password_hash, verified) VALUES (?, ?, ?, ?)",
+            (user_id, email, password_hash, int(verified)),
         )
         await db.commit()
-        return {"id": user_id, "username": username}
+        return {"id": user_id, "email": email, "verified": verified}
+    finally:
+        await db.close()
+
+
+async def verify_user(user_id: str) -> bool:
+    """Mark a user as verified. Returns True if updated, False if not found."""
+    db = await _get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE users SET verified = 1 WHERE id = ?", (user_id,)
+        )
+        await db.commit()
+        return cursor.rowcount > 0
     finally:
         await db.close()
 
@@ -136,20 +179,21 @@ async def get_user_roles(user_id: str) -> list[str]:
         await db.close()
 
 
-async def get_user_by_username(username: str) -> dict | None:
+async def get_user_by_email(email: str) -> dict | None:
     db = await _get_db()
     try:
         cursor = await db.execute(
-            "SELECT id, username, password_hash FROM users WHERE username = ?",
-            (username,),
+            "SELECT id, email, password_hash, verified FROM users WHERE email = ?",
+            (email,),
         )
         row = await cursor.fetchone()
         if row is None:
             return None
         return {
             "id": row["id"],
-            "username": row["username"],
+            "email": row["email"],
             "password_hash": row["password_hash"],
+            "verified": bool(row["verified"]),
         }
     finally:
         await db.close()
@@ -160,7 +204,7 @@ async def list_users() -> list[dict]:
     db = await _get_db()
     try:
         cursor = await db.execute(
-            "SELECT id, username, created_at FROM users ORDER BY created_at"
+            "SELECT id, email, verified, created_at FROM users ORDER BY created_at"
         )
         users = []
         for row in await cursor.fetchall():
@@ -171,7 +215,8 @@ async def list_users() -> list[dict]:
             users.append(
                 {
                     "id": row["id"],
-                    "username": row["username"],
+                    "email": row["email"],
+                    "verified": bool(row["verified"]),
                     "created_at": row["created_at"],
                     "roles": roles,
                 }
@@ -206,13 +251,11 @@ async def remove_role(user_id: str, role_name: str) -> bool:
         await db.close()
 
 
-async def update_username(user_id: str, username: str) -> None:
-    """Update a user's username."""
+async def update_email(user_id: str, email: str) -> None:
+    """Update a user's email."""
     db = await _get_db()
     try:
-        await db.execute(
-            "UPDATE users SET username = ? WHERE id = ?", (username, user_id)
-        )
+        await db.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
         await db.commit()
     finally:
         await db.close()
@@ -235,13 +278,13 @@ async def get_user_by_id(user_id: str) -> dict | None:
     db = await _get_db()
     try:
         cursor = await db.execute(
-            "SELECT id, username FROM users WHERE id = ?",
+            "SELECT id, email FROM users WHERE id = ?",
             (user_id,),
         )
         row = await cursor.fetchone()
         if row is None:
             return None
-        return {"id": row["id"], "username": row["username"]}
+        return {"id": row["id"], "email": row["email"]}
     finally:
         await db.close()
 

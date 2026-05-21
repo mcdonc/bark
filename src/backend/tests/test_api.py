@@ -29,7 +29,7 @@ async def client(app):
 
 async def _auth_headers(client):
     resp = await client.post(
-        "/auth/login", json={"username": "testuser", "password": "testpass"}
+        "/auth/login", json={"email": "testuser@example.com", "password": "testpass"}
     )
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
@@ -51,67 +51,118 @@ class TestConfig:
 class TestAuthRoutes:
     async def test_register(self, client, admin_user):
         login_resp = await client.post(
-            "/auth/login", json={"username": "testadmin", "password": "testpass"}
+            "/auth/login",
+            json={"email": "testadmin@example.com", "password": "testpass"},
         )
         token = login_resp.json()["access_token"]
         resp = await client.post(
             "/auth/register",
-            json={"username": "newuser", "password": "newpass"},
+            json={"email": "new@example.com", "password": "newpass"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 200
-        assert "access_token" in resp.json()
+        data = resp.json()
+        assert data["status"] == "pending_verification"
+        assert data["email"] == "new@example.com"
 
     async def test_register_test_mode(self, client, db, monkeypatch):
-        """In test mode, unauthenticated registration is allowed."""
+        """In test mode, unauthenticated registration is allowed and auto-verified."""
         monkeypatch.setenv("BARK_TEST_MODE", "1")
         resp = await client.post(
-            "/auth/register", json={"username": "newuser", "password": "newpass"}
+            "/auth/register", json={"email": "new@example.com", "password": "newpass"}
         )
         assert resp.status_code == 200
         assert "access_token" in resp.json()
 
-    async def test_register_requires_auth(self, client):
+    async def test_register_unauthenticated(self, client, db):
+        """Registration is open — no auth required (verification gates access)."""
         resp = await client.post(
-            "/auth/register", json={"username": "newuser", "password": "newpass"}
+            "/auth/register", json={"email": "new@example.com", "password": "newpass"}
         )
-        assert resp.status_code == 401
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "pending_verification"
 
-    async def test_register_requires_admin_role(self, client, user):
-        """Non-admin authenticated user cannot register new users."""
-        login_resp = await client.post(
-            "/auth/login", json={"username": "testuser", "password": "testpass"}
-        )
-        token = login_resp.json()["access_token"]
+    async def test_register_email_send_failure_rolls_back(self, client, db):
+        """If verification email fails, user creation is rolled back."""
+        with (
+            patch.object(
+                api.email_service,
+                "send_verification_email",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("sendmail not found"),
+            ),
+            pytest.raises(RuntimeError, match="sendmail not found"),
+        ):
+            await client.post(
+                "/auth/register",
+                json={"email": "fail@example.com", "password": "newpass"},
+            )
+        # User should not exist — transaction was rolled back
+        user = await user_store.get_user_by_email("fail@example.com")
+        assert user is None
+
+    async def test_register_short_password(self, client, db):
         resp = await client.post(
             "/auth/register",
-            json={"username": "newuser", "password": "newpass"},
-            headers={"Authorization": f"Bearer {token}"},
+            json={"email": "short@example.com", "password": "abc"},
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 400
 
     async def test_register_duplicate(self, client, admin_user):
         login_resp = await client.post(
-            "/auth/login", json={"username": "testadmin", "password": "testpass"}
+            "/auth/login",
+            json={"email": "testadmin@example.com", "password": "testpass"},
         )
         token = login_resp.json()["access_token"]
         resp = await client.post(
             "/auth/register",
-            json={"username": "testadmin", "password": "pass"},
+            json={"email": "testadmin@example.com", "password": "pass"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 400
 
+    async def test_verify_email(self, client, db):
+        """Verify endpoint marks user as verified."""
+        from bark_backend import auth as auth_mod
+
+        import bcrypt
+
+        password_hash = bcrypt.hashpw(b"pass", bcrypt.gensalt()).decode()
+        user = await user_store.create_user(
+            "unverified@example.com", password_hash, verified=False
+        )
+        token = auth_mod.create_verification_token(user["id"])
+        resp = await client.get(f"/auth/verify?token={token}")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "verified"
+        # User can now log in
+        login_resp = await client.post(
+            "/auth/login", json={"email": "unverified@example.com", "password": "pass"}
+        )
+        assert login_resp.status_code == 200
+
+    async def test_verify_invalid_token(self, client, db):
+        resp = await client.get("/auth/verify?token=garbage")
+        assert resp.status_code == 400
+
+    async def test_verify_nonexistent_user(self, client, db):
+        from bark_backend import auth as auth_mod
+
+        token = auth_mod.create_verification_token("nonexistent-id")
+        resp = await client.get(f"/auth/verify?token={token}")
+        assert resp.status_code == 404
+
     async def test_login(self, client, user):
         resp = await client.post(
-            "/auth/login", json={"username": "testuser", "password": "testpass"}
+            "/auth/login",
+            json={"email": "testuser@example.com", "password": "testpass"},
         )
         assert resp.status_code == 200
         assert "access_token" in resp.json()
 
     async def test_login_bad_password(self, client, user):
         resp = await client.post(
-            "/auth/login", json={"username": "testuser", "password": "wrong"}
+            "/auth/login", json={"email": "testuser@example.com", "password": "wrong"}
         )
         assert resp.status_code == 401
 
@@ -540,14 +591,18 @@ class TestRoles:
     async def test_require_role_passes(self, admin_user):
         """require_role dependency passes when user has the role."""
         checker = auth.require_role("admin")
-        user = {"id": admin_user["id"], "username": "testadmin", "roles": ["admin"]}
+        user = {
+            "id": admin_user["id"],
+            "email": "testadmin@example.com",
+            "roles": ["admin"],
+        }
         result = await checker(user)
         assert result == user
 
     async def test_require_role_fails(self, user):
         """require_role dependency raises 403 when user lacks the role."""
         checker = auth.require_role("admin")
-        user_dict = {"id": user["id"], "username": "testuser", "roles": []}
+        user_dict = {"id": user["id"], "email": "testuser@example.com", "roles": []}
         with pytest.raises(HTTPException) as exc_info:
             await checker(user_dict)
         assert exc_info.value.status_code == 403
@@ -579,14 +634,14 @@ class TestRoles:
     async def test_roles_in_jwt(self, user):
         await user_store.ensure_role("admin")
         await user_store.assign_role(user["id"], "admin")
-        token = auth._create_token(user["id"], "testuser", ["admin"])
+        token = auth._create_token(user["id"], "testuser@example.com", ["admin"])
         payload = auth._decode_token(token)
         assert payload["roles"] == ["admin"]
 
     async def test_login_includes_roles(self, client, admin_user):
         resp = await client.post(
             "/auth/login",
-            json={"username": "testadmin", "password": "testpass"},
+            json={"email": "testadmin@example.com", "password": "testpass"},
         )
         assert resp.status_code == 200
         token = resp.json()["access_token"]
@@ -596,7 +651,7 @@ class TestRoles:
     async def test_login_no_roles(self, client, user):
         resp = await client.post(
             "/auth/login",
-            json={"username": "testuser", "password": "testpass"},
+            json={"email": "testuser@example.com", "password": "testpass"},
         )
         assert resp.status_code == 200
         token = resp.json()["access_token"]
@@ -637,7 +692,8 @@ class TestRoles:
 class TestAdminEndpoints:
     async def _admin_headers(self, client):
         resp = await client.post(
-            "/auth/login", json={"username": "testadmin", "password": "testpass"}
+            "/auth/login",
+            json={"email": "testadmin@example.com", "password": "testpass"},
         )
         return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
@@ -647,16 +703,17 @@ class TestAdminEndpoints:
         assert resp.status_code == 200
         users = resp.json()
         assert len(users) >= 2
-        usernames = [u["username"] for u in users]
-        assert "testadmin" in usernames
-        assert "testuser" in usernames
+        emails = [u["email"] for u in users]
+        assert "testadmin@example.com" in emails
+        assert "testuser@example.com" in emails
         # Admin user should have roles
-        admin = next(u for u in users if u["username"] == "testadmin")
+        admin = next(u for u in users if u["email"] == "testadmin@example.com")
         assert "admin" in admin["roles"]
 
     async def test_list_users_requires_admin(self, client, user):
         login_resp = await client.post(
-            "/auth/login", json={"username": "testuser", "password": "testpass"}
+            "/auth/login",
+            json={"email": "testuser@example.com", "password": "testpass"},
         )
         headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
         resp = await client.get("/admin/users", headers=headers)
@@ -676,8 +733,8 @@ class TestAdminEndpoints:
         assert resp.status_code == 200
         # Verify user is gone
         resp = await client.get("/admin/users", headers=headers)
-        usernames = [u["username"] for u in resp.json()]
-        assert "testuser" not in usernames
+        emails = [u["email"] for u in resp.json()]
+        assert "testuser@example.com" not in emails
 
     async def test_delete_self_forbidden(self, client, admin_user):
         headers = await self._admin_headers(client)
@@ -694,7 +751,8 @@ class TestAdminEndpoints:
         headers = await self._admin_headers(client)
         # Create a workspace for the user
         user_login = await client.post(
-            "/auth/login", json={"username": "testuser", "password": "testpass"}
+            "/auth/login",
+            json={"email": "testuser@example.com", "password": "testpass"},
         )
         user_headers = {"Authorization": f"Bearer {user_login.json()['access_token']}"}
         ws_resp = await client.post("/workspaces?name=to-delete", headers=user_headers)
@@ -738,16 +796,16 @@ class TestAdminEndpoints:
         roles = await user_store.get_user_roles(user["id"])
         assert "editor" not in roles
 
-    async def test_update_username(self, client, admin_user, user):
+    async def test_update_email(self, client, admin_user, user):
         headers = await self._admin_headers(client)
         resp = await client.patch(
             f"/admin/users/{user['id']}",
-            json={"username": "renamed"},
+            json={"email": "renamed"},
             headers=headers,
         )
         assert resp.status_code == 200
         updated = await user_store.get_user_by_id(user["id"])
-        assert updated["username"] == "renamed"
+        assert updated["email"] == "renamed"
 
     async def test_update_password(self, client, admin_user, user):
         headers = await self._admin_headers(client)
@@ -759,7 +817,8 @@ class TestAdminEndpoints:
         assert resp.status_code == 200
         # Verify can login with new password
         login_resp = await client.post(
-            "/auth/login", json={"username": "testuser", "password": "newpass123"}
+            "/auth/login",
+            json={"email": "testuser@example.com", "password": "newpass123"},
         )
         assert login_resp.status_code == 200
 
@@ -767,7 +826,7 @@ class TestAdminEndpoints:
         headers = await self._admin_headers(client)
         resp = await client.patch(
             "/admin/users/nonexistent-id",
-            json={"username": "x"},
+            json={"email": "x"},
             headers=headers,
         )
         assert resp.status_code == 404
@@ -789,16 +848,16 @@ class TestArchiveUserData:
         data_dir.mkdir(parents=True)
         (data_dir / "hello.txt").write_text("test content")
 
-        result = await workspace_manager.archive_user_data(user["id"], user["username"])
+        result = await workspace_manager.archive_user_data(user["id"], user["email"])
         assert result is not None
         assert result.exists()
-        assert result.name == f"{user['id']}-{user['username']}.tar.xz"
+        assert result.name == f"{user['id']}-{user['email']}.tar.xz"
         # Original directory should be removed
         assert not user_dir.exists()
 
     async def test_archive_no_data_dir(self, temp_data_dir, user):
         """Returns None if user has no data directory."""
-        result = await workspace_manager.archive_user_data(user["id"], user["username"])
+        result = await workspace_manager.archive_user_data(user["id"], user["email"])
         assert result is None
 
     async def test_archive_tar_nonzero_exit(self, temp_data_dir, user):
@@ -812,7 +871,7 @@ class TestArchiveUserData:
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
             result = await workspace_manager.archive_user_data(
-                user["id"], user["username"]
+                user["id"], user["email"]
             )
         assert result is None
 
@@ -823,7 +882,7 @@ class TestArchiveUserData:
 
         with patch("asyncio.create_subprocess_exec", side_effect=OSError("no tar")):
             result = await workspace_manager.archive_user_data(
-                user["id"], user["username"]
+                user["id"], user["email"]
             )
         assert result is None
         # Original directory should still exist (not deleted on failure)

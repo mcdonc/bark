@@ -7,23 +7,23 @@ from bark_backend import user_store
 
 class TestUsers:
     async def test_create_user(self, db):
-        user = await user_store.create_user("alice", "hash123")
-        assert user["username"] == "alice"
+        user = await user_store.create_user("alice@example.com", "hash123")
+        assert user["email"] == "alice@example.com"
         assert "id" in user
 
-    async def test_get_user_by_username(self, user):
-        found = await user_store.get_user_by_username("testuser")
+    async def test_get_user_by_email(self, user):
+        found = await user_store.get_user_by_email("testuser@example.com")
         assert found is not None
         assert found["id"] == user["id"]
 
-    async def test_get_user_by_username_not_found(self, db):
-        found = await user_store.get_user_by_username("nonexistent")
+    async def test_get_user_by_email_not_found(self, db):
+        found = await user_store.get_user_by_email("nonexistent")
         assert found is None
 
     async def test_get_user_by_id(self, user):
         found = await user_store.get_user_by_id(user["id"])
         assert found is not None
-        assert found["username"] == "testuser"
+        assert found["email"] == "testuser@example.com"
 
     async def test_get_user_by_id_not_found(self, db):
         found = await user_store.get_user_by_id("fake-id")

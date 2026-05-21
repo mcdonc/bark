@@ -62,7 +62,7 @@ async function globalSetup() {
         BARK_PORT: backendPort,
         BARK_DATA_DIR: dataDir,
         BARK_JWT_SECRET: "e2e-test-secret",
-        BARK_DEFAULT_USER: "admin",
+        BARK_DEFAULT_USER: "admin@example.com",
         BARK_DEFAULT_PASSWORD: "admin",
         BARK_TEST_MODE: "1",
         BARK_INSTANCE_ID: "e2e-test",

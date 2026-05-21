@@ -69,7 +69,7 @@ def _mock_terminal(alive=True):
 
 def _base_state(user=None):
     return {
-        "user": user or {"id": "uid", "username": "testuser"},
+        "user": user or {"id": "uid", "email": "testuser@example.com"},
         "pi_client": None,
         "container_id": None,
         "event_task": None,
@@ -1202,7 +1202,7 @@ class TestHandleWebsocketDispatch:
     async def _run_commands(self, user, commands):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         msgs = [json.dumps(c) for c in commands] + [WebSocketDisconnect()]
         ws.receive_text = AsyncMock(side_effect=msgs)
@@ -1268,7 +1268,7 @@ class TestHandleWebsocketDispatch:
         """Container should be left running on disconnect (cleaned up by idle timeout)."""
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
 
         workspace = await workspace_manager.create_workspace(user["id"], "stop-ws")
@@ -1404,7 +1404,7 @@ class TestHandleWebsocket:
     async def test_valid_token_then_disconnect(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(side_effect=WebSocketDisconnect())
 
@@ -1415,7 +1415,7 @@ class TestHandleWebsocket:
     async def test_invalid_json(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(side_effect=["not json", WebSocketDisconnect()])
 
@@ -1427,7 +1427,7 @@ class TestHandleWebsocket:
     async def test_unknown_command(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(
             side_effect=[
@@ -1444,7 +1444,7 @@ class TestHandleWebsocket:
     async def test_ui_ready_with_pending(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         workspace = await workspace_manager.create_workspace(user["id"], "ui-ready-ws")
 
@@ -1486,7 +1486,7 @@ class TestHandleWebsocket:
     async def test_ui_ready_no_pending(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(
             side_effect=[
@@ -1510,7 +1510,7 @@ class TestHandleWebsocket:
     async def test_general_exception_logged(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["username"])
+        token = auth_mod._create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(side_effect=RuntimeError("unexpected"))
 

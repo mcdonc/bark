@@ -29,8 +29,8 @@ test.describe("Bark E2E", () => {
   });
 
   test("login with wrong password fails", async ({ page, request }) => {
-    const username = `wrong-pw-${Date.now()}`;
-    await registerUser(request, username);
+    const email = `wrong-pw-${Date.now()}@test.example.com`;
+    await registerUser(request, email);
 
     // Type credentials manually instead of loginViaUI (which waits 15s
     // for a Workspaces title that never comes on failed login).
@@ -42,7 +42,7 @@ test.describe("Bark E2E", () => {
 
     await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
     await page.waitForTimeout(300);
-    await page.keyboard.type(username);
+    await page.keyboard.type(email);
 
     await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
     await page.waitForTimeout(300);
@@ -129,7 +129,7 @@ test.describe("Bark E2E", () => {
   test("create and delete workspace", async ({ request }) => {
     const { token, headers } = await registerUser(
       request,
-      `crud-ws-${Date.now()}`,
+      `crud-ws-${Date.now()}@test.example.com`,
     );
     const wsName = "e2e-test-workspace";
 
@@ -208,7 +208,7 @@ test.describe("Bark E2E", () => {
   test("file upload, rename, and delete", async ({ request }) => {
     const { token, headers } = await registerUser(
       request,
-      `file-ops-${Date.now()}`,
+      `file-ops-${Date.now()}@test.example.com`,
     );
     const wsResp = await request.post(
       `${API_BASE}/workspaces?name=e2e-file-ops-${Date.now()}`,
@@ -291,7 +291,7 @@ test.describe("Bark E2E", () => {
   test("folder upload and zip download round-trip", async ({ request }) => {
     const { token, headers } = await registerUser(
       request,
-      `folder-${Date.now()}`,
+      `folder-${Date.now()}@test.example.com`,
     );
     const wsResp = await request.post(
       `${API_BASE}/workspaces?name=e2e-folder-${Date.now()}`,
@@ -365,9 +365,9 @@ test.describe("Bark E2E", () => {
   });
 
   test("logout returns to login page", async ({ page, request }) => {
-    const username = `logout-${Date.now()}`;
-    await registerUser(request, username);
-    await loginViaUI(page, username, TEST_PASSWORD);
+    const email = `logout-${Date.now()}@test.example.com`;
+    await registerUser(request, email);
+    await loginViaUI(page, email, TEST_PASSWORD);
 
     const { width } = vp(page);
 
@@ -382,12 +382,12 @@ test.describe("Bark E2E", () => {
     page,
     request,
   }) => {
-    const username = `e2e-user-${Date.now()}`;
+    const email = `e2e-user-${Date.now()}@test.example.com`;
     const password = "testpass1234";
 
     // Register via API
     const regResp = await request.post(`${API_BASE}/auth/register`, {
-      data: { username, password },
+      data: { email, password },
     });
     expect(regResp.ok()).toBeTruthy();
     const regData = await regResp.json();
@@ -403,7 +403,7 @@ test.describe("Bark E2E", () => {
 
     await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
     await page.waitForTimeout(200);
-    await page.keyboard.type(username);
+    await page.keyboard.type(email);
 
     await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
     await page.waitForTimeout(200);
@@ -535,8 +535,8 @@ test.describe("Bark E2E", () => {
     page,
     request,
   }) => {
-    const username = `lifecycle-${Date.now()}`;
-    const { token, headers } = await registerUser(request, username);
+    const email = `lifecycle-${Date.now()}@test.example.com`;
+    const { token, headers } = await registerUser(request, email);
     const { workspaceId, cleanup } = await createWorkspace(
       request,
       headers,
@@ -550,7 +550,7 @@ test.describe("Bark E2E", () => {
       // Open the workspace — openWorkspace handles WebSocket lifecycle
       // and waits for container_ready, so the container is guaranteed
       // to be running when it returns.
-      await openWorkspace(page, username, workspaceId);
+      await openWorkspace(page, email, workspaceId);
 
       expect(dockerContainersForWorkspace(workspaceId).length).toBeGreaterThan(
         0,
@@ -578,7 +578,7 @@ test.describe("Bark E2E", () => {
   test("two workspaces are independent", async ({ request }) => {
     const { token, headers } = await registerUser(
       request,
-      `two-ws-${Date.now()}`,
+      `two-ws-${Date.now()}@test.example.com`,
     );
 
     // Clean up any leftovers
@@ -691,7 +691,7 @@ test.describe("Bark E2E", () => {
       return;
     }
 
-    const { workspaceId, username, headers, cleanup } =
+    const { workspaceId, email, headers, cleanup } =
       await createAndOpenWorkspace(page, request, "e2e-idle-test");
 
     // Set a short idle timeout for this workspace only
@@ -721,7 +721,7 @@ test.describe("Bark E2E", () => {
 
       // Re-open the workspace using openWorkspace which handles login,
       // navigation, WebSocket lifecycle, and container_ready properly.
-      await openWorkspace(page, username, workspaceId);
+      await openWorkspace(page, email, workspaceId);
 
       expect(dockerContainersForWorkspace(workspaceId).length).toBeGreaterThan(
         0,
@@ -736,7 +736,7 @@ test.describe("Bark E2E", () => {
   }) => {
     // Login as the default admin user (seeded on startup)
     const loginResp = await request.post(`${API_BASE}/auth/login`, {
-      data: { username: "admin", password: "admin" },
+      data: { email: "admin@example.com", password: "admin" },
     });
     expect(loginResp.ok()).toBeTruthy();
     const adminToken = (await loginResp.json()).access_token;
@@ -745,7 +745,7 @@ test.describe("Bark E2E", () => {
     // Create a test user via test mode
     const { token: userToken, headers: userHeaders } = await registerUser(
       request,
-      "admin-test-user",
+      "admin-test@test.example.com",
     );
 
     // Admin can list users
@@ -754,7 +754,9 @@ test.describe("Bark E2E", () => {
     });
     expect(listResp.ok()).toBeTruthy();
     const users = await listResp.json();
-    const testUser = users.find((u: any) => u.username === "admin-test-user");
+    const testUser = users.find(
+      (u: any) => u.email === "admin-test@test.example.com",
+    );
     expect(testUser).toBeTruthy();
     expect(testUser.roles).toEqual([]);
 
@@ -776,7 +778,7 @@ test.describe("Bark E2E", () => {
       headers: adminHeaders,
     });
     const updatedUser = (await listResp2.json()).find(
-      (u: any) => u.username === "admin-test-user",
+      (u: any) => u.email === "admin-test@test.example.com",
     );
     expect(updatedUser.roles).toContain("editor");
 
@@ -799,14 +801,14 @@ test.describe("Bark E2E", () => {
       headers: adminHeaders,
     });
     const deletedUser = (await listResp3.json()).find(
-      (u: any) => u.username === "admin-test-user",
+      (u: any) => u.email === "admin-test@test.example.com",
     );
     expect(deletedUser).toBeUndefined();
   });
 
   test("deep link redirects back after login", async ({ page, request }) => {
-    const username = `deeplink-${Date.now()}`;
-    const { headers } = await registerUser(request, username);
+    const email = `deeplink-${Date.now()}@test.example.com`;
+    const { headers } = await registerUser(request, email);
     const { workspaceId } = await createWorkspace(request, headers, "deeplink");
 
     // Navigate directly to a workspace URL without being logged in.
@@ -822,7 +824,7 @@ test.describe("Bark E2E", () => {
 
     await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
     await page.waitForTimeout(200);
-    await page.keyboard.type(username);
+    await page.keyboard.type(email);
 
     await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
     await page.waitForTimeout(200);
@@ -850,7 +852,7 @@ test.describe("Bark E2E", () => {
     // Login as the default admin user via the API, then set the token
     // and navigate directly to the admin page.
     const loginResp = await request.post(`${API_BASE}/auth/login`, {
-      data: { username: "admin", password: "admin" },
+      data: { email: "admin@example.com", password: "admin" },
     });
     expect(loginResp.ok()).toBeTruthy();
     const adminToken = (await loginResp.json()).access_token;
@@ -863,11 +865,13 @@ test.describe("Bark E2E", () => {
     expect(resp.ok()).toBeTruthy();
     const users = await resp.json();
     expect(users.length).toBeGreaterThan(0);
-    expect(users.some((u: any) => u.username === "admin")).toBeTruthy();
+    expect(
+      users.some((u: any) => u.email === "admin@example.com"),
+    ).toBeTruthy();
 
     // Create a user via API, verify it appears, then delete via API
     const regResp = await request.post(`${API_BASE}/auth/register`, {
-      data: { username: "e2e-admin-ui-test", password: "testpass" },
+      data: { email: "e2e-admin-ui@test.example.com", password: "testpass" },
     });
     expect(regResp.ok()).toBeTruthy();
 
@@ -876,16 +880,16 @@ test.describe("Bark E2E", () => {
     });
     const updatedUsers = await resp2.json();
     const newUser = updatedUsers.find(
-      (u: any) => u.username === "e2e-admin-ui-test",
+      (u: any) => u.email === "e2e-admin-ui@test.example.com",
     );
     expect(newUser).toBeTruthy();
 
-    // Update username via API
+    // Update email via API
     const patchResp = await request.patch(
       `${API_BASE}/admin/users/${newUser.id}`,
       {
         headers: adminHeaders,
-        data: { username: "e2e-admin-renamed" },
+        data: { email: "e2e-admin-renamed@test.example.com" },
       },
     );
     expect(patchResp.ok()).toBeTruthy();
@@ -895,7 +899,9 @@ test.describe("Bark E2E", () => {
       headers: adminHeaders,
     });
     expect(
-      (await resp3.json()).some((u: any) => u.username === "e2e-admin-renamed"),
+      (await resp3.json()).some(
+        (u: any) => u.email === "e2e-admin-renamed@test.example.com",
+      ),
     ).toBeTruthy();
 
     // Delete via API
@@ -910,7 +916,9 @@ test.describe("Bark E2E", () => {
       headers: adminHeaders,
     });
     expect(
-      (await resp4.json()).some((u: any) => u.username === "e2e-admin-renamed"),
+      (await resp4.json()).some(
+        (u: any) => u.email === "e2e-admin-renamed@test.example.com",
+      ),
     ).toBeFalsy();
   });
 });

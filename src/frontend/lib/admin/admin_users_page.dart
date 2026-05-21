@@ -75,13 +75,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     }
   }
 
-  Future<void> _deleteUser(String userId, String username) async {
+  Future<void> _deleteUser(String userId, String email) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete User'),
         content: Text(
-          'Delete user "$username"? This will delete all their workspaces and data.',
+          'Delete user "$email"? This will delete all their workspaces and data.',
         ),
         actions: [
           TextButton(
@@ -116,7 +116,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (ctx) => _EditUserDialog(
-        currentUsername: user['username'] as String,
+        currentEmail: user['email'] as String,
       ),
     );
     if (result == null) return;
@@ -206,7 +206,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                             color:
                                 isAdmin ? const Color(0xFF1A237E) : Colors.grey,
                           ),
-                          title: Text(user['username'] ?? ''),
+                          title: Text(user['email'] ?? ''),
                           subtitle: Text(
                             roles.isEmpty
                                 ? 'No roles'
@@ -247,7 +247,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                                   tooltip: 'Delete user',
                                   onPressed: () => _deleteUser(
                                     user['id'],
-                                    user['username'],
+                                    user['email'],
                                   ),
                                 ),
                               ],
@@ -266,12 +266,12 @@ class _AddUserDialog extends StatefulWidget {
 }
 
 class _AddUserDialogState extends State<_AddUserDialog> {
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -284,8 +284,8 @@ class _AddUserDialogState extends State<_AddUserDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
-            controller: _usernameController,
-            decoration: const InputDecoration(labelText: 'Username'),
+            controller: _emailController,
+            decoration: const InputDecoration(labelText: 'Email'),
             autofocus: true,
           ),
           const SizedBox(height: 8),
@@ -303,11 +303,11 @@ class _AddUserDialogState extends State<_AddUserDialog> {
         ),
         TextButton(
           onPressed: () {
-            final username = _usernameController.text.trim();
+            final email = _emailController.text.trim();
             final password = _passwordController.text;
-            if (username.isEmpty || password.isEmpty) return;
+            if (email.isEmpty || password.isEmpty) return;
             Navigator.pop(context, {
-              'username': username,
+              'email': email,
               'password': password,
             });
           },
@@ -319,27 +319,27 @@ class _AddUserDialogState extends State<_AddUserDialog> {
 }
 
 class _EditUserDialog extends StatefulWidget {
-  final String currentUsername;
+  final String currentEmail;
 
-  const _EditUserDialog({required this.currentUsername});
+  const _EditUserDialog({required this.currentEmail});
 
   @override
   State<_EditUserDialog> createState() => _EditUserDialogState();
 }
 
 class _EditUserDialogState extends State<_EditUserDialog> {
-  late final TextEditingController _usernameController;
+  late final TextEditingController _emailController;
   final _passwordController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController(text: widget.currentUsername);
+    _emailController = TextEditingController(text: widget.currentEmail);
   }
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -352,8 +352,8 @@ class _EditUserDialogState extends State<_EditUserDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
-            controller: _usernameController,
-            decoration: const InputDecoration(labelText: 'Username'),
+            controller: _emailController,
+            decoration: const InputDecoration(labelText: 'Email'),
             autofocus: true,
           ),
           const SizedBox(height: 8),
@@ -374,10 +374,10 @@ class _EditUserDialogState extends State<_EditUserDialog> {
         ),
         TextButton(
           onPressed: () {
-            final username = _usernameController.text.trim();
+            final email = _emailController.text.trim();
             final password = _passwordController.text;
-            if (username.isEmpty) return;
-            final result = <String, String>{'username': username};
+            if (email.isEmpty) return;
+            final result = <String, String>{'email': email};
             if (password.isNotEmpty) result['password'] = password;
             Navigator.pop(context, result);
           },

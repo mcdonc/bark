@@ -133,10 +133,10 @@ void main() {
       expect(service.token, 'reg-token');
     });
 
-    test('duplicate username returns error', () async {
+    test('duplicate email returns error', () async {
       testAuthHttpClientOverride = MockClient((request) async {
         return http.Response(
-          jsonEncode({'detail': 'Username already taken'}),
+          jsonEncode({'detail': 'Registration failed'}),
           400,
         );
       });
@@ -145,7 +145,7 @@ void main() {
       await Future.delayed(Duration.zero);
 
       final error = await service.register('existing', 'pass');
-      expect(error, 'Username already taken');
+      expect(error, 'Registration failed');
     });
   });
 

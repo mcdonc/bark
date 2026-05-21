@@ -63,6 +63,11 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Save a token from email verification (public for VerifyPage).
+  Future<void> saveTokenFromVerification(String token) async {
+    await _saveToken(token);
+  }
+
   Future<void> _clearToken() async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
@@ -75,19 +80,24 @@ class AuthService extends ChangeNotifier {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
-  Future<String?> register(String username, String password) async {
+  Future<String?> register(String email, String password) async {
     _loading = true;
     notifyListeners();
     try {
       final response = await _client.post(
         Uri.parse('$_baseUrl/auth/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
+        body: jsonEncode({'email': email, 'password': password}),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _saveToken(data['access_token']);
-        return null;
+        if (data['access_token'] != null) {
+          // Test mode: auto-verified, log in immediately
+          await _saveToken(data['access_token']);
+          return null;
+        }
+        // Production: verification email sent
+        return 'Check your email to verify your account.';
       }
       final error = jsonDecode(response.body);
       return error['detail'] ?? 'Registration failed';
@@ -99,14 +109,14 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<String?> login(String username, String password) async {
+  Future<String?> login(String email, String password) async {
     _loading = true;
     notifyListeners();
     try {
       final response = await _client.post(
         Uri.parse('$_baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'username': username, 'password': password}),
+        body: jsonEncode({'email': email, 'password': password}),
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
