@@ -36,8 +36,8 @@ RUN EXISTING_USER=$(getent passwd $BARK_UID | cut -d: -f1) \
 # Make /bin/sh point to bash so Pi's bash tool supports bashisms (source, etc.)
 RUN ln -sf /bin/bash /bin/sh
 
-RUN mkdir -p /workspace && chown bark:bark /workspace
-WORKDIR /workspace
+RUN mkdir -p /work && chown bark:bark /work
+WORKDIR /work
 
 # Prevent bark user from escalating to root
 RUN passwd -l root \
