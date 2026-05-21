@@ -36,15 +36,15 @@ export async function loginViaUI(page: Page, email: string, password: string) {
   const cx = width / 2;
   const f = fv(page);
 
-  await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
+  await f.click({ position: { x: cx, y: height * 0.52 }, force: true });
   await page.waitForTimeout(200);
   await page.keyboard.type(email);
 
-  await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
+  await f.click({ position: { x: cx, y: height * 0.6 }, force: true });
   await page.waitForTimeout(200);
   await page.keyboard.type(password);
 
-  await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
+  await f.click({ position: { x: cx, y: height * 0.7 }, force: true });
   await expect(page).toHaveTitle(/Workspaces/i, { timeout: 10_000 });
 }
 

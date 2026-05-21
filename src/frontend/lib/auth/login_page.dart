@@ -76,7 +76,12 @@ class _LoginPageState extends State<LoginPage> {
                     'Web Coding Agent',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+                  Text(
+                    _isRegister ? 'Create Account' : 'Log In',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 24),
                   TextFormField(
                     controller: _emailController,
                     decoration: InputDecoration(
@@ -120,13 +125,19 @@ class _LoginPageState extends State<LoginPage> {
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: auth.loading ? null : _submit,
+                      style: _isRegister
+                          ? FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              foregroundColor: Colors.white,
+                            )
+                          : null,
                       child: auth.loading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_isRegister ? 'Register' : 'Login'),
+                          : Text(_isRegister ? 'Create Account' : 'Log In'),
                     ),
                   ),
                   if (pendingRedirect != null) ...[
@@ -148,8 +159,8 @@ class _LoginPageState extends State<LoginPage> {
                     },
                     child: Text(
                       _isRegister
-                          ? 'Already have an account? Login'
-                          : 'Need an account? Register',
+                          ? 'Already have an account? Log in'
+                          : 'Need an account? Create one',
                     ),
                   ),
                 ],

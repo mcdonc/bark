@@ -33,7 +33,7 @@ void main() {
 
       expect(find.byType(LoginPage), findsOneWidget);
       expect(find.text('Bark'), findsOneWidget);
-      expect(find.text('Login'), findsWidgets); // button + title
+      expect(find.text('Log In'), findsWidgets); // button + title
     });
 
     testWidgets('has email and password fields', (tester) async {
@@ -47,8 +47,8 @@ void main() {
       await tester.pumpWidget(buildLoginPage());
       await tester.pumpAndSettle();
 
-      expect(find.text('Login'), findsWidgets);
-      expect(find.textContaining('Register'), findsOneWidget);
+      expect(find.text('Log In'), findsWidgets);
+      expect(find.textContaining('Create one'), findsOneWidget);
     });
 
     testWidgets('can type in fields', (tester) async {
@@ -67,13 +67,13 @@ void main() {
       await tester.pumpWidget(buildLoginPage());
       await tester.pumpAndSettle();
 
-      expect(find.text('Login'), findsWidgets);
+      expect(find.text('Log In'), findsWidgets);
 
-      await tester.tap(find.textContaining('Register'));
+      await tester.tap(find.textContaining('Create one'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Register'), findsWidgets);
-      expect(find.textContaining('Login'), findsWidgets);
+      expect(find.text('Create Account'), findsWidgets);
+      expect(find.textContaining('Log in'), findsWidgets);
     });
 
     testWidgets('shows Bark logo', (tester) async {
@@ -115,7 +115,7 @@ void main() {
       await tester.enterText(fields.first, 'notanemail');
       await tester.enterText(fields.last, 'password');
 
-      await tester.tap(find.text('Login'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Log In'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('valid email'), findsOneWidget);
@@ -126,14 +126,14 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to register mode
-      await tester.tap(find.textContaining('Register'));
+      await tester.tap(find.textContaining('Create one'));
       await tester.pumpAndSettle();
 
       final fields = find.byType(TextField);
       await tester.enterText(fields.first, 'notanemail');
       await tester.enterText(fields.last, 'password');
 
-      await tester.tap(find.text('Register'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Create Account'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('valid email'), findsOneWidget);
@@ -144,7 +144,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Switch to register mode
-      await tester.tap(find.textContaining('Register'));
+      await tester.tap(find.textContaining('Create one'));
       await tester.pumpAndSettle();
 
       final fields = find.byType(TextField);
@@ -153,7 +153,7 @@ void main() {
 
       // Tap an invalid password to trigger validation without a real HTTP call
       await tester.enterText(fields.last, '');
-      await tester.tap(find.text('Register'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Create Account'));
       await tester.pumpAndSettle();
 
       // Email field should not show validation error
@@ -164,7 +164,7 @@ void main() {
       await tester.pumpWidget(buildLoginPage());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.textContaining('Register'));
+      await tester.tap(find.textContaining('Create one'));
       await tester.pumpAndSettle();
 
       expect(find.text('Email'), findsOneWidget);

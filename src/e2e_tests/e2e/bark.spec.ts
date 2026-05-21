@@ -40,15 +40,15 @@ test.describe("Bark E2E", () => {
     const cx = width / 2;
     const f = fv(page);
 
-    await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.52 }, force: true });
     await page.waitForTimeout(300);
     await page.keyboard.type(email);
 
-    await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.6 }, force: true });
     await page.waitForTimeout(300);
     await page.keyboard.type("wrongpassword");
 
-    await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.7 }, force: true });
 
     // Wait briefly for the login attempt to complete, then verify
     // we're still on the login page (not redirected to workspaces).
@@ -401,15 +401,15 @@ test.describe("Bark E2E", () => {
     const cx = width / 2;
     const f = fv(page);
 
-    await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.52 }, force: true });
     await page.waitForTimeout(200);
     await page.keyboard.type(email);
 
-    await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.6 }, force: true });
     await page.waitForTimeout(200);
     await page.keyboard.type(password);
 
-    await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.7 }, force: true });
 
     await expect(page).toHaveTitle(/Workspaces/i, { timeout: 10_000 });
   });
@@ -894,15 +894,15 @@ test.describe("Bark E2E", () => {
     const cx = width / 2;
     const f = fv(page);
 
-    await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.52 }, force: true });
     await page.waitForTimeout(200);
     await page.keyboard.type(email);
 
-    await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.6 }, force: true });
     await page.waitForTimeout(200);
     await page.keyboard.type(TEST_PASSWORD);
 
-    await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.68 }, force: true });
 
     // Should end up at the workspace, not the workspace list.
     let finalUrl = "";
