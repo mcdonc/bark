@@ -19,6 +19,15 @@ import {
 } from "./helpers";
 
 test.describe("Bark E2E", () => {
+  test("index.html has cache-busted flutter_bootstrap.js", async ({
+    request,
+  }) => {
+    const resp = await request.get(`${API_BASE}/`);
+    expect(resp.ok()).toBeTruthy();
+    const html = await resp.text();
+    expect(html).toMatch(/flutter_bootstrap\.js\?v=[0-9a-f]{12}/);
+  });
+
   test("login with wrong password fails", async ({ page, request }) => {
     const username = `wrong-pw-${Date.now()}`;
     await registerUser(request, username);
@@ -841,25 +850,30 @@ test.describe("Bark E2E", () => {
     await waitForFlutter(page);
     await expect(page).toHaveTitle(/Login/i, { timeout: 10_000 });
 
-    // Log in via the UI. The "Please log in to continue." message shifts
-    // the form down slightly, so use slightly lower Y coordinates.
+    // Log in using the same coordinates as loginViaUI. The re-auth message
+    // is below the form so it doesn't shift the input fields.
     const { width, height } = vp(page);
     const cx = width / 2;
     const f = fv(page);
 
-    await f.click({ position: { x: cx, y: height * 0.5 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.47 }, force: true });
     await page.waitForTimeout(300);
     await page.keyboard.type(username);
 
-    await f.click({ position: { x: cx, y: height * 0.58 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.55 }, force: true });
     await page.waitForTimeout(300);
     await page.keyboard.type(TEST_PASSWORD);
 
-    await f.click({ position: { x: cx, y: height * 0.69 }, force: true });
+    await f.click({ position: { x: cx, y: height * 0.66 }, force: true });
 
-    // Should end up at the workspace, not the workspace list
-    await page.waitForTimeout(5000);
-    const finalUrl = page.url();
+    // Should end up at the workspace, not the workspace list.
+    // Poll for up to 30s since login can be slow under parallel load.
+    let finalUrl = "";
+    for (let i = 0; i < 60; i++) {
+      await page.waitForTimeout(500);
+      finalUrl = page.url();
+      if (finalUrl.includes(workspaceId)) break;
+    }
     expect(finalUrl).toContain(workspaceId);
 
     // Cleanup

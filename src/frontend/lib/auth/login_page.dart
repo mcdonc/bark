@@ -76,15 +76,6 @@ class _LoginPageState extends State<LoginPage> {
                     'Web Coding Agent',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  if (pendingRedirect != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      'Please log in to continue.',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 32),
                   TextFormField(
                     controller: _usernameController,
@@ -133,6 +124,15 @@ class _LoginPageState extends State<LoginPage> {
                           : Text(_isRegister ? 'Register' : 'Login'),
                     ),
                   ),
+                  if (pendingRedirect != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Please log in to continue.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: () {

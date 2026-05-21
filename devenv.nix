@@ -122,7 +122,9 @@
   '';
 
   scripts.test-e2e.exec = ''
-    cd $DEVENV_ROOT/src/e2e_tests
+    cd $DEVENV_ROOT
+    devenv tasks run bark:flutter-build bark:docker-build
+    cd src/e2e_tests
     npm install --silent
     exec npx playwright test --reporter=list "$@"
   '';
