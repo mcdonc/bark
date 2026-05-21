@@ -245,7 +245,7 @@ export async function openWorkspace(
   // Extra settle time for the UI to render after container ready.
   // WebKit on CI needs more time for Flutter to fully process the
   // container_ready event and establish bidirectional chat.
-  await page.waitForTimeout(4000);
+  // await page.waitForTimeout(4000);
 }
 
 /** Convenience: register user, create workspace, open it. */

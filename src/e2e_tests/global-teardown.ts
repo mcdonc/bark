@@ -42,7 +42,9 @@ async function globalTeardown() {
 
   // Remove any containers that survived shutdown (including stopped ones holding ports)
   try {
-    const ids = execSync('docker ps -a --filter "label=bark.managed=true" -q')
+    const ids = execSync(
+      'docker ps -a --filter "label=bark.managed=true" --filter "label=bark.instance=e2e-test" -q',
+    )
       .toString()
       .trim();
     if (ids) {
