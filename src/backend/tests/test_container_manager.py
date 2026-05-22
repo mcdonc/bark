@@ -12,30 +12,30 @@ from bark_backend import container_manager, user_store
 class TestParseIdleTimeout:
     def test_default_values(self, monkeypatch):
         monkeypatch.delenv("BARK_IDLE_TIMEOUT_SECONDS", raising=False)
-        timeout, interval = container_manager._parse_idle_timeout()
+        timeout, interval = container_manager.parse_idle_timeout()
         assert timeout == 30 * 60
         assert interval == max(10, min(60, timeout // 3))
 
     def test_custom_value(self, monkeypatch):
         monkeypatch.setenv("BARK_IDLE_TIMEOUT_SECONDS", "120")
-        timeout, interval = container_manager._parse_idle_timeout()
+        timeout, interval = container_manager.parse_idle_timeout()
         assert timeout == 120
         assert interval == max(10, min(60, 120 // 3))
 
     def test_invalid_value_uses_default(self, monkeypatch):
         monkeypatch.setenv("BARK_IDLE_TIMEOUT_SECONDS", "not_a_number")
-        timeout, interval = container_manager._parse_idle_timeout()
+        timeout, interval = container_manager.parse_idle_timeout()
         assert timeout == 30 * 60
 
     def test_small_value_clamps_interval(self, monkeypatch):
         monkeypatch.setenv("BARK_IDLE_TIMEOUT_SECONDS", "15")
-        timeout, interval = container_manager._parse_idle_timeout()
+        timeout, interval = container_manager.parse_idle_timeout()
         assert timeout == 15
         assert interval == 10  # clamped to min 10
 
     def test_large_value_clamps_interval(self, monkeypatch):
         monkeypatch.setenv("BARK_IDLE_TIMEOUT_SECONDS", "3600")
-        timeout, interval = container_manager._parse_idle_timeout()
+        timeout, interval = container_manager.parse_idle_timeout()
         assert timeout == 3600
         assert interval == 60  # clamped to max 60
 
@@ -47,15 +47,15 @@ class TestActivityTracking:
     def teardown_method(self):
         container_manager._containers.clear()
 
-    def test_track_activity(self):
-        container_manager._track_activity("cid-1", "ws-1")
+    def testtrack_activity(self):
+        container_manager.track_activity("cid-1", "ws-1")
         assert "cid-1" in container_manager._containers
         info = container_manager._containers["cid-1"]
         assert info["workspace_id"] == "ws-1"
         assert info["last_activity"] <= time.time()
 
     def test_record_activity_updates_time(self):
-        container_manager._track_activity("cid-1", "ws-1")
+        container_manager.track_activity("cid-1", "ws-1")
         old_time = container_manager._containers["cid-1"]["last_activity"]
         time.sleep(0.01)
         container_manager.record_activity("cid-1")
@@ -67,9 +67,9 @@ class TestActivityTracking:
         container_manager.record_activity("nonexistent")
         assert "nonexistent" not in container_manager._containers
 
-    def test_track_activity_overwrites(self):
-        container_manager._track_activity("cid-1", "ws-1")
-        container_manager._track_activity("cid-1", "ws-2")
+    def testtrack_activity_overwrites(self):
+        container_manager.track_activity("cid-1", "ws-1")
+        container_manager.track_activity("cid-1", "ws-2")
         assert container_manager._containers["cid-1"]["workspace_id"] == "ws-2"
 
 
@@ -672,11 +672,11 @@ class TestCleanupIdleContainers:
             container_manager, "get_docker", return_value=mock_docker
         ):
             task = asyncio.create_task(
-                container_manager._cleanup_idle_containers()
+                container_manager.cleanup_idle_containers()
             )
             # Let the task enter the Event wait, then wake it
             await asyncio.sleep(0.05)
-            container_manager._get_cleanup_wake().set()
+            container_manager.get_cleanup_wake().set()
             await asyncio.sleep(0.05)
             task.cancel()
             try:
@@ -698,10 +698,10 @@ class TestCleanupIdleContainers:
             container_manager, "get_docker", return_value=mock_docker
         ):
             task = asyncio.create_task(
-                container_manager._cleanup_idle_containers()
+                container_manager.cleanup_idle_containers()
             )
             await asyncio.sleep(0.05)
-            container_manager._get_cleanup_wake().set()
+            container_manager.get_cleanup_wake().set()
             await asyncio.sleep(0.05)
             task.cancel()
             try:
@@ -734,10 +734,10 @@ class TestCleanupIdleContainers:
             container_manager, "get_docker", return_value=mock_docker
         ):
             task = asyncio.create_task(
-                container_manager._cleanup_idle_containers()
+                container_manager.cleanup_idle_containers()
             )
             await asyncio.sleep(0.05)
-            container_manager._get_cleanup_wake().set()
+            container_manager.get_cleanup_wake().set()
             await asyncio.sleep(0.05)
             task.cancel()
             try:
@@ -767,10 +767,10 @@ class TestCleanupIdleContainers:
             container_manager, "get_docker", return_value=mock_docker
         ):
             task = asyncio.create_task(
-                container_manager._cleanup_idle_containers()
+                container_manager.cleanup_idle_containers()
             )
             await asyncio.sleep(0.05)
-            container_manager._get_cleanup_wake().set()
+            container_manager.get_cleanup_wake().set()
             await asyncio.sleep(0.05)
             task.cancel()
             try:
@@ -799,11 +799,11 @@ class TestCleanupIdleContainers:
                 # The Event-based wait will timeout after max(2, 5//2)=2s,
                 # then check containers. We cancel after one iteration.
                 task = asyncio.create_task(
-                    container_manager._cleanup_idle_containers()
+                    container_manager.cleanup_idle_containers()
                 )
                 await asyncio.sleep(0.1)  # Let it start
                 # Wake it immediately via the event
-                container_manager._get_cleanup_wake().set()
+                container_manager.get_cleanup_wake().set()
                 await asyncio.sleep(0.1)  # Let it process
                 task.cancel()
                 try:
@@ -853,7 +853,7 @@ class TestCleanupIdleContainers:
 
                 with patch("asyncio.wait_for", side_effect=patched_wait_for):
                     try:
-                        await container_manager._cleanup_idle_containers()
+                        await container_manager.cleanup_idle_containers()
                     except asyncio.CancelledError:
                         pass
             mock_c.stop.assert_awaited()

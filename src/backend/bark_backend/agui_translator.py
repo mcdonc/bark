@@ -111,7 +111,7 @@ def translate_event(pi_event: dict, workspace_id: str) -> list[dict]:
     elif event_type == "tool_execution_update":
         tool_call_id = pi_event.get("toolCallId", str(uuid.uuid4()))
         # Extract text from partialResult.content[].text
-        delta = _extract_content_text(pi_event.get("partialResult", {}))
+        delta = extract_content_text(pi_event.get("partialResult", {}))
         if delta:
             agui_events.append(
                 {
@@ -130,7 +130,7 @@ def translate_event(pi_event: dict, workspace_id: str) -> list[dict]:
             }
         )
         # Extract text from result.content[].text
-        result_text = _extract_content_text(pi_event.get("result", {}))
+        result_text = extract_content_text(pi_event.get("result", {}))
         agui_events.append(
             {
                 "type": "TOOL_CALL_RESULT",
@@ -150,7 +150,7 @@ def translate_event(pi_event: dict, workspace_id: str) -> list[dict]:
                     "value": {"path": ".", "action": "modified"},
                 }
             )
-        elif tool_name == "bash" and _bash_likely_creates_files(pi_event):
+        elif tool_name == "bash" and bash_likely_creates_files(pi_event):
             agui_events.append(
                 {
                     "type": "CUSTOM",
@@ -237,7 +237,7 @@ _FILE_CREATING_PATTERNS = [
 ]
 
 
-def _bash_likely_creates_files(pi_event: dict) -> bool:
+def bash_likely_creates_files(pi_event: dict) -> bool:
     """Check if a bash command is likely to create or modify files."""
     args = pi_event.get("args", {})
     if isinstance(args, dict):
@@ -250,7 +250,7 @@ def _bash_likely_creates_files(pi_event: dict) -> bool:
     return any(pattern in command_lower for pattern in _FILE_CREATING_PATTERNS)
 
 
-def _extract_content_text(container: dict | str | None) -> str:
+def extract_content_text(container: dict | str | None) -> str:
     """Extract text from Pi's content structure: {content: [{type: 'text', text: '...'}]}."""
     if container is None:
         return ""
@@ -270,7 +270,7 @@ def _extract_content_text(container: dict | str | None) -> str:
     return ""
 
 
-def _extract_file_path(pi_event: dict) -> str | None:
+def extract_file_path(pi_event: dict) -> str | None:
     """Try to extract a file path from a tool execution event."""
     args = pi_event.get("args", {})
     if isinstance(args, dict):

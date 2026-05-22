@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def _seed_default_user() -> None:
+async def seed_default_user() -> None:
     """Create default user if it doesn't exist.
 
     If BARK_DEFAULT_PASSWORD is set, use it. Otherwise generate a random
@@ -60,7 +60,7 @@ async def _seed_default_user() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await user_store.init_db()
-    await _seed_default_user()
+    await seed_default_user()
     container_manager.start_cleanup_loop()
     logger.info("Bark backend started")
     yield

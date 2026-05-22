@@ -11,7 +11,7 @@ _data_dir = Path(
 DB_PATH = _data_dir / "bark.db"
 
 
-async def _get_db() -> aiosqlite.Connection:
+async def get_db() -> aiosqlite.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
@@ -22,7 +22,7 @@ async def _get_db() -> aiosqlite.Connection:
 
 
 async def init_db() -> None:
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -103,7 +103,7 @@ async def transaction():
 
     Commits on clean exit, rolls back on exception.
     """
-    db = await _get_db()
+    db = await get_db()
     try:
         yield db
         await db.commit()
@@ -119,7 +119,7 @@ async def create_user(
     password_hash: str,
     verified: bool = False,
 ) -> dict:
-    db = await _get_db()
+    db = await get_db()
     try:
         user_id = str(uuid.uuid4())
         await db.execute(
@@ -134,7 +134,7 @@ async def create_user(
 
 async def verify_user(user_id: str) -> bool:
     """Mark a user as verified. Returns True if updated, False if not found."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "UPDATE users SET verified = 1 WHERE id = ?", (user_id,)
@@ -147,7 +147,7 @@ async def verify_user(user_id: str) -> bool:
 
 async def ensure_role(name: str) -> None:
     """Create a role if it doesn't exist."""
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute(
             "INSERT OR IGNORE INTO roles (name) VALUES (?)", (name,)
@@ -159,7 +159,7 @@ async def ensure_role(name: str) -> None:
 
 async def assign_role(user_id: str, role_name: str) -> None:
     """Assign a role to a user (idempotent)."""
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute(
             "INSERT OR IGNORE INTO user_roles (user_id, role_name) VALUES (?, ?)",
@@ -172,7 +172,7 @@ async def assign_role(user_id: str, role_name: str) -> None:
 
 async def get_user_roles(user_id: str) -> list[str]:
     """Get all roles for a user."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT role_name FROM user_roles WHERE user_id = ?", (user_id,)
@@ -184,7 +184,7 @@ async def get_user_roles(user_id: str) -> list[str]:
 
 
 async def get_user_by_email(email: str) -> dict | None:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT id, email, password_hash, verified FROM users WHERE email = ?",
@@ -205,7 +205,7 @@ async def get_user_by_email(email: str) -> dict | None:
 
 async def list_users() -> list[dict]:
     """List all users with their roles."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT id, email, verified, created_at FROM users ORDER BY created_at"
@@ -233,7 +233,7 @@ async def list_users() -> list[dict]:
 
 async def delete_user(user_id: str) -> bool:
     """Delete a user. Returns True if deleted, False if not found."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
         await db.commit()
@@ -244,7 +244,7 @@ async def delete_user(user_id: str) -> bool:
 
 async def remove_role(user_id: str, role_name: str) -> bool:
     """Remove a role from a user. Returns True if removed."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "DELETE FROM user_roles WHERE user_id = ? AND role_name = ?",
@@ -258,7 +258,7 @@ async def remove_role(user_id: str, role_name: str) -> bool:
 
 async def update_email(user_id: str, email: str) -> None:
     """Update a user's email."""
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute(
             "UPDATE users SET email = ? WHERE id = ?", (email, user_id)
@@ -270,7 +270,7 @@ async def update_email(user_id: str, email: str) -> None:
 
 async def update_password(user_id: str, password_hash: str) -> None:
     """Update a user's password hash."""
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute(
             "UPDATE users SET password_hash = ? WHERE id = ?",
@@ -282,7 +282,7 @@ async def update_password(user_id: str, password_hash: str) -> None:
 
 
 async def get_user_by_id(user_id: str) -> dict | None:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT id, email FROM users WHERE id = ?",
@@ -300,7 +300,7 @@ async def get_user_by_id(user_id: str) -> dict | None:
 
 
 async def create_workspace(user_id: str, name: str) -> dict:
-    db = await _get_db()
+    db = await get_db()
     try:
         workspace_id = str(uuid.uuid4())
         await db.execute(
@@ -321,7 +321,7 @@ async def create_workspace(user_id: str, name: str) -> dict:
 
 
 async def list_workspaces(user_id: str) -> list[dict]:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT id, name, container_id, created_at FROM workspaces WHERE user_id = ? ORDER BY created_at",
@@ -342,7 +342,7 @@ async def list_workspaces(user_id: str) -> list[dict]:
 
 
 async def get_workspace(workspace_id: str, user_id: str) -> dict | None:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT id, user_id, name, container_id, num_ports FROM workspaces WHERE id = ? AND user_id = ?",
@@ -364,7 +364,7 @@ async def get_workspace(workspace_id: str, user_id: str) -> dict | None:
 
 async def add_port_allocations(workspace_id: str, ports: list[int]) -> None:
     """Allocate ports to a workspace. Raises IntegrityError on conflict."""
-    db = await _get_db()
+    db = await get_db()
     try:
         for port in ports:
             await db.execute(
@@ -380,7 +380,7 @@ async def find_and_allocate_ports(
     workspace_id: str, count: int, start: int
 ) -> list[int]:
     """Atomically find free ports and allocate them in a single transaction."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute("SELECT port FROM port_allocations")
         rows = await cursor.fetchall()
@@ -406,7 +406,7 @@ async def find_and_allocate_ports(
 
 async def remove_port_allocations(workspace_id: str, ports: list[int]) -> None:
     """Remove specific port allocations from a workspace."""
-    db = await _get_db()
+    db = await get_db()
     try:
         for port in ports:
             await db.execute(
@@ -420,7 +420,7 @@ async def remove_port_allocations(workspace_id: str, ports: list[int]) -> None:
 
 async def get_workspace_ports(workspace_id: str) -> list[int]:
     """Return all allocated ports for a workspace, sorted."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT port FROM port_allocations WHERE workspace_id = ? ORDER BY port",
@@ -434,7 +434,7 @@ async def get_workspace_ports(workspace_id: str) -> list[int]:
 
 async def get_all_allocated_ports() -> set[int]:
     """Return all allocated port numbers across all workspaces."""
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute("SELECT port FROM port_allocations")
         rows = await cursor.fetchall()
@@ -444,7 +444,7 @@ async def get_all_allocated_ports() -> set[int]:
 
 
 async def delete_workspace(workspace_id: str, user_id: str) -> bool:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "DELETE FROM workspaces WHERE id = ? AND user_id = ?",
@@ -459,7 +459,7 @@ async def delete_workspace(workspace_id: str, user_id: str) -> bool:
 async def update_workspace_container(
     workspace_id: str, container_id: str | None
 ) -> None:
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute(
             "UPDATE workspaces SET container_id = ? WHERE id = ?",
@@ -471,7 +471,7 @@ async def update_workspace_container(
 
 
 async def get_user_workspaces_with_containers(user_id: str) -> list[dict]:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT id, container_id FROM workspaces WHERE user_id = ? AND container_id IS NOT NULL",
@@ -490,7 +490,7 @@ async def get_user_workspaces_with_containers(user_id: str) -> list[dict]:
 
 
 async def blocklist_token(jti: str, expires_at: str) -> None:
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute(
             "INSERT OR IGNORE INTO token_blocklist (jti, expires_at) VALUES (?, ?)",
@@ -502,7 +502,7 @@ async def blocklist_token(jti: str, expires_at: str) -> None:
 
 
 async def is_token_blocklisted(jti: str) -> bool:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             "SELECT 1 FROM token_blocklist WHERE jti = ?",
@@ -526,7 +526,7 @@ async def save_message(
     is_complete: bool = False,
     is_queued: bool = False,
 ) -> int:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             """INSERT INTO messages (workspace_id, entry_type, content, tool_args, tool_output, is_complete, is_queued)
@@ -548,7 +548,7 @@ async def save_message(
 
 
 async def get_messages(workspace_id: str) -> list[dict]:
-    db = await _get_db()
+    db = await get_db()
     try:
         cursor = await db.execute(
             """SELECT id, entry_type, content, tool_args, tool_output, is_complete, is_queued, created_at
@@ -574,7 +574,7 @@ async def get_messages(workspace_id: str) -> list[dict]:
 
 
 async def delete_workspace_messages(workspace_id: str) -> None:
-    db = await _get_db()
+    db = await get_db()
     try:
         await db.execute(
             "DELETE FROM messages WHERE workspace_id = ?", (workspace_id,)

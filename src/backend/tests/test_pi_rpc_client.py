@@ -180,7 +180,7 @@ class TestReadLoop:
         client._proc = _mock_proc(stdout_data=data)
         client._running = True
 
-        await client._read_loop()
+        await client.read_loop()
 
         result = await client._event_queue.get()
         assert result == event
@@ -199,7 +199,7 @@ class TestReadLoop:
         client._proc = _mock_proc(stdout_data=data)
         client._running = True
 
-        await client._read_loop()
+        await client.read_loop()
 
         assert await client._event_queue.get() == e1
         assert await client._event_queue.get() == e2
@@ -213,7 +213,7 @@ class TestReadLoop:
         client._proc = _mock_proc(stdout_data=data)
         client._running = True
 
-        await client._read_loop()
+        await client.read_loop()
 
         assert await client._event_queue.get() == event
         assert await client._event_queue.get() is None
@@ -225,7 +225,7 @@ class TestReadLoop:
         client._proc = _mock_proc(stdout_data=data)
         client._running = True
 
-        await client._read_loop()
+        await client.read_loop()
 
         # Only sentinel
         assert await client._event_queue.get() is None
@@ -236,7 +236,7 @@ class TestReadLoop:
         client._proc.stdout.at_eof = MagicMock(return_value=True)
         client._running = True
 
-        await client._read_loop()
+        await client.read_loop()
 
         assert await client._event_queue.get() is None
 
@@ -245,7 +245,7 @@ class TestReadLoop:
         client._proc = _mock_proc(returncode=0)
         client._running = True
 
-        await client._read_loop()
+        await client.read_loop()
 
         assert await client._event_queue.get() is None
 
@@ -254,7 +254,7 @@ class TestReadLoop:
         client._proc = _mock_proc()
         client._running = False
 
-        await client._read_loop()
+        await client.read_loop()
 
         assert await client._event_queue.get() is None
 
@@ -268,7 +268,7 @@ class TestReadLoop:
 
         client._proc.stdout.read = _explode
 
-        await client._read_loop()
+        await client.read_loop()
 
         # Should still get sentinel
         assert await client._event_queue.get() is None
@@ -278,7 +278,7 @@ class TestReadLoop:
         client._proc = _mock_proc(stderr_data=b"some error output")
         client._running = True
 
-        await client._read_loop()
+        await client.read_loop()
         assert await client._event_queue.get() is None
 
     async def test_logs_stderr_awaitable(self):
@@ -292,7 +292,7 @@ class TestReadLoop:
 
         client._proc.stderr.read = MagicMock(return_value=async_stderr_read())
 
-        await client._read_loop()
+        await client.read_loop()
         assert await client._event_queue.get() is None
 
     async def test_stderr_read_exception_handled(self):
@@ -303,7 +303,7 @@ class TestReadLoop:
             side_effect=OSError("stderr broken")
         )
 
-        await client._read_loop()
+        await client.read_loop()
         assert await client._event_queue.get() is None
 
 

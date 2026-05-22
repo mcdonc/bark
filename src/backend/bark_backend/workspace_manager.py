@@ -54,25 +54,25 @@ async def archive_user_data(user_id: str, email: str) -> Path | None:
         return None
 
 
-def _workspace_path(user_id: str, workspace_id: str) -> Path:
+def workspace_path(user_id: str, workspace_id: str) -> Path:
     return WORKSPACES_ROOT / user_id / "work" / workspace_id
 
 
-def _sessions_path(user_id: str, workspace_id: str) -> Path:
+def sessions_path(user_id: str, workspace_id: str) -> Path:
     return WORKSPACES_ROOT / user_id / "sessions" / workspace_id
 
 
-def _home_path(user_id: str, workspace_id: str) -> Path:
+def home_path(user_id: str, workspace_id: str) -> Path:
     return WORKSPACES_ROOT / user_id / "home" / workspace_id
 
 
 async def create_workspace(user_id: str, name: str) -> dict:
     workspace = await user_store.create_workspace(user_id, name)
-    path = _workspace_path(user_id, workspace["id"])
+    path = workspace_path(user_id, workspace["id"])
     path.mkdir(parents=True, exist_ok=True)
-    sessions = _sessions_path(user_id, workspace["id"])
+    sessions = sessions_path(user_id, workspace["id"])
     sessions.mkdir(parents=True, exist_ok=True)
-    home = _home_path(user_id, workspace["id"])
+    home = home_path(user_id, workspace["id"])
     home.mkdir(parents=True, exist_ok=True)
     # Allocate ports at creation time so ranges are sequential
     await container_manager.allocate_ports(
@@ -96,28 +96,28 @@ async def delete_workspace(workspace_id: str, user_id: str) -> bool:
 
     deleted = await user_store.delete_workspace(workspace_id, user_id)
     if deleted:
-        path = _workspace_path(user_id, workspace_id)
+        path = workspace_path(user_id, workspace_id)
         if path.exists():
             shutil.rmtree(path, ignore_errors=True)
-        sessions = _sessions_path(user_id, workspace_id)
+        sessions = sessions_path(user_id, workspace_id)
         if sessions.exists():
             shutil.rmtree(sessions, ignore_errors=True)
     return deleted
 
 
 def get_workspace_host_path(user_id: str, workspace_id: str) -> Path:
-    path = _workspace_path(user_id, workspace_id)
+    path = workspace_path(user_id, workspace_id)
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def get_sessions_host_path(user_id: str, workspace_id: str) -> Path:
-    path = _sessions_path(user_id, workspace_id)
+    path = sessions_path(user_id, workspace_id)
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def get_home_host_path(user_id: str, workspace_id: str) -> Path:
-    path = _home_path(user_id, workspace_id)
+    path = home_path(user_id, workspace_id)
     path.mkdir(parents=True, exist_ok=True)
     return path

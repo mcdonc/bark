@@ -15,23 +15,23 @@ class TestSeedDefaultUser:
     async def test_creates_user_when_missing(self, db, monkeypatch):
         monkeypatch.setenv("BARK_DEFAULT_USER", "seed-test")
         monkeypatch.setenv("BARK_DEFAULT_PASSWORD", "seed-pass")
-        await main._seed_default_user()
+        await main.seed_default_user()
         user = await user_store.get_user_by_email("seed-test")
         assert user is not None
 
     async def test_skips_existing_user(self, db, monkeypatch):
         monkeypatch.setenv("BARK_DEFAULT_USER", "seed-test")
         monkeypatch.setenv("BARK_DEFAULT_PASSWORD", "seed-pass")
-        await main._seed_default_user()
+        await main.seed_default_user()
         # Call again — should not raise
-        await main._seed_default_user()
+        await main.seed_default_user()
         user = await user_store.get_user_by_email("seed-test")
         assert user is not None
 
     async def test_generates_password_when_not_set(self, db, monkeypatch):
         monkeypatch.setenv("BARK_DEFAULT_USER", "gen-test")
         monkeypatch.delenv("BARK_DEFAULT_PASSWORD", raising=False)
-        await main._seed_default_user()
+        await main.seed_default_user()
         user = await user_store.get_user_by_email("gen-test")
         assert user is not None
         # Password was generated, so we can't know it, but user exists
@@ -45,7 +45,7 @@ class TestSeedDefaultUser:
         import logging
 
         with caplog.at_level(logging.INFO):
-            await main._seed_default_user()
+            await main.seed_default_user()
         assert "generated password:" in caplog.text
         assert "log-test" in caplog.text
 

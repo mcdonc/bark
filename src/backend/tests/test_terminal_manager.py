@@ -37,15 +37,15 @@ def mock_os(real_pipe):
     r, w = real_pipe
     with (
         patch.object(
-            terminal_manager, "_openpty", return_value=(r, w)
-        ) as m_openpty,
-        patch.object(terminal_manager, "_set_winsize") as m_winsize,
-        patch.object(terminal_manager, "_fd_read", return_value=b"") as m_read,
-        patch.object(terminal_manager, "_fd_write", return_value=0) as m_write,
-        patch.object(terminal_manager, "_fd_close") as m_close,
+            terminal_manager, "openpty", return_value=(r, w)
+        ) as mopenpty,
+        patch.object(terminal_manager, "set_winsize") as m_winsize,
+        patch.object(terminal_manager, "fd_read", return_value=b"") as m_read,
+        patch.object(terminal_manager, "fd_write", return_value=0) as m_write,
+        patch.object(terminal_manager, "fd_close") as m_close,
     ):
         yield {
-            "openpty": m_openpty,
+            "openpty": mopenpty,
             "set_winsize": m_winsize,
             "fd_read": m_read,
             "fd_write": m_write,
@@ -128,7 +128,7 @@ class TestOnReadable:
         s = TerminalSession("cid")
         s._master_fd = mock_os["master_fd"]
 
-        s._on_readable()
+        s.on_readable()
 
         assert s._output_queue.qsize() == 1
         assert s._output_queue.get_nowait() == "hello"
@@ -138,7 +138,7 @@ class TestOnReadable:
         s = TerminalSession("cid")
         s._master_fd = mock_os["master_fd"]
 
-        s._on_readable()
+        s.on_readable()
 
         assert s._output_queue.get_nowait() is None
 
@@ -147,7 +147,7 @@ class TestOnReadable:
         s = TerminalSession("cid")
         s._master_fd = mock_os["master_fd"]
 
-        s._on_readable()
+        s.on_readable()
 
         assert s._output_queue.get_nowait() is None
 
@@ -156,7 +156,7 @@ class TestOnReadable:
         s = TerminalSession("cid")
         s._master_fd = mock_os["master_fd"]
 
-        s._on_readable()
+        s.on_readable()
 
         result = s._output_queue.get_nowait()
         assert "\ufffd" in result
@@ -170,7 +170,7 @@ class TestRemoveReader:
         with patch.object(
             loop, "remove_reader", side_effect=ValueError("bad fd")
         ):
-            s._remove_reader()
+            s.remove_reader()
 
     def test_oserror_suppressed(self):
         s = TerminalSession("cid")
@@ -179,7 +179,7 @@ class TestRemoveReader:
         with patch.object(
             loop, "remove_reader", side_effect=OSError("bad fd")
         ):
-            s._remove_reader()
+            s.remove_reader()
 
 
 class TestIsAlive:
@@ -336,7 +336,7 @@ class TestStop:
 
         assert s._proc is None
 
-    async def test_stop_fd_close_error(self, mock_os):
+    async def test_stopfd_close_error(self, mock_os):
         mock_os["fd_close"].side_effect = OSError("already closed")
         s = TerminalSession("cid")
         s._master_fd = mock_os["master_fd"]
@@ -346,7 +346,7 @@ class TestStop:
 
         assert s._master_fd is None
 
-    async def test_stop_remove_reader_raises_valueerror(self, mock_os):
+    async def test_stopremove_reader_raises_valueerror(self, mock_os):
         """remove_reader raising ValueError is handled gracefully."""
         fd = mock_os["master_fd"]
         s = TerminalSession("cid")
@@ -361,7 +361,7 @@ class TestStop:
 
         assert s._master_fd is None
 
-    async def test_stop_remove_reader_raises_oserror(self, mock_os):
+    async def test_stopremove_reader_raises_oserror(self, mock_os):
         """remove_reader raising OSError is handled gracefully."""
         fd = mock_os["master_fd"]
         s = TerminalSession("cid")

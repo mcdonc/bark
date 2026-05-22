@@ -2,9 +2,9 @@
 
 from bark_backend.agui_translator import (
     translate_event,
-    _bash_likely_creates_files,
-    _extract_content_text,
-    _extract_file_path,
+    bash_likely_creates_files,
+    extract_content_text,
+    extract_file_path,
 )
 
 
@@ -300,71 +300,71 @@ class TestTranslateEvent:
 
 class TestBashLikelyCreatesFiles:
     def test_mkdir(self):
-        assert _bash_likely_creates_files(
+        assert bash_likely_creates_files(
             {"args": {"command": "mkdir -p /tmp/foo"}}
         )
 
     def test_touch(self):
-        assert _bash_likely_creates_files(
+        assert bash_likely_creates_files(
             {"args": {"command": "touch file.txt"}}
         )
 
     def test_git_clone(self):
-        assert _bash_likely_creates_files(
+        assert bash_likely_creates_files(
             {"args": {"command": "git clone https://github.com/foo/bar"}}
         )
 
     def test_echo_redirect(self):
-        assert _bash_likely_creates_files(
+        assert bash_likely_creates_files(
             {"args": {"command": 'echo "hi" > output.txt'}}
         )
 
     def test_ls_does_not(self):
-        assert not _bash_likely_creates_files({"args": {"command": "ls -la"}})
+        assert not bash_likely_creates_files({"args": {"command": "ls -la"}})
 
     def test_cat_does_not(self):
-        assert not _bash_likely_creates_files(
+        assert not bash_likely_creates_files(
             {"args": {"command": "cat file.txt"}}
         )
 
     def test_string_args(self):
-        assert _bash_likely_creates_files({"args": "mkdir foo"})
+        assert bash_likely_creates_files({"args": "mkdir foo"})
 
     def test_empty_args(self):
-        assert not _bash_likely_creates_files({"args": {}})
+        assert not bash_likely_creates_files({"args": {}})
 
     def test_non_dict_non_str_args(self):
-        assert not _bash_likely_creates_files({"args": 42})
+        assert not bash_likely_creates_files({"args": 42})
 
     def test_no_args_key(self):
-        assert not _bash_likely_creates_files({})
+        assert not bash_likely_creates_files({})
 
     def test_npm_init(self):
-        assert _bash_likely_creates_files({"args": {"command": "npm init -y"}})
+        assert bash_likely_creates_files({"args": {"command": "npm init -y"}})
 
     def test_pip_install(self):
-        assert _bash_likely_creates_files(
+        assert bash_likely_creates_files(
             {"args": {"command": "pip install requests"}}
         )
 
     def test_curl_output(self):
-        assert _bash_likely_creates_files(
+        assert bash_likely_creates_files(
             {"args": {"command": "curl -o file.tar.gz http://example.com"}}
         )
 
     def test_python_venv(self):
-        assert _bash_likely_creates_files(
+        assert bash_likely_creates_files(
             {"args": {"command": "python3 -m venv .venv"}}
         )
 
     def test_case_insensitive(self):
-        assert _bash_likely_creates_files({"args": {"command": "MKDIR foo"}})
+        assert bash_likely_creates_files({"args": {"command": "MKDIR foo"}})
 
 
 class TestExtractContentText:
     def test_dict_with_content_list(self):
         assert (
-            _extract_content_text(
+            extract_content_text(
                 {
                     "content": [
                         {"type": "text", "text": "hello"},
@@ -377,22 +377,21 @@ class TestExtractContentText:
 
     def test_string_content(self):
         assert (
-            _extract_content_text({"content": "plain string"})
-            == "plain string"
+            extract_content_text({"content": "plain string"}) == "plain string"
         )
 
     def test_raw_string(self):
-        assert _extract_content_text("just a string") == "just a string"
+        assert extract_content_text("just a string") == "just a string"
 
     def test_none(self):
-        assert _extract_content_text(None) == ""
+        assert extract_content_text(None) == ""
 
     def test_empty_dict(self):
-        assert _extract_content_text({}) == ""
+        assert extract_content_text({}) == ""
 
     def test_mixed_content_list(self):
         assert (
-            _extract_content_text(
+            extract_content_text(
                 {"content": [{"type": "text", "text": "a"}, "b"]}
             )
             == "ab"
@@ -400,7 +399,7 @@ class TestExtractContentText:
 
     def test_non_text_type_skipped(self):
         assert (
-            _extract_content_text(
+            extract_content_text(
                 {
                     "content": [
                         {"type": "image", "url": "http://example.com"},
@@ -412,35 +411,35 @@ class TestExtractContentText:
         )
 
     def test_content_not_list_or_str(self):
-        assert _extract_content_text({"content": 42}) == ""
+        assert extract_content_text({"content": 42}) == ""
 
 
 class TestExtractFilePath:
     def test_path_key(self):
         assert (
-            _extract_file_path({"args": {"path": "/work/foo.txt"}})
+            extract_file_path({"args": {"path": "/work/foo.txt"}})
             == "/work/foo.txt"
         )
 
     def test_file_path_key(self):
         assert (
-            _extract_file_path({"args": {"file_path": "/work/bar.py"}})
+            extract_file_path({"args": {"file_path": "/work/bar.py"}})
             == "/work/bar.py"
         )
 
     def test_path_preferred_over_file_path(self):
         assert (
-            _extract_file_path(
+            extract_file_path(
                 {"args": {"path": "a.txt", "file_path": "b.txt"}}
             )
             == "a.txt"
         )
 
     def test_no_path(self):
-        assert _extract_file_path({"args": {"command": "ls"}}) is None
+        assert extract_file_path({"args": {"command": "ls"}}) is None
 
     def test_non_dict_args(self):
-        assert _extract_file_path({"args": "some string"}) is None
+        assert extract_file_path({"args": "some string"}) is None
 
     def test_no_args(self):
-        assert _extract_file_path({}) is None
+        assert extract_file_path({}) is None

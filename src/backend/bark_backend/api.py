@@ -91,7 +91,7 @@ async def register(
             status_code=400, detail="Password must be at least 4 characters"
         )
 
-    password_hash = auth._hash_password(req.password)
+    password_hash = auth.hash_password(req.password)
     user_id = str(uuid.uuid4())
 
     hostname, proto, base_path = ws_handler.derive_hosting_info(
@@ -138,7 +138,7 @@ async def verify_email(token: str):
         raise HTTPException(status_code=404, detail="User not found")
     user = await user_store.get_user_by_id(user_id)
     roles = await user_store.get_user_roles(user_id)
-    token = auth._create_token(user_id, user["email"], roles)
+    token = auth.create_token(user_id, user["email"], roles)
     return {"status": "verified", "access_token": token}
 
 
@@ -417,6 +417,6 @@ async def update_user(
     if req.email is not None:
         await user_store.update_email(user_id, req.email)
     if req.password is not None:
-        password_hash = auth._hash_password(req.password)
+        password_hash = auth.hash_password(req.password)
         await user_store.update_password(user_id, password_hash)
     return {"status": "updated"}

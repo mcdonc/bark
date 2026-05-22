@@ -12,11 +12,11 @@ class TestCreateWorkspace:
         assert ws["user_id"] == user["id"]
         assert "id" in ws
 
-        data_path = workspace_manager._workspace_path(user["id"], ws["id"])
+        data_path = workspace_manager.workspace_path(user["id"], ws["id"])
         assert data_path.exists()
         assert data_path.is_dir()
 
-        sessions_path = workspace_manager._sessions_path(user["id"], ws["id"])
+        sessions_path = workspace_manager.sessions_path(user["id"], ws["id"])
         assert sessions_path.exists()
         assert sessions_path.is_dir()
 
@@ -67,8 +67,8 @@ class TestGetWorkspace:
 class TestDeleteWorkspace:
     async def test_delete_removes_db_and_dirs(self, user):
         ws = await workspace_manager.create_workspace(user["id"], "doomed")
-        data_path = workspace_manager._workspace_path(user["id"], ws["id"])
-        sessions_path = workspace_manager._sessions_path(user["id"], ws["id"])
+        data_path = workspace_manager.workspace_path(user["id"], ws["id"])
+        sessions_path = workspace_manager.sessions_path(user["id"], ws["id"])
         (data_path / "file.txt").write_text("hello")
 
         deleted = await workspace_manager.delete_workspace(
@@ -98,8 +98,8 @@ class TestDeleteWorkspace:
 
     async def test_delete_missing_dirs_ok(self, user):
         ws = await workspace_manager.create_workspace(user["id"], "no-dirs")
-        data_path = workspace_manager._workspace_path(user["id"], ws["id"])
-        sessions_path = workspace_manager._sessions_path(user["id"], ws["id"])
+        data_path = workspace_manager.workspace_path(user["id"], ws["id"])
+        sessions_path = workspace_manager.sessions_path(user["id"], ws["id"])
         data_path.rmdir()
         sessions_path.rmdir()
 

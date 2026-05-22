@@ -49,22 +49,22 @@ async def handle_websocket(ws: WebSocket) -> None:
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                await _send_error(ws, "Invalid JSON")
+                await send_error(ws, "Invalid JSON")
                 continue
 
             cmd = msg.get("cmd")
             if cmd == "workspace_connect":
-                await _handle_workspace_connect(ws, conn_state, msg)
+                await handle_workspace_connect(ws, conn_state, msg)
             elif cmd == "workspace_disconnect":
-                await _handle_workspace_disconnect(ws, conn_state)
+                await handle_workspace_disconnect(ws, conn_state)
             elif cmd == "prompt":
-                await _handle_prompt(ws, conn_state, msg)
+                await handle_prompt(ws, conn_state, msg)
             elif cmd == "steer":
-                await _handle_steer(conn_state, msg)
+                await handle_steer(conn_state, msg)
             elif cmd == "follow_up":
-                await _handle_follow_up(conn_state, msg)
+                await handle_follow_up(conn_state, msg)
             elif cmd == "abort":
-                await _handle_abort(conn_state)
+                await handle_abort(conn_state)
             elif cmd == "ui_ready":
                 status_msg = conn_state.pop("pending_status_msg", None)
                 if status_msg:
@@ -79,34 +79,29 @@ async def handle_websocket(ws: WebSocket) -> None:
                         }
                     )
             elif cmd == "extension_ui_response":
-                await _handle_extension_ui_response(conn_state, msg)
+                await handle_extension_ui_response(conn_state, msg)
             elif cmd == "terminal_start":
-                await _handle_terminal_start(ws, conn_state, msg)
+                await handle_terminal_start(ws, conn_state, msg)
             elif cmd == "terminal_input":
-                await _handle_terminal_input(conn_state, msg)
+                await handle_terminal_input(conn_state, msg)
             elif cmd == "terminal_resize":
-                await _handle_terminal_resize(conn_state, msg)
+                await handle_terminal_resize(conn_state, msg)
             elif cmd == "terminal_stop":
-                await _handle_terminal_stop(conn_state)
+                await handle_terminal_stop(conn_state)
             elif cmd == "restart_container":
-                await _handle_restart_container(ws, conn_state)
+                await handle_restart_container(ws, conn_state)
             else:
-                await _send_error(ws, f"Unknown command: {cmd}")
+                await send_error(ws, f"Unknown command: {cmd}")
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected for user %s", user["email"])
     except Exception as e:
         logger.error("WebSocket error: %s", e)
     finally:
-        await _cleanup_connection(ws, conn_state)
+        await cleanup_connection(ws, conn_state)
         # Container is intentionally left running — idle timeout will clean it up.
         # This allows instant reconnection when navigating back to the workspace.
         _connections.pop(ws, None)
-
-
-def _derive_hosting_info(ws: WebSocket) -> tuple[str, str, str]:
-    """Derive hosting hostname, proto, and base path from WebSocket headers."""
-    return derive_hosting_info(ws.headers)
 
 
 def derive_hosting_info(headers) -> tuple[str, str, str]:
@@ -139,7 +134,7 @@ def derive_hosting_info(headers) -> tuple[str, str, str]:
     return hostname, proto, base_path
 
 
-async def _start_workspace_container(
+async def start_workspace_container(
     ws: WebSocket, state: dict, workspace_id: str, workspace: dict
 ) -> None:
     """Start/restart container, connect Pi RPC, start event forwarding, resume session."""
@@ -163,8 +158,8 @@ async def _start_workspace_container(
         most_recent = session_files[-1]
         resume_session = most_recent.replace(home_path, "/home/bark")
 
-    hosting_hostname, hosting_proto, hosting_base_path = _derive_hosting_info(
-        ws
+    hosting_hostname, hosting_proto, hosting_base_path = derive_hosting_info(
+        ws.headers
     )
     container_id, container_status = await container_manager.start_container(
         workspace_id,
@@ -189,7 +184,7 @@ async def _start_workspace_container(
     state["pi_client"] = pi_client
 
     # Register idle timeout notification
-    async def _on_idle(wid: str) -> None:
+    async def on_idle(wid: str) -> None:
         try:
             await ws.send_json(
                 {
@@ -204,11 +199,11 @@ async def _start_workspace_container(
         except (WebSocketDisconnect, RuntimeError, ConnectionError):
             pass
 
-    state["_idle_cb"] = _on_idle
-    container_manager.on_idle_stop(workspace_id, _on_idle)
+    state["_idle_cb"] = on_idle
+    container_manager.on_idle_stop(workspace_id, on_idle)
 
     state["event_task"] = asyncio.create_task(
-        _forward_events(ws, pi_client, workspace_id, state)
+        forward_events(ws, pi_client, workspace_id, state)
     )
 
     # Cache workspace info for auto-restart
@@ -227,24 +222,24 @@ async def _start_workspace_container(
         )
 
 
-async def _handle_workspace_connect(
+async def handle_workspace_connect(
     ws: WebSocket, state: dict, msg: dict
 ) -> None:
     workspace_id = msg.get("workspaceId")
     if not workspace_id:
-        await _send_error(ws, "Missing workspaceId")
+        await send_error(ws, "Missing workspaceId")
         return
 
     user = state["user"]
     workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
     if workspace is None:
-        await _send_error(ws, "Workspace not found")
+        await send_error(ws, "Workspace not found")
         return
 
     # Disconnect from any current workspace
-    await _handle_workspace_disconnect(ws, state)
+    await handle_workspace_disconnect(ws, state)
 
-    await _start_workspace_container(ws, state, workspace_id, workspace)
+    await start_workspace_container(ws, state, workspace_id, workspace)
 
     ports = await container_manager.get_workspace_ports(workspace_id)
     status = state.get("container_status", "created")
@@ -284,8 +279,8 @@ async def _handle_workspace_connect(
     )
 
 
-async def _handle_workspace_disconnect(ws: WebSocket, state: dict) -> None:
-    await _cleanup_connection(ws, state)
+async def handle_workspace_disconnect(ws: WebSocket, state: dict) -> None:
+    await cleanup_connection(ws, state)
     # Container is intentionally left running — idle timeout will clean it up.
     state["workspace_id"] = None
     state["container_id"] = None
@@ -293,15 +288,15 @@ async def _handle_workspace_disconnect(ws: WebSocket, state: dict) -> None:
     state["event_task"] = None
 
 
-async def _handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
+async def handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
     text = msg.get("text", "")
     if not text:
-        await _send_error(ws, "Empty prompt")
+        await send_error(ws, "Empty prompt")
         return
 
     workspace_id = state.get("workspace_id")
     if not workspace_id:
-        await _send_error(ws, "Not connected to a workspace")
+        await send_error(ws, "Not connected to a workspace")
         return
 
     logger.info(
@@ -369,7 +364,7 @@ async def _handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
             pass
         # Clean up old connection
         try:
-            await _cleanup_connection(ws, state)
+            await cleanup_connection(ws, state)
         except (RuntimeError, OSError, ConnectionError) as cleanup_err:
             logger.warning("Cleanup error during restart: %s", cleanup_err)
 
@@ -380,10 +375,10 @@ async def _handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
                 workspace_id, state["user"]["id"]
             )
         if workspace is None:
-            await _send_error(ws, "Workspace not found")
+            await send_error(ws, "Workspace not found")
             return
 
-        await _start_workspace_container(ws, state, workspace_id, workspace)
+        await start_workspace_container(ws, state, workspace_id, workspace)
 
         # Record activity immediately to prevent idle timeout from killing it again
         container_manager.record_activity(state["container_id"])
@@ -409,10 +404,10 @@ async def _handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
             logger.info("Prompt sent successfully after restart")
         else:
             logger.error("Pi client not alive after restart")
-            await _send_error(ws, "Failed to restart container")
+            await send_error(ws, "Failed to restart container")
 
 
-async def _handle_steer(state: dict, msg: dict) -> None:
+async def handle_steer(state: dict, msg: dict) -> None:
     pi_client: PiRpcClient | None = state.get("pi_client")
     if pi_client is None:
         return
@@ -420,7 +415,7 @@ async def _handle_steer(state: dict, msg: dict) -> None:
     await pi_client.steer(msg.get("text", ""))
 
 
-async def _handle_follow_up(state: dict, msg: dict) -> None:
+async def handle_follow_up(state: dict, msg: dict) -> None:
     pi_client: PiRpcClient | None = state.get("pi_client")
     if pi_client is None:
         return
@@ -428,7 +423,7 @@ async def _handle_follow_up(state: dict, msg: dict) -> None:
     await pi_client.follow_up(msg.get("text", ""))
 
 
-async def _handle_extension_ui_response(state: dict, msg: dict) -> None:
+async def handle_extension_ui_response(state: dict, msg: dict) -> None:
     """Forward extension UI response from frontend to Pi."""
     pi_client: PiRpcClient | None = state.get("pi_client")
     if pi_client is None:
@@ -444,18 +439,18 @@ async def _handle_extension_ui_response(state: dict, msg: dict) -> None:
     await pi_client.send_command(response)
 
 
-async def _handle_abort(state: dict) -> None:
+async def handle_abort(state: dict) -> None:
     pi_client: PiRpcClient | None = state.get("pi_client")
     if pi_client is None:
         return
     await pi_client.abort()
 
 
-async def _handle_restart_container(ws: WebSocket, state: dict) -> None:
+async def handle_restart_container(ws: WebSocket, state: dict) -> None:
     """Restart a stopped container (e.g., after idle timeout)."""
     workspace_id = state.get("workspace_id")
     if not workspace_id:
-        await _send_error(ws, "Not connected to a workspace")
+        await send_error(ws, "Not connected to a workspace")
         return
 
     await ws.send_json(
@@ -470,7 +465,7 @@ async def _handle_restart_container(ws: WebSocket, state: dict) -> None:
     )
 
     try:
-        await _cleanup_connection(ws, state)
+        await cleanup_connection(ws, state)
     except (RuntimeError, OSError, ConnectionError) as e:
         logger.warning("Cleanup error during restart: %s", e)
 
@@ -480,10 +475,10 @@ async def _handle_restart_container(ws: WebSocket, state: dict) -> None:
             workspace_id, state["user"]["id"]
         )
     if workspace is None:
-        await _send_error(ws, "Workspace not found")
+        await send_error(ws, "Workspace not found")
         return
 
-    await _start_workspace_container(ws, state, workspace_id, workspace)
+    await start_workspace_container(ws, state, workspace_id, workspace)
     container_manager.record_activity(state["container_id"])
 
     ports = await container_manager.get_workspace_ports(workspace_id)
@@ -518,26 +513,24 @@ async def _handle_restart_container(ws: WebSocket, state: dict) -> None:
     )
 
 
-async def _handle_terminal_start(
-    ws: WebSocket, state: dict, msg: dict
-) -> None:
+async def handle_terminal_start(ws: WebSocket, state: dict, msg: dict) -> None:
     container_id = state.get("container_id")
     if not container_id:
         return
     # Stop existing terminal if any
-    await _stop_terminal(state)
+    await stop_terminal(state)
     cols = msg.get("cols", 80)
     rows = msg.get("rows", 24)
     session = TerminalSession(container_id)
     await session.start(cols, rows)
     state["terminal_session"] = session
     state["terminal_task"] = asyncio.create_task(
-        _forward_terminal_output(ws, session, state)
+        forward_terminal_output(ws, session, state)
     )
     container_manager.record_activity(container_id)
 
 
-async def _handle_terminal_input(state: dict, msg: dict) -> None:
+async def handle_terminal_input(state: dict, msg: dict) -> None:
     session: TerminalSession | None = state.get("terminal_session")
     if session is None or not session.is_alive:
         return
@@ -545,18 +538,18 @@ async def _handle_terminal_input(state: dict, msg: dict) -> None:
     await session.write(msg.get("data", ""))
 
 
-async def _handle_terminal_resize(state: dict, msg: dict) -> None:
+async def handle_terminal_resize(state: dict, msg: dict) -> None:
     session: TerminalSession | None = state.get("terminal_session")
     if session is None:
         return
     await session.resize(msg.get("cols", 80), msg.get("rows", 24))
 
 
-async def _handle_terminal_stop(state: dict) -> None:
-    await _stop_terminal(state)
+async def handle_terminal_stop(state: dict) -> None:
+    await stop_terminal(state)
 
 
-async def _stop_terminal(state: dict) -> None:
+async def stop_terminal(state: dict) -> None:
     task = state.get("terminal_task")
     if task:
         task.cancel()
@@ -571,7 +564,7 @@ async def _stop_terminal(state: dict) -> None:
         state["terminal_session"] = None
 
 
-async def _forward_terminal_output(
+async def forward_terminal_output(
     ws: WebSocket, session: TerminalSession, state: dict
 ) -> None:
     """Forward terminal output to the frontend via WebSocket."""
@@ -608,7 +601,7 @@ async def _forward_terminal_output(
             pass
 
 
-async def _forward_events(
+async def forward_events(
     ws: WebSocket, pi_client: PiRpcClient, workspace_id: str, state: dict
 ) -> None:
     """Forward Pi RPC events as AG-UI events over WebSocket, saving to history."""
@@ -682,7 +675,7 @@ async def _forward_events(
         )
 
 
-async def _cleanup_connection(ws: WebSocket, state: dict) -> None:
+async def cleanup_connection(ws: WebSocket, state: dict) -> None:
     # Remove idle callback
     workspace_id = state.get("workspace_id")
     idle_cb = state.get("_idle_cb")
@@ -701,8 +694,8 @@ async def _cleanup_connection(ws: WebSocket, state: dict) -> None:
     if pi_client:
         await pi_client.disconnect()
 
-    await _stop_terminal(state)
+    await stop_terminal(state)
 
 
-async def _send_error(ws: WebSocket, message: str) -> None:
+async def send_error(ws: WebSocket, message: str) -> None:
     await ws.send_json({"type": "error", "message": message})

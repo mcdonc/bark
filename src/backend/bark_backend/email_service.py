@@ -10,7 +10,7 @@ import aiosmtplib
 logger = logging.getLogger(__name__)
 
 
-def _smtp_config() -> dict:
+def smtp_config() -> dict:
     """Read SMTP configuration from environment at call time."""
     return {
         "host": os.environ.get("BARK_SMTP_HOST"),
@@ -23,13 +23,13 @@ def _smtp_config() -> dict:
     }
 
 
-def _use_smtp() -> bool:
+def use_smtp() -> bool:
     """Return True if SMTP is configured, False to use sendmail."""
     return bool(os.environ.get("BARK_SMTP_HOST"))
 
 
-def _build_message(to: str, subject: str, body: str) -> EmailMessage:
-    cfg = _smtp_config()
+def build_message(to: str, subject: str, body: str) -> EmailMessage:
+    cfg = smtp_config()
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = cfg["from_addr"] or cfg["user"] or "noreply@localhost"
@@ -38,8 +38,8 @@ def _build_message(to: str, subject: str, body: str) -> EmailMessage:
     return msg
 
 
-async def _send_via_smtp(msg: EmailMessage) -> None:
-    cfg = _smtp_config()
+async def send_via_smtp(msg: EmailMessage) -> None:
+    cfg = smtp_config()
     logger.debug(
         "SMTP config: host=%s port=%s user=%s tls=%s",
         cfg["host"],
@@ -60,7 +60,7 @@ async def _send_via_smtp(msg: EmailMessage) -> None:
     logger.info("Email sent via SMTP to %s", msg["To"])
 
 
-async def _send_via_sendmail(msg: EmailMessage) -> None:
+async def send_via_sendmail(msg: EmailMessage) -> None:
     sendmail = os.environ.get("BARK_SENDMAIL_PATH", "sendmail")
     logger.info("Using sendmail at: %s", sendmail)
     import shutil
@@ -84,22 +84,22 @@ async def _send_via_sendmail(msg: EmailMessage) -> None:
 
 async def send_email(to: str, subject: str, body: str) -> None:
     """Send an email via SMTP (if configured) or local sendmail."""
-    msg = _build_message(to, subject, body)
+    msg = build_message(to, subject, body)
     logger.info(
         "From: %s, To: %s, Subject: %s", msg["From"], to, msg["Subject"]
     )
-    if _use_smtp():
+    if use_smtp():
         logger.info(
             "Sending email to %s via SMTP (%s)",
             to,
             os.environ.get("BARK_SMTP_HOST"),
         )
-        await _send_via_smtp(msg)
+        await send_via_smtp(msg)
     else:
         logger.info(
             "Sending email to %s via sendmail (no BARK_SMTP_HOST set)", to
         )
-        await _send_via_sendmail(msg)
+        await send_via_sendmail(msg)
 
 
 async def send_verification_email(to: str, verification_url: str) -> None:

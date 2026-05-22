@@ -10,23 +10,23 @@ from bark_backend import auth, user_store
 
 class TestPasswordHashing:
     def test_hash_and_verify(self):
-        hashed = auth._hash_password("mypassword")
-        assert auth._verify_password("mypassword", hashed)
+        hashed = auth.hash_password("mypassword")
+        assert auth.verify_password("mypassword", hashed)
 
     def test_wrong_password_fails(self):
-        hashed = auth._hash_password("mypassword")
-        assert not auth._verify_password("wrongpassword", hashed)
+        hashed = auth.hash_password("mypassword")
+        assert not auth.verify_password("wrongpassword", hashed)
 
     def test_different_hashes_for_same_password(self):
-        h1 = auth._hash_password("same")
-        h2 = auth._hash_password("same")
+        h1 = auth.hash_password("same")
+        h2 = auth.hash_password("same")
         assert h1 != h2  # bcrypt uses random salt
 
 
 class TestJWT:
     def test_create_and_decode_token(self):
-        token = auth._create_token("user-123", "alice@example.com")
-        payload = auth._decode_token(token)
+        token = auth.create_token("user-123", "alice@example.com")
+        payload = auth.decode_token(token)
         assert payload["sub"] == "user-123"
         assert payload["email"] == "alice@example.com"
         assert "jti" in payload
@@ -36,7 +36,7 @@ class TestJWT:
         from jose import JWTError
 
         with pytest.raises(JWTError):
-            auth._decode_token("garbage.token.value")
+            auth.decode_token("garbage.token.value")
 
 
 class TestRegister:
@@ -139,7 +139,7 @@ class TestVerification:
 
     def test_decode_wrong_purpose(self):
         # A regular auth token should not pass as a verification token
-        token = auth._create_token("user-123", "test")
+        token = auth.create_token("user-123", "test")
         assert auth.decode_verification_token(token) is None
 
     async def test_verify_user(self, db):
@@ -162,7 +162,7 @@ class TestVerification:
 
 class TestTokenValidation:
     async def test_get_user_from_valid_token(self, user):
-        token = auth._create_token(user["id"], user["email"])
+        token = auth.create_token(user["id"], user["email"])
         result = await auth.get_user_from_token(token)
         assert result is not None
         assert result["id"] == user["id"]
@@ -172,7 +172,7 @@ class TestTokenValidation:
         assert result is None
 
     async def test_blocklisted_token_rejected(self, user):
-        token = auth._create_token(user["id"], user["email"])
+        token = auth.create_token(user["id"], user["email"])
         # Token should work before blocklisting
         assert await auth.get_user_from_token(token) is not None
         # Blocklist it
@@ -200,13 +200,13 @@ class TestTokenValidation:
 
     async def test_get_user_from_token_deleted_user(self, user):
         """Token for a user that no longer exists returns None."""
-        token = auth._create_token("nonexistent-id", "ghost@example.com")
+        token = auth.create_token("nonexistent-id", "ghost@example.com")
         assert await auth.get_user_from_token(token) is None
 
 
 class TestGetCurrentUser:
     async def test_valid_credentials(self, user):
-        token = auth._create_token(user["id"], user["email"])
+        token = auth.create_token(user["id"], user["email"])
         creds = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials=token
         )
@@ -240,7 +240,7 @@ class TestGetCurrentUser:
         assert exc_info.value.status_code == 401
 
     async def test_blocklisted_token(self, user):
-        token = auth._create_token(user["id"], user["email"])
+        token = auth.create_token(user["id"], user["email"])
         await auth.logout(token)
         creds = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials=token
@@ -250,7 +250,7 @@ class TestGetCurrentUser:
         assert exc_info.value.status_code == 401
 
     async def test_deleted_user(self, user):
-        token = auth._create_token("nonexistent-id", "ghost@example.com")
+        token = auth.create_token("nonexistent-id", "ghost@example.com")
         creds = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials=token
         )
@@ -261,7 +261,7 @@ class TestGetCurrentUser:
 
 class TestGetCurrentUserOptional:
     async def test_valid_credentials(self, user):
-        token = auth._create_token(user["id"], user["email"])
+        token = auth.create_token(user["id"], user["email"])
         creds = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials=token
         )
@@ -293,7 +293,7 @@ class TestGetCurrentUserOptional:
         assert result is None
 
     async def test_blocklisted_token(self, user):
-        token = auth._create_token(user["id"], user["email"])
+        token = auth.create_token(user["id"], user["email"])
         await auth.logout(token)
         creds = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials=token
@@ -302,7 +302,7 @@ class TestGetCurrentUserOptional:
         assert result is None
 
     async def test_deleted_user(self, user):
-        token = auth._create_token("nonexistent-id", "ghost@example.com")
+        token = auth.create_token("nonexistent-id", "ghost@example.com")
         creds = HTTPAuthorizationCredentials(
             scheme="Bearer", credentials=token
         )

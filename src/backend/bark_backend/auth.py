@@ -20,11 +20,11 @@ TOKEN_EXPIRE_HOURS = 24
 security = HTTPBearer(auto_error=False)
 
 
-def _hash_password(password: str) -> str:
+def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
-def _verify_password(password: str, hashed: str) -> bool:
+def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
@@ -43,7 +43,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-def _create_token(
+def create_token(
     user_id: str, email: str, roles: list[str] | None = None
 ) -> str:
     jti = str(uuid.uuid4())
@@ -58,7 +58,7 @@ def _create_token(
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def _decode_token(token: str) -> dict:
+def decode_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 
@@ -91,14 +91,14 @@ async def register(
             status_code=400, detail="Password must be at least 4 characters"
         )
 
-    password_hash = _hash_password(req.password)
+    password_hash = hash_password(req.password)
     user = await user_store.create_user(
         req.email, password_hash, verified=verified
     )
     token = None
     if verified:
         roles = await user_store.get_user_roles(user["id"])
-        token = _create_token(user["id"], user["email"], roles)
+        token = create_token(user["id"], user["email"], roles)
     return RegisterResult(
         user_id=user["id"], email=user["email"], access_token=token
     )
@@ -106,7 +106,7 @@ async def register(
 
 async def login(req: LoginRequest) -> TokenResponse:
     user = await user_store.get_user_by_email(req.email)
-    if user is None or not _verify_password(
+    if user is None or not verify_password(
         req.password, user["password_hash"]
     ):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -116,7 +116,7 @@ async def login(req: LoginRequest) -> TokenResponse:
         )
 
     roles = await user_store.get_user_roles(user["id"])
-    token = _create_token(user["id"], user["email"], roles)
+    token = create_token(user["id"], user["email"], roles)
     return TokenResponse(access_token=token)
 
 
@@ -150,7 +150,7 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        payload = _decode_token(credentials.credentials)
+        payload = decode_token(credentials.credentials)
         user_id = payload.get("sub")
         jti = payload.get("jti")
         if user_id is None or jti is None:
@@ -173,14 +173,14 @@ async def get_current_user(
 def require_role(role: str):
     """FastAPI dependency that requires the current user to have a specific role."""
 
-    async def _check(user: dict = Depends(get_current_user)) -> dict:
+    async def check(user: dict = Depends(get_current_user)) -> dict:
         if role not in user.get("roles", []):
             raise HTTPException(
                 status_code=403, detail=f"Role '{role}' required"
             )
         return user
 
-    return _check
+    return check
 
 
 async def get_current_user_optional(
@@ -190,7 +190,7 @@ async def get_current_user_optional(
     if credentials is None:
         return None
     try:
-        payload = _decode_token(credentials.credentials)
+        payload = decode_token(credentials.credentials)
         user_id = payload.get("sub")
         jti = payload.get("jti")
         if user_id is None or jti is None:
@@ -208,7 +208,7 @@ async def get_current_user_optional(
 async def get_user_from_token(token: str) -> dict | None:
     """Validate a token string (used for WebSocket auth)."""
     try:
-        payload = _decode_token(token)
+        payload = decode_token(token)
         user_id = payload.get("sub")
         jti = payload.get("jti")
         if user_id is None or jti is None:
@@ -223,7 +223,7 @@ async def get_user_from_token(token: str) -> dict | None:
 async def logout(token: str) -> None:
     """Blocklist the token's JTI."""
     try:
-        payload = _decode_token(token)
+        payload = decode_token(token)
         jti = payload.get("jti")
         exp = payload.get("exp")
         if jti and exp:

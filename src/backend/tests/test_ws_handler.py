@@ -15,24 +15,24 @@ from bark_backend import (
     workspace_manager,
 )
 from bark_backend.ws_handler import (
-    _derive_hosting_info,
-    _start_workspace_container,
-    _handle_workspace_connect,
-    _handle_workspace_disconnect,
-    _handle_prompt,
-    _handle_steer,
-    _handle_follow_up,
-    _handle_abort,
-    _handle_extension_ui_response,
-    _handle_restart_container,
-    _handle_terminal_start,
-    _handle_terminal_input,
-    _handle_terminal_resize,
-    _handle_terminal_stop,
-    _forward_terminal_output,
-    _forward_events,
-    _cleanup_connection,
-    _send_error,
+    derive_hosting_info,
+    start_workspace_container,
+    handle_workspace_connect,
+    handle_workspace_disconnect,
+    handle_prompt,
+    handle_steer,
+    handle_follow_up,
+    handle_abort,
+    handle_extension_ui_response,
+    handle_restart_container,
+    handle_terminal_start,
+    handle_terminal_input,
+    handle_terminal_resize,
+    handle_terminal_stop,
+    forward_terminal_output,
+    forward_events,
+    cleanup_connection,
+    send_error,
     handle_websocket,
 )
 
@@ -84,19 +84,19 @@ def _base_state(user=None):
     }
 
 
-# --- _send_error ---
+# --- send_error ---
 
 
 class TestSendError:
     async def test_sends_error_json(self):
         ws = _mock_ws()
-        await _send_error(ws, "bad thing")
+        await send_error(ws, "bad thing")
         ws.send_json.assert_awaited_once_with(
             {"type": "error", "message": "bad thing"}
         )
 
 
-# --- _derive_hosting_info ---
+# --- derive_hosting_info ---
 
 
 class TestDeriveHostingInfo:
@@ -105,7 +105,7 @@ class TestDeriveHostingInfo:
         monkeypatch.setenv("BARK_HOSTING_PROTO", "https")
         monkeypatch.setenv("BARK_HOSTING_BASE_PATH", "/app")
         ws = _mock_ws(headers={"host": "header.example.com"})
-        h, p, b = _derive_hosting_info(ws)
+        h, p, b = derive_hosting_info(ws.headers)
         assert h == "env.example.com"
         assert p == "https"
         assert b == "/app"
@@ -123,7 +123,7 @@ class TestDeriveHostingInfo:
                 "x-forwarded-prefix": "/bark",
             }
         )
-        h, p, b = _derive_hosting_info(ws)
+        h, p, b = derive_hosting_info(ws.headers)
         assert h == "arctor.repoze.org"
         assert p == "https"
         assert b == "/bark"
@@ -135,7 +135,7 @@ class TestDeriveHostingInfo:
         monkeypatch.delenv("BARK_HOSTING_BASE_PATH", raising=False)
         monkeypatch.setenv("BARK_NGINX_PORT", "8995")
         ws = _mock_ws(headers={"host": "myhost:8997"})
-        h, p, b = _derive_hosting_info(ws)
+        h, p, b = derive_hosting_info(ws.headers)
         assert h == "myhost:8995"
         assert p == "http"
         assert b == ""
@@ -146,7 +146,7 @@ class TestDeriveHostingInfo:
         monkeypatch.delenv("BARK_HOSTING_BASE_PATH", raising=False)
         monkeypatch.delenv("BARK_NGINX_PORT", raising=False)
         ws = _mock_ws(headers={"host": "myhost:8997"})
-        h, p, b = _derive_hosting_info(ws)
+        h, p, b = derive_hosting_info(ws.headers)
         assert h == "myhost:8997"
         assert p == "http"
         assert b == ""
@@ -157,7 +157,7 @@ class TestDeriveHostingInfo:
         monkeypatch.delenv("BARK_HOSTING_BASE_PATH", raising=False)
         monkeypatch.setenv("BARK_NGINX_PORT", "8995")
         ws = _mock_ws(headers={})
-        h, p, b = _derive_hosting_info(ws)
+        h, p, b = derive_hosting_info(ws.headers)
         assert h == "localhost:8995"
         assert p == "http"
         assert b == ""
@@ -168,13 +168,13 @@ class TestDeriveHostingInfo:
         monkeypatch.delenv("BARK_HOSTING_BASE_PATH", raising=False)
         monkeypatch.delenv("BARK_NGINX_PORT", raising=False)
         ws = _mock_ws(headers={})
-        h, p, b = _derive_hosting_info(ws)
+        h, p, b = derive_hosting_info(ws.headers)
         assert h == "localhost"
         assert p == "http"
         assert b == ""
 
 
-# --- _handle_steer ---
+# --- handle_steer ---
 
 
 class TestHandleSteer:
@@ -188,18 +188,18 @@ class TestHandleSteer:
             "workspace_id": "ws",
         }
 
-        await _handle_steer(state, {"text": "go left"})
+        await handle_steer(state, {"text": "go left"})
 
         pi.steer.assert_awaited_once_with("go left")
         container_manager._containers.pop("cid", None)
 
     async def test_steer_no_client(self):
         state = _base_state()
-        await _handle_steer(state, {"text": "go left"})
+        await handle_steer(state, {"text": "go left"})
         assert state["pi_client"] is None
 
 
-# --- _handle_follow_up ---
+# --- handle_follow_up ---
 
 
 class TestHandleFollowUp:
@@ -213,18 +213,18 @@ class TestHandleFollowUp:
             "workspace_id": "ws",
         }
 
-        await _handle_follow_up(state, {"text": "and then?"})
+        await handle_follow_up(state, {"text": "and then?"})
 
         pi.follow_up.assert_awaited_once_with("and then?")
         container_manager._containers.pop("cid", None)
 
     async def test_follow_up_no_client(self):
         state = _base_state()
-        await _handle_follow_up(state, {"text": "and then?"})
+        await handle_follow_up(state, {"text": "and then?"})
         assert state["pi_client"] is None
 
 
-# --- _handle_abort ---
+# --- handle_abort ---
 
 
 class TestHandleAbort:
@@ -232,16 +232,16 @@ class TestHandleAbort:
         pi = _mock_pi_client()
         state = _base_state()
         state["pi_client"] = pi
-        await _handle_abort(state)
+        await handle_abort(state)
         pi.abort.assert_awaited_once()
 
     async def test_abort_no_client(self):
         state = _base_state()
-        await _handle_abort(state)
+        await handle_abort(state)
         assert state["pi_client"] is None
 
 
-# --- _handle_extension_ui_response ---
+# --- handle_extension_ui_response ---
 
 
 class TestHandleExtensionUiResponse:
@@ -250,7 +250,7 @@ class TestHandleExtensionUiResponse:
         state = _base_state()
         state["pi_client"] = pi
 
-        await _handle_extension_ui_response(
+        await handle_extension_ui_response(
             state,
             {
                 "id": "ext-1",
@@ -267,7 +267,7 @@ class TestHandleExtensionUiResponse:
         state = _base_state()
         state["pi_client"] = pi
 
-        await _handle_extension_ui_response(
+        await handle_extension_ui_response(
             state,
             {
                 "id": "ext-1",
@@ -282,7 +282,7 @@ class TestHandleExtensionUiResponse:
         state = _base_state()
         state["pi_client"] = pi
 
-        await _handle_extension_ui_response(
+        await handle_extension_ui_response(
             state,
             {
                 "id": "ext-1",
@@ -294,11 +294,11 @@ class TestHandleExtensionUiResponse:
 
     async def test_no_client(self):
         state = _base_state()
-        await _handle_extension_ui_response(state, {"id": "ext-1"})
+        await handle_extension_ui_response(state, {"id": "ext-1"})
         assert state["pi_client"] is None
 
 
-# --- _handle_terminal_input ---
+# --- handle_terminal_input ---
 
 
 class TestHandleTerminalInput:
@@ -312,25 +312,25 @@ class TestHandleTerminalInput:
             "workspace_id": "ws",
         }
 
-        await _handle_terminal_input(state, {"data": "ls\n"})
+        await handle_terminal_input(state, {"data": "ls\n"})
 
         t.write.assert_awaited_once_with("ls\n")
         container_manager._containers.pop("cid", None)
 
     async def test_no_session(self):
         state = _base_state()
-        await _handle_terminal_input(state, {"data": "ls\n"})
+        await handle_terminal_input(state, {"data": "ls\n"})
         assert state["terminal_session"] is None
 
     async def test_dead_session(self):
         t = _mock_terminal(alive=False)
         state = _base_state()
         state["terminal_session"] = t
-        await _handle_terminal_input(state, {"data": "ls\n"})
+        await handle_terminal_input(state, {"data": "ls\n"})
         t.write.assert_not_awaited()
 
 
-# --- _handle_terminal_resize ---
+# --- handle_terminal_resize ---
 
 
 class TestHandleTerminalResize:
@@ -339,7 +339,7 @@ class TestHandleTerminalResize:
         state = _base_state()
         state["terminal_session"] = t
 
-        await _handle_terminal_resize(state, {"cols": 120, "rows": 40})
+        await handle_terminal_resize(state, {"cols": 120, "rows": 40})
 
         t.resize.assert_awaited_once_with(120, 40)
 
@@ -348,17 +348,17 @@ class TestHandleTerminalResize:
         state = _base_state()
         state["terminal_session"] = t
 
-        await _handle_terminal_resize(state, {})
+        await handle_terminal_resize(state, {})
 
         t.resize.assert_awaited_once_with(80, 24)
 
     async def test_no_session(self):
         state = _base_state()
-        await _handle_terminal_resize(state, {"cols": 120, "rows": 40})
+        await handle_terminal_resize(state, {"cols": 120, "rows": 40})
         assert state["terminal_session"] is None
 
 
-# --- _handle_terminal_stop ---
+# --- handle_terminal_stop ---
 
 
 class TestHandleTerminalStop:
@@ -368,7 +368,7 @@ class TestHandleTerminalStop:
         state["terminal_session"] = t
         state["terminal_task"] = asyncio.create_task(asyncio.sleep(10))
 
-        await _handle_terminal_stop(state)
+        await handle_terminal_stop(state)
 
         t.stop.assert_awaited_once()
         assert state["terminal_session"] is None
@@ -376,12 +376,12 @@ class TestHandleTerminalStop:
 
     async def test_no_session(self):
         state = _base_state()
-        await _handle_terminal_stop(state)
+        await handle_terminal_stop(state)
         assert state["terminal_session"] is None
         assert state["terminal_task"] is None
 
 
-# --- _handle_terminal_start ---
+# --- handle_terminal_start ---
 
 
 class TestHandleTerminalStart:
@@ -404,7 +404,7 @@ class TestHandleTerminalStart:
 
             mock_session.output = fake_output
 
-            await _handle_terminal_start(ws, state, {"cols": 100, "rows": 30})
+            await handle_terminal_start(ws, state, {"cols": 100, "rows": 30})
 
         MockTS.assert_called_once_with("cid")
         mock_session.start.assert_awaited_once_with(100, 30)
@@ -422,11 +422,11 @@ class TestHandleTerminalStart:
     async def test_no_container(self):
         ws = _mock_ws()
         state = _base_state()
-        await _handle_terminal_start(ws, state, {})
+        await handle_terminal_start(ws, state, {})
         assert state["terminal_session"] is None
 
 
-# --- _forward_terminal_output ---
+# --- forward_terminal_output ---
 
 
 class TestForwardTerminalOutput:
@@ -441,7 +441,7 @@ class TestForwardTerminalOutput:
 
         t.output = fake_output
 
-        await _forward_terminal_output(ws, t, state)
+        await forward_terminal_output(ws, t, state)
 
         calls = ws.send_json.call_args_list
         assert calls[0][0][0] == {"type": "terminal_output", "data": "line1"}
@@ -462,7 +462,7 @@ class TestForwardTerminalOutput:
         t.output = cancel_output
 
         with pytest.raises(asyncio.CancelledError):
-            await _forward_terminal_output(ws, t, state)
+            await forward_terminal_output(ws, t, state)
 
     async def test_ws_error_logged(self):
         ws = _mock_ws()
@@ -475,7 +475,7 @@ class TestForwardTerminalOutput:
 
         t.output = fake_output
 
-        await _forward_terminal_output(ws, t, state)
+        await forward_terminal_output(ws, t, state)
         # The error send_json was called (it raised, triggering the handler)
         assert ws.send_json.call_count >= 1
 
@@ -491,12 +491,12 @@ class TestForwardTerminalOutput:
 
         t.output = fake_output
 
-        await _forward_terminal_output(ws, t, state)
+        await forward_terminal_output(ws, t, state)
         # Both sends failed — verify both were attempted
         assert ws.send_json.call_count == 2
 
 
-# --- _forward_events ---
+# --- forward_events ---
 
 
 class TestForwardEvents:
@@ -528,7 +528,7 @@ class TestForwardEvents:
 
         pi.events = fake_events
 
-        await _forward_events(ws, pi, workspace["id"], state)
+        await forward_events(ws, pi, workspace["id"], state)
 
         assert ws.send_json.call_count >= 5
         assert state["agent_running"] is False
@@ -558,7 +558,7 @@ class TestForwardEvents:
                 yield e
 
         pi.events = fake_events
-        await _forward_events(ws, pi, workspace["id"], state)
+        await forward_events(ws, pi, workspace["id"], state)
 
         msgs = await user_store.get_messages(workspace["id"])
         assert any(m["content"] == "hello world" for m in msgs)
@@ -590,7 +590,7 @@ class TestForwardEvents:
                 yield e
 
         pi.events = fake_events
-        await _forward_events(ws, pi, workspace["id"], state)
+        await forward_events(ws, pi, workspace["id"], state)
 
         msgs = await user_store.get_messages(workspace["id"])
         tool_msgs = [m for m in msgs if m["entry_type"] == "tool_call"]
@@ -611,7 +611,7 @@ class TestForwardEvents:
                 yield e
 
         pi.events = fake_events
-        await _forward_events(ws, pi, workspace["id"], state)
+        await forward_events(ws, pi, workspace["id"], state)
 
         msgs = await user_store.get_messages(workspace["id"])
         assert any(m["entry_type"] == "error" for m in msgs)
@@ -626,7 +626,7 @@ class TestForwardEvents:
             yield {"type": "agent_end", "messages": []}
 
         pi.events = fake_events
-        await _forward_events(ws, pi, "ws-1", state)
+        await forward_events(ws, pi, "ws-1", state)
 
         assert state["agent_running"] is False
 
@@ -644,7 +644,7 @@ class TestForwardEvents:
             yield {"type": "agent_start"}
 
         pi.events = fake_events
-        await _forward_events(ws, pi, "ws-1", state)
+        await forward_events(ws, pi, "ws-1", state)
 
         assert container_manager._containers["cid-1"]["last_activity"] > 0
 
@@ -658,12 +658,12 @@ class TestForwardEvents:
             yield {"type": "agent_start"}
 
         pi.events = fake_events
-        await _forward_events(ws, pi, "ws-1", state)
+        await forward_events(ws, pi, "ws-1", state)
 
         ws.send_json.assert_awaited_once()
 
 
-# --- _cleanup_connection ---
+# --- cleanup_connection ---
 
 
 class TestCleanupConnection:
@@ -683,7 +683,7 @@ class TestCleanupConnection:
             state["_idle_cb"]
         )
 
-        await _cleanup_connection(ws, state)
+        await cleanup_connection(ws, state)
 
         pi.disconnect.assert_awaited_once()
         t.stop.assert_awaited_once()
@@ -696,26 +696,26 @@ class TestCleanupConnection:
     async def test_cleanup_minimal(self):
         ws = _mock_ws()
         state = _base_state()
-        await _cleanup_connection(ws, state)
+        await cleanup_connection(ws, state)
         assert state["pi_client"] is None
         assert state["terminal_session"] is None
 
 
-# --- _handle_prompt ---
+# --- handle_prompt ---
 
 
 class TestHandlePrompt:
     async def test_empty_prompt(self):
         ws = _mock_ws()
         state = _base_state()
-        await _handle_prompt(ws, state, {"text": ""})
+        await handle_prompt(ws, state, {"text": ""})
         ws.send_json.assert_awaited_once()
         assert "Empty prompt" in ws.send_json.call_args[0][0]["message"]
 
     async def test_no_workspace(self):
         ws = _mock_ws()
         state = _base_state()
-        await _handle_prompt(ws, state, {"text": "hello"})
+        await handle_prompt(ws, state, {"text": "hello"})
         assert "Not connected" in ws.send_json.call_args[0][0]["message"]
 
     async def test_prompt_success(self, db):
@@ -732,7 +732,7 @@ class TestHandlePrompt:
             "workspace_id": workspace["id"],
         }
 
-        await _handle_prompt(ws, state, {"text": "hello world"})
+        await handle_prompt(ws, state, {"text": "hello world"})
 
         pi.prompt.assert_awaited_once_with("hello world")
         msgs = await user_store.get_messages(workspace["id"])
@@ -754,7 +754,7 @@ class TestHandlePrompt:
             "workspace_id": workspace["id"],
         }
 
-        await _handle_prompt(ws, state, {"text": "queued msg"})
+        await handle_prompt(ws, state, {"text": "queued msg"})
 
         pi.follow_up.assert_awaited_once_with("queued msg")
         calls = [c[0][0] for c in ws.send_json.call_args_list]
@@ -791,7 +791,7 @@ class TestHandlePrompt:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch("asyncio.sleep", new_callable=AsyncMock),
@@ -800,7 +800,7 @@ class TestHandlePrompt:
                 "last_activity": 0,
                 "workspace_id": workspace["id"],
             }
-            await _handle_prompt(ws, state, {"text": "hello after restart"})
+            await handle_prompt(ws, state, {"text": "hello after restart"})
 
         pi_new.prompt.assert_awaited_once_with("hello after restart")
         container_manager._containers.pop("new-cid", None)
@@ -813,7 +813,7 @@ class TestHandlePrompt:
         state["container_id"] = "cid"
         state["workspace"] = None
 
-        await _handle_prompt(ws, state, {"text": "hello"})
+        await handle_prompt(ws, state, {"text": "hello"})
 
         calls = [c[0][0] for c in ws.send_json.call_args_list]
         assert any("Workspace not found" in str(c) for c in calls)
@@ -841,12 +841,12 @@ class TestHandlePrompt:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch("asyncio.sleep", new_callable=AsyncMock),
         ):
-            await _handle_prompt(ws, state, {"text": "hello"})
+            await handle_prompt(ws, state, {"text": "hello"})
 
         calls = [c[0][0] for c in ws.send_json.call_args_list]
         assert any("Failed to restart" in str(c) for c in calls)
@@ -875,12 +875,12 @@ class TestHandlePrompt:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch.object(
                 ws_handler,
-                "_cleanup_connection",
+                "cleanup_connection",
                 side_effect=RuntimeError("cleanup boom"),
             ),
             patch("asyncio.sleep", new_callable=AsyncMock),
@@ -889,7 +889,7 @@ class TestHandlePrompt:
                 "last_activity": 0,
                 "workspace_id": workspace["id"],
             }
-            await _handle_prompt(ws, state, {"text": "hello"})
+            await handle_prompt(ws, state, {"text": "hello"})
 
         pi_new.prompt.assert_awaited_once()
         container_manager._containers.pop("new-cid", None)
@@ -930,7 +930,7 @@ class TestHandlePrompt:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch("asyncio.sleep", new_callable=AsyncMock),
@@ -939,26 +939,26 @@ class TestHandlePrompt:
                 "last_activity": 0,
                 "workspace_id": workspace["id"],
             }
-            await _handle_prompt(ws, state, {"text": "hello"})
+            await handle_prompt(ws, state, {"text": "hello"})
 
         pi_new.prompt.assert_awaited_once()
         container_manager._containers.pop("new-cid", None)
 
 
-# --- _handle_workspace_connect ---
+# --- handle_workspace_connect ---
 
 
 class TestHandleWorkspaceConnect:
     async def test_missing_workspace_id(self):
         ws = _mock_ws()
         state = _base_state()
-        await _handle_workspace_connect(ws, state, {})
+        await handle_workspace_connect(ws, state, {})
         assert "Missing" in ws.send_json.call_args[0][0]["message"]
 
     async def test_workspace_not_found(self, user):
         ws = _mock_ws()
         state = _base_state(user=user)
-        await _handle_workspace_connect(ws, state, {"workspaceId": "fake"})
+        await handle_workspace_connect(ws, state, {"workspaceId": "fake"})
         assert "not found" in ws.send_json.call_args[0][0]["message"]
 
     async def test_connect_success(self, user):
@@ -975,7 +975,7 @@ class TestHandleWorkspaceConnect:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch.object(
@@ -984,7 +984,7 @@ class TestHandleWorkspaceConnect:
                 return_value=[9000, 9001],
             ),
         ):
-            await _handle_workspace_connect(
+            await handle_workspace_connect(
                 ws, state, {"workspaceId": workspace["id"]}
             )
 
@@ -1014,14 +1014,14 @@ class TestHandleWorkspaceConnect:
             with (
                 patch.object(
                     ws_handler,
-                    "_start_workspace_container",
+                    "start_workspace_container",
                     side_effect=fake_start,
                 ),
                 patch.object(
                     container_manager, "get_workspace_ports", return_value=[]
                 ),
             ):
-                await _handle_workspace_connect(
+                await handle_workspace_connect(
                     ws, state, {"workspaceId": workspace["id"]}
                 )
 
@@ -1031,7 +1031,7 @@ class TestHandleWorkspaceConnect:
             container_manager.IDLE_TIMEOUT_SECONDS = original_timeout
 
 
-# --- _handle_workspace_disconnect ---
+# --- handle_workspace_disconnect ---
 
 
 class TestHandleWorkspaceDisconnect:
@@ -1048,21 +1048,21 @@ class TestHandleWorkspaceDisconnect:
             "stop_and_remove_container",
             new_callable=AsyncMock,
         ):
-            await _handle_workspace_disconnect(ws, state)
+            await handle_workspace_disconnect(ws, state)
 
         assert state["workspace_id"] is None
         assert state["container_id"] is None
         assert state["pi_client"] is None
 
 
-# --- _handle_restart_container ---
+# --- handle_restart_container ---
 
 
 class TestHandleRestartContainer:
     async def test_no_workspace(self):
         ws = _mock_ws()
         state = _base_state()
-        await _handle_restart_container(ws, state)
+        await handle_restart_container(ws, state)
         assert "Not connected" in ws.send_json.call_args[0][0]["message"]
 
     async def test_workspace_gone(self, user):
@@ -1071,7 +1071,7 @@ class TestHandleRestartContainer:
         state["workspace_id"] = "gone-ws"
         state["workspace"] = None
 
-        await _handle_restart_container(ws, state)
+        await handle_restart_container(ws, state)
 
         calls = [c[0][0] for c in ws.send_json.call_args_list]
         assert any("not found" in str(c) for c in calls)
@@ -1097,14 +1097,14 @@ class TestHandleRestartContainer:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch.object(
                 container_manager, "get_workspace_ports", return_value=[9000]
             ),
         ):
-            await _handle_restart_container(ws, state)
+            await handle_restart_container(ws, state)
 
         calls = [c[0][0] for c in ws.send_json.call_args_list]
         ready = [
@@ -1117,7 +1117,7 @@ class TestHandleRestartContainer:
         container_manager._containers.pop("new-cid", None)
 
 
-# --- _start_workspace_container ---
+# --- start_workspace_container ---
 
 
 class TestStartWorkspaceContainer:
@@ -1145,7 +1145,7 @@ class TestStartWorkspaceContainer:
             patch.object(ws_handler, "PiRpcClient", return_value=pi),
             patch("glob.glob", return_value=[]),
         ):
-            await _start_workspace_container(
+            await start_workspace_container(
                 ws, state, workspace["id"], workspace
             )
 
@@ -1194,7 +1194,7 @@ class TestStartWorkspaceContainer:
                 return_value=[f"{home_path}/.pi/sessions/session.jsonl"],
             ),
         ):
-            await _start_workspace_container(
+            await start_workspace_container(
                 ws, state, workspace["id"], workspace
             )
 
@@ -1233,7 +1233,7 @@ class TestStartWorkspaceContainer:
             patch.object(ws_handler, "PiRpcClient", return_value=pi),
             patch("glob.glob", return_value=[]),
         ):
-            await _start_workspace_container(
+            await start_workspace_container(
                 ws, state, workspace["id"], workspace
             )
 
@@ -1260,7 +1260,7 @@ class TestHandleWebsocketDispatch:
     async def _run_commands(self, user, commands):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         msgs = [json.dumps(c) for c in commands] + [WebSocketDisconnect()]
         ws.receive_text = AsyncMock(side_effect=msgs)
@@ -1330,7 +1330,7 @@ class TestHandleWebsocketDispatch:
         """Container should be left running on disconnect (cleaned up by idle timeout)."""
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
 
         workspace = await workspace_manager.create_workspace(
@@ -1355,7 +1355,7 @@ class TestHandleWebsocketDispatch:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch.object(
@@ -1372,7 +1372,7 @@ class TestHandleWebsocketDispatch:
         mock_stop.assert_not_awaited()
 
 
-# --- _handle_restart_container additional coverage ---
+# --- handle_restart_container additional coverage ---
 
 
 class TestHandleRestartContainerExtra:
@@ -1397,19 +1397,19 @@ class TestHandleRestartContainerExtra:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch.object(
                 ws_handler,
-                "_cleanup_connection",
+                "cleanup_connection",
                 side_effect=RuntimeError("cleanup boom"),
             ),
             patch.object(
                 container_manager, "get_workspace_ports", return_value=[9000]
             ),
         ):
-            await _handle_restart_container(ws, state)
+            await handle_restart_container(ws, state)
 
         calls = [c[0][0] for c in ws.send_json.call_args_list]
         ready = [
@@ -1450,14 +1450,14 @@ class TestHandleRestartContainerExtra:
             with (
                 patch.object(
                     ws_handler,
-                    "_start_workspace_container",
+                    "start_workspace_container",
                     side_effect=fake_start,
                 ),
                 patch.object(
                     container_manager, "get_workspace_ports", return_value=[]
                 ),
             ):
-                await _handle_restart_container(ws, state)
+                await handle_restart_container(ws, state)
 
             calls = [c[0][0] for c in ws.send_json.call_args_list]
             ready = [
@@ -1491,7 +1491,7 @@ class TestHandleWebsocket:
     async def test_valid_token_then_disconnect(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(side_effect=WebSocketDisconnect())
 
@@ -1502,7 +1502,7 @@ class TestHandleWebsocket:
     async def test_invalid_json(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(
             side_effect=["not json", WebSocketDisconnect()]
@@ -1516,7 +1516,7 @@ class TestHandleWebsocket:
     async def test_unknown_command(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(
             side_effect=[
@@ -1533,7 +1533,7 @@ class TestHandleWebsocket:
     async def test_ui_ready_with_pending(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         workspace = await workspace_manager.create_workspace(
             user["id"], "ui-ready-ws"
@@ -1559,7 +1559,7 @@ class TestHandleWebsocket:
         with (
             patch.object(
                 ws_handler,
-                "_start_workspace_container",
+                "start_workspace_container",
                 side_effect=fake_start,
             ),
             patch.object(
@@ -1586,7 +1586,7 @@ class TestHandleWebsocket:
     async def test_ui_ready_no_pending(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(
             side_effect=[
@@ -1610,7 +1610,7 @@ class TestHandleWebsocket:
     async def test_general_exception_logged(self, user):
         from bark_backend import auth as auth_mod
 
-        token = auth_mod._create_token(user["id"], user["email"])
+        token = auth_mod.create_token(user["id"], user["email"])
         ws = _mock_ws(query_params={"token": token})
         ws.receive_text = AsyncMock(side_effect=RuntimeError("unexpected"))
 

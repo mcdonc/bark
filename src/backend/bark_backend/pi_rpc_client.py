@@ -30,12 +30,12 @@ class PiRpcClient:
             stderr=asyncio.subprocess.PIPE,
         )
         self._running = True
-        self._read_task = asyncio.create_task(self._read_loop())
+        self._read_task = asyncio.create_task(self.read_loop())
         logger.info(
             "Attached to container %s via docker attach", self.container_id
         )
 
-    async def _read_loop(self) -> None:
+    async def read_loop(self) -> None:
         """Read newline-delimited JSON events from stdout.
 
         Uses chunked reads instead of readline() to avoid buffer limits —

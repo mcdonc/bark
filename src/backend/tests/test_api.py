@@ -631,7 +631,7 @@ class TestSetIdleTimeout:
             # Global CHECK_INTERVAL_SECONDS should be unchanged
             assert (
                 container_manager.CHECK_INTERVAL_SECONDS
-                == container_manager._parse_idle_timeout()[1]
+                == container_manager.parse_idle_timeout()[1]
             )
         finally:
             container_manager._workspace_idle_timeouts.clear()
@@ -691,10 +691,10 @@ class TestRoles:
     async def test_roles_in_jwt(self, user):
         await user_store.ensure_role("admin")
         await user_store.assign_role(user["id"], "admin")
-        token = auth._create_token(
+        token = auth.create_token(
             user["id"], "testuser@example.com", ["admin"]
         )
-        payload = auth._decode_token(token)
+        payload = auth.decode_token(token)
         assert payload["roles"] == ["admin"]
 
     async def test_login_includes_roles(self, client, admin_user):
@@ -704,7 +704,7 @@ class TestRoles:
         )
         assert resp.status_code == 200
         token = resp.json()["access_token"]
-        payload = auth._decode_token(token)
+        payload = auth.decode_token(token)
         assert "admin" in payload["roles"]
 
     async def test_login_no_roles(self, client, user):
@@ -714,7 +714,7 @@ class TestRoles:
         )
         assert resp.status_code == 200
         token = resp.json()["access_token"]
-        payload = auth._decode_token(token)
+        payload = auth.decode_token(token)
         assert payload["roles"] == []
 
     async def test_cascade_delete_user(self, db):
@@ -723,7 +723,7 @@ class TestRoles:
         await user_store.ensure_role("admin")
         await user_store.assign_role(user["id"], "admin")
         assert await user_store.get_user_roles(user["id"]) == ["admin"]
-        db_conn = await user_store._get_db()
+        db_conn = await user_store.get_db()
         try:
             await db_conn.execute(
                 "DELETE FROM users WHERE id = ?", (user["id"],)
@@ -738,7 +738,7 @@ class TestRoles:
         await user_store.ensure_role("temp")
         await user_store.assign_role(user["id"], "temp")
         assert "temp" in await user_store.get_user_roles(user["id"])
-        db_conn = await user_store._get_db()
+        db_conn = await user_store.get_db()
         try:
             await db_conn.execute(
                 "DELETE FROM roles WHERE name = ?", ("temp",)

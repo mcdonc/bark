@@ -11,24 +11,24 @@ from collections.abc import AsyncGenerator
 logger = logging.getLogger(__name__)
 
 
-def _openpty() -> tuple[int, int]:  # pragma: no cover
+def openpty() -> tuple[int, int]:  # pragma: no cover
     return os.openpty()
 
 
-def _set_winsize(fd: int, rows: int, cols: int) -> None:  # pragma: no cover
+def set_winsize(fd: int, rows: int, cols: int) -> None:  # pragma: no cover
     winsize = struct.pack("HHHH", rows, cols, 0, 0)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
 
 
-def _fd_read(fd: int, size: int) -> bytes:  # pragma: no cover
+def fd_read(fd: int, size: int) -> bytes:  # pragma: no cover
     return os.read(fd, size)
 
 
-def _fd_write(fd: int, data: bytes) -> int:  # pragma: no cover
+def fd_write(fd: int, data: bytes) -> int:  # pragma: no cover
     return os.write(fd, data)
 
 
-def _fd_close(fd: int) -> None:  # pragma: no cover
+def fd_close(fd: int) -> None:  # pragma: no cover
     os.close(fd)
 
 
@@ -44,9 +44,9 @@ class TerminalSession:
 
     async def start(self, cols: int = 80, rows: int = 24) -> None:
         """Start a shell session via docker exec with a PTY."""
-        master_fd, slave_fd = _openpty()
+        master_fd, slave_fd = openpty()
 
-        _set_winsize(master_fd, rows, cols)
+        set_winsize(master_fd, rows, cols)
 
         self._master_fd = master_fd
         self._running = True
@@ -92,11 +92,11 @@ class TerminalSession:
             stderr=slave_fd,
             close_fds=True,
         )
-        _fd_close(slave_fd)  # Parent doesn't need the slave end
+        fd_close(slave_fd)  # Parent doesn't need the slave end
 
         # Register async reader on the master fd
         loop = asyncio.get_event_loop()
-        loop.add_reader(master_fd, self._on_readable)
+        loop.add_reader(master_fd, self.on_readable)
 
         # Prompt and aliases come from /etc/bash.bashrc in the container image
 
@@ -104,7 +104,7 @@ class TerminalSession:
             "Terminal session started for container %s", self.container_id
         )
 
-    def _remove_reader(self) -> None:
+    def remove_reader(self) -> None:
         """Deregister the PTY master fd from the event loop."""
         if self._master_fd is not None:
             try:
@@ -112,19 +112,19 @@ class TerminalSession:
             except (ValueError, OSError):
                 pass
 
-    def _on_readable(self) -> None:
+    def on_readable(self) -> None:
         """Called when data is available on the PTY master fd."""
         try:
-            data = _fd_read(self._master_fd, 65536)
+            data = fd_read(self._master_fd, 65536)
             if data:
                 self._output_queue.put_nowait(
                     data.decode("utf-8", errors="replace")
                 )
             else:
-                self._remove_reader()
+                self.remove_reader()
                 self._output_queue.put_nowait(None)
         except OSError:
-            self._remove_reader()
+            self.remove_reader()
             self._output_queue.put_nowait(None)
 
     @property
@@ -134,12 +134,12 @@ class TerminalSession:
     async def write(self, data: str) -> None:
         """Write user input to the terminal."""
         if self._master_fd is not None:
-            _fd_write(self._master_fd, data.encode("utf-8"))
+            fd_write(self._master_fd, data.encode("utf-8"))
 
     async def resize(self, cols: int, rows: int) -> None:
         """Resize the terminal PTY."""
         if self._master_fd is not None:
-            _set_winsize(self._master_fd, rows, cols)
+            set_winsize(self._master_fd, rows, cols)
 
     async def output(self) -> AsyncGenerator[str, None]:
         """Yield terminal output as it arrives."""
@@ -175,7 +175,7 @@ class TerminalSession:
         # Close the master fd
         if self._master_fd is not None:
             try:
-                _fd_close(self._master_fd)
+                fd_close(self._master_fd)
             except OSError:
                 pass
             self._master_fd = None

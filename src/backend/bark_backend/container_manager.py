@@ -13,7 +13,7 @@ IMAGE_NAME = os.environ.get("BARK_IMAGE_NAME", "bark-pi")
 INSTANCE_ID = os.environ.get("BARK_INSTANCE_ID", "default")
 
 
-def _parse_idle_timeout() -> tuple[int, int]:
+def parse_idle_timeout() -> tuple[int, int]:
     """Parse BARK_IDLE_TIMEOUT_SECONDS and compute check interval.
 
     Returns (idle_timeout_seconds, check_interval_seconds).
@@ -36,7 +36,7 @@ def _parse_idle_timeout() -> tuple[int, int]:
     return timeout, interval
 
 
-IDLE_TIMEOUT_SECONDS, CHECK_INTERVAL_SECONDS = _parse_idle_timeout()
+IDLE_TIMEOUT_SECONDS, CHECK_INTERVAL_SECONDS = parse_idle_timeout()
 
 # Port allocation
 PORT_RANGE_START = 9000
@@ -61,7 +61,7 @@ _port_lock: asyncio.Lock = asyncio.Lock()
 _cleanup_wake: asyncio.Event | None = None
 
 
-def _get_cleanup_wake() -> asyncio.Event:
+def get_cleanup_wake() -> asyncio.Event:
     global _cleanup_wake
     if _cleanup_wake is None:
         _cleanup_wake = asyncio.Event()
@@ -113,7 +113,7 @@ async def start_container(
             container = await docker.containers.get(existing_container_id)
             info = await container.show()
             if info["State"]["Running"]:
-                _track_activity(existing_container_id, workspace_id)
+                track_activity(existing_container_id, workspace_id)
                 return existing_container_id, "connected"
             # Stopped container: remove it so we recreate with fresh entrypoint
             await container.delete(force=True)
@@ -224,7 +224,7 @@ async def start_container(
     container_id = container.id
 
     await user_store.update_workspace_container(workspace_id, container_id)
-    _track_activity(container_id, workspace_id)
+    track_activity(container_id, workspace_id)
 
     logger.info(
         "Started container %s for workspace %s (ports %s)",
@@ -275,7 +275,7 @@ async def stop_user_containers(user_id: str) -> None:
             await stop_and_remove_container(ws["container_id"])
 
 
-def _track_activity(container_id: str, workspace_id: str) -> None:
+def track_activity(container_id: str, workspace_id: str) -> None:
     _containers[container_id] = {
         "last_activity": time.time(),
         "workspace_id": workspace_id,
@@ -293,7 +293,7 @@ def set_workspace_idle_timeout(workspace_id: str, seconds: int) -> None:
     _workspace_idle_timeouts[workspace_id] = seconds
     # Wake the cleanup loop so it picks up the new short timeout immediately
     # instead of waiting for its current (potentially long) sleep to finish.
-    _get_cleanup_wake().set()
+    get_cleanup_wake().set()
 
 
 def get_workspace_idle_timeout(workspace_id: str) -> int:
@@ -313,7 +313,7 @@ def remove_idle_callback(workspace_id: str, callback) -> None:
         cbs.remove(callback)
 
 
-async def _cleanup_idle_containers() -> None:
+async def cleanup_idle_containers() -> None:
     """Periodically stop idle containers."""
     while True:
         # Sleep interval adapts to the shortest active per-workspace timeout
@@ -326,7 +326,7 @@ async def _cleanup_idle_containers() -> None:
             interval = CHECK_INTERVAL_SECONDS
         # Use Event-based wait so set_workspace_idle_timeout can wake us
         # immediately, even if we're in the middle of a long default sleep.
-        wake = _get_cleanup_wake()
+        wake = get_cleanup_wake()
         wake.clear()
         try:
             await asyncio.wait_for(wake.wait(), timeout=interval)
@@ -360,7 +360,7 @@ def start_cleanup_loop() -> None:
         CHECK_INTERVAL_SECONDS,
     )
     if _cleanup_task is None:
-        _cleanup_task = asyncio.create_task(_cleanup_idle_containers())
+        _cleanup_task = asyncio.create_task(cleanup_idle_containers())
 
 
 async def shutdown() -> None:
