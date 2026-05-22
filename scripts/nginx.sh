@@ -37,6 +37,25 @@ http {
       proxy_http_version 1.1;
     }
 
+    # LLM proxy: forward to the real LLM endpoint with API key injected.
+    # Containers hit this instead of the real endpoint, so they never
+    # see the API key. Restricted to Docker subnets only.
+    location /llm-proxy/ {
+      allow 172.16.0.0/12;
+      allow 192.168.0.0/16;
+      allow 10.0.0.0/8;
+      deny all;
+      proxy_pass ${OLLAMA_BASE_URL}/;
+      proxy_set_header Authorization "Bearer ${OLLAMA_API_KEY}";
+      proxy_set_header Host \$proxy_host;
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      # SSE streaming support
+      proxy_buffering off;
+      proxy_cache off;
+      chunked_transfer_encoding on;
+    }
+
     location / {
       proxy_pass http://127.0.0.1:${BARK_PORT}/;
       proxy_set_header Host \$http_host;

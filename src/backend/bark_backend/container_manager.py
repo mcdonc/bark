@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import time
 
 import aiodocker
@@ -140,32 +139,20 @@ async def start_container(
         await user_store.remove_port_allocations(workspace_id, excess)
         host_ports = host_ports[:num_ports]
 
-    # Collect API keys from environment to pass to the container
+    # Pass LLM config to the container via the nginx proxy.
+    # The proxy injects the API key, so containers never see it.
     env_vars = []
-    for key in os.environ:
-        if key.startswith(
-            (
-                "ANTHROPIC_",
-                "OPENAI_",
-                "GOOGLE_",
-                "GROQ_",
-                "MISTRAL_",
-                "OLLAMA_",
-            )
-        ):
-            val = env_util.resolve_env_secret(key) or ""
-            env_vars.append(f"{key}={val}")
-    # Log provider env vars for debugging
-    provider_keys = [v.split("=", 1)[0] for v in env_vars]
-    if provider_keys:
-        logger.info("Container env vars: %s", ", ".join(provider_keys))
-    ollama_url = env_util.resolve_env_secret("OLLAMA_BASE_URL", "")
-    if ollama_url:
-        # Log just the hostname to verify connectivity without exposing secrets
-        from urllib.parse import urlparse
-
-        parsed = urlparse(ollama_url)
-        logger.info("OLLAMA_BASE_URL host: %s", parsed.hostname)
+    nginx_port = env_util.resolve_env_secret("BARK_NGINX_PORT", "8995")
+    proxy_url = f"http://host.docker.internal:{nginx_port}/llm-proxy"
+    ollama_model = env_util.resolve_env_secret("OLLAMA_MODEL", "")
+    env_vars.append(f"LLM_BASE_URL={proxy_url}")
+    if ollama_model:
+        env_vars.append(f"LLM_MODEL={ollama_model}")
+    logger.info(
+        "Container LLM proxy: %s (model: %s)",
+        proxy_url,
+        ollama_model,
+    )
     # Pass Logfire/OTEL config so the Pi otel-telemetry extension can
     # send traces to the same Logfire project as the backend.
     logfire_token = env_util.resolve_env_secret("LOGFIRE_TOKEN")
@@ -220,6 +207,7 @@ async def start_container(
                 "/var/log": "rw,noexec,nosuid,size=16m",
             },
             "PortBindings": port_bindings,
+            "ExtraHosts": ["host.docker.internal:host-gateway"],
         },
         "ExposedPorts": exposed_ports,
         "Env": env_vars,

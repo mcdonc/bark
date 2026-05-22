@@ -351,10 +351,10 @@ class TestStartContainer:
             "BARK_RESUME_SESSION=/path/to/session.jsonl" in e for e in env
         )
 
-    async def test_provider_env_vars_forwarded(self, workspace, monkeypatch):
-        monkeypatch.setenv("OLLAMA_API_KEY", "test-key")
-        monkeypatch.setenv("OLLAMA_BASE_URL", "https://ollama.example.com/api")
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-2")
+    async def test_llm_proxy_env_vars(self, workspace, monkeypatch):
+        """Container gets proxy URL, not real API keys."""
+        monkeypatch.setenv("OLLAMA_MODEL", "gemma4:31b")
+        monkeypatch.setenv("BARK_NGINX_PORT", "8995")
         mock_docker = _mock_docker()
         mock_c = _mock_container("cid")
         mock_docker.containers.create_or_replace = AsyncMock(
@@ -371,8 +371,17 @@ class TestStartContainer:
             )
         call_kwargs = mock_docker.containers.create_or_replace.call_args
         env = call_kwargs[1]["config"]["Env"]
-        assert "OLLAMA_API_KEY=test-key" in env
-        assert "ANTHROPIC_API_KEY=test-key-2" in env
+        env_dict = dict(e.split("=", 1) for e in env)
+        assert env_dict["LLM_BASE_URL"] == (
+            "http://host.docker.internal:8995/llm-proxy"
+        )
+        assert env_dict["LLM_MODEL"] == "gemma4:31b"
+        # API keys should NOT be in the container env
+        assert not any(e.startswith("OLLAMA_API_KEY=") for e in env)
+        assert not any(e.startswith("ANTHROPIC_API_KEY=") for e in env)
+        # host.docker.internal must be resolvable
+        host_config = call_kwargs[1]["config"]["HostConfig"]
+        assert "host.docker.internal:host-gateway" in host_config["ExtraHosts"]
 
     async def test_hosting_env_vars(self, workspace):
         mock_docker = _mock_docker()
