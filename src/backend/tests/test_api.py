@@ -274,6 +274,8 @@ class TestResendVerification:
         assert "already verified" in resp.json()["detail"]
 
     async def test_resend_rate_limited(self, client, db):
+        # Clear stale rate limit state from parallel test workers
+        api._resend_timestamps.pop("unverified@example.com", None)
         await self._create_unverified_user()
         with patch.object(
             api.email_service,
