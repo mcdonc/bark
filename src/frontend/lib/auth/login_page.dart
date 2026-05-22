@@ -19,6 +19,8 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isRegister = false;
   String? _error;
+  bool _needsVerification = false;
+  bool _resending = false;
 
   @override
   void initState() {
@@ -49,10 +51,32 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!mounted) return;
     if (error != null) {
-      setState(() => _error = error);
+      setState(() {
+        _error = error;
+        _needsVerification = (error?.contains('not verified') ?? false) ||
+            (error?.contains('Check your email') ?? false);
+      });
     }
     // On success, auth state change triggers GoRouter refreshListenable,
     // which redirects from /login to pendingRedirect or /workspaces.
+  }
+
+  Future<void> _resendVerification() async {
+    setState(() => _resending = true);
+    final auth = context.read<AuthService>();
+    final error = await auth.resendVerification(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _resending = false;
+      if (error != null) {
+        _error = error;
+      } else {
+        _error = 'Verification email sent. Check your inbox.';
+      }
+    });
   }
 
   @override
@@ -119,6 +143,20 @@ class _LoginPageState extends State<LoginPage> {
                     Text(_error!,
                         style: TextStyle(
                             color: Theme.of(context).colorScheme.error)),
+                    if (_needsVerification) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _resending ? null : _resendVerification,
+                        child: _resending
+                            ? const SizedBox(
+                                height: 16,
+                                width: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Resend verification email'),
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 24),
                   SizedBox(

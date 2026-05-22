@@ -213,6 +213,93 @@ class TestAuthRoutes:
         assert resp.status_code == 401
 
 
+# --- Resend verification ---
+
+
+class TestResendVerification:
+    async def _create_unverified_user(self):
+        password_hash = auth.hash_password("testpass")
+        await user_store.create_user(
+            "unverified@example.com", password_hash, verified=False
+        )
+
+    async def test_resend_success(self, client, db):
+        await self._create_unverified_user()
+        with patch.object(
+            api.email_service,
+            "send_verification_email",
+            new_callable=AsyncMock,
+        ) as mock_send:
+            resp = await client.post(
+                "/auth/resend-verification",
+                json={
+                    "email": "unverified@example.com",
+                    "password": "testpass",
+                },
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "sent"
+        mock_send.assert_awaited_once()
+
+    async def test_resend_wrong_password(self, client, db):
+        await self._create_unverified_user()
+        resp = await client.post(
+            "/auth/resend-verification",
+            json={
+                "email": "unverified@example.com",
+                "password": "wrong",
+            },
+        )
+        assert resp.status_code == 401
+
+    async def test_resend_nonexistent_user(self, client, db):
+        resp = await client.post(
+            "/auth/resend-verification",
+            json={
+                "email": "nobody@example.com",
+                "password": "pass",
+            },
+        )
+        assert resp.status_code == 401
+
+    async def test_resend_already_verified(self, client, admin_user):
+        resp = await client.post(
+            "/auth/resend-verification",
+            json={
+                "email": "testadmin@example.com",
+                "password": "testpass",
+            },
+        )
+        assert resp.status_code == 400
+        assert "already verified" in resp.json()["detail"]
+
+    async def test_resend_rate_limited(self, client, db):
+        await self._create_unverified_user()
+        with patch.object(
+            api.email_service,
+            "send_verification_email",
+            new_callable=AsyncMock,
+        ):
+            resp1 = await client.post(
+                "/auth/resend-verification",
+                json={
+                    "email": "unverified@example.com",
+                    "password": "testpass",
+                },
+            )
+            assert resp1.status_code == 200
+            resp2 = await client.post(
+                "/auth/resend-verification",
+                json={
+                    "email": "unverified@example.com",
+                    "password": "testpass",
+                },
+            )
+        assert resp2.status_code == 429
+        # Clean up rate limit state
+        api._resend_timestamps.pop("unverified@example.com", None)
+
+
 # --- Workspace routes ---
 
 

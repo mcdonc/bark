@@ -156,6 +156,28 @@ class TestSendVerificationEmail:
         msg = mock_sendmail.call_args[0][0]
         assert msg["To"] == "user@example.com"
         assert "Verify" in msg["Subject"]
-        body = msg.get_content()
-        assert "https://bark.example.com/#/verify?token=abc123" in body
-        assert "72 hours" in body
+        # Multipart: plain text + HTML
+        parts = list(msg.iter_parts())
+        assert len(parts) == 2
+        text_part = parts[0].get_content()
+        assert "https://bark.example.com/#/verify?token=abc123" in text_part
+        assert "72 hours" in text_part
+        html_part = parts[1].get_content()
+        assert (
+            'href="https://bark.example.com/#/verify?token=abc123"'
+            in html_part
+        )
+        assert "Verify my account" in html_part
+        assert "Bark" in html_part
+
+    async def test_sends_via_smtp_when_configured(self, monkeypatch):
+        monkeypatch.setenv("BARK_SMTP_HOST", "smtp.example.com")
+        monkeypatch.setenv("BARK_SMTP_USER", "user")
+        monkeypatch.setenv("BARK_SMTP_PASSWORD", "pass")
+        mock_smtp = AsyncMock()
+        with patch.object(email_service, "send_via_smtp", mock_smtp):
+            await email_service.send_verification_email(
+                "user@example.com",
+                "https://bark.example.com/#/verify?token=abc",
+            )
+        mock_smtp.assert_awaited_once()

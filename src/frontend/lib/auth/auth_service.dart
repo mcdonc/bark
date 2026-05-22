@@ -134,6 +134,23 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<String?> resendVerification(String email, String password) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$_baseUrl/auth/resend-verification'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}),
+      );
+      if (response.statusCode == 200) {
+        return null;
+      }
+      final error = jsonDecode(response.body);
+      return error['detail'] ?? 'Failed to resend';
+    } catch (e) {
+      return 'Connection error: $e';
+    }
+  }
+
   /// Make an authenticated HTTP request. If the response is 401,
   /// clear the token (router will redirect to login).
   Future<http.Response> authGet(String path) async {

@@ -103,15 +103,48 @@ async def send_email(to: str, subject: str, body: str) -> None:
 
 
 async def send_verification_email(to: str, verification_url: str) -> None:
-    """Send a verification email with the given callback URL."""
+    """Send a verification email with the given callback URL.
+
+    Sends as multipart/alternative with both plain text and HTML
+    so the link is clickable regardless of mail client.
+    """
     logger.info(
-        "Sending verification email to %s with URL: %s", to, verification_url
+        "Sending verification email to %s with URL: %s",
+        to,
+        verification_url,
     )
-    subject = "Verify your Bark account"
-    body = (
-        f"Click the link below to verify your email address and activate "
-        f"your Bark account:\n\n{verification_url}\n\n"
-        f"This link expires in 72 hours.\n\n"
-        f"If you did not request this, you can ignore this email."
+    text_body = (
+        "Click the link below to verify your email address and "
+        "activate your Bark account:\n\n"
+        f"<{verification_url}>\n\n"
+        "This link expires in 72 hours.\n\n"
+        "If you did not request this, you can ignore this email."
     )
-    await send_email(to, subject, body)
+    html_body = (
+        '<div style="font-family:sans-serif;max-width:480px;margin:0 auto">'
+        '<div style="text-align:center;padding:24px 0">'
+        '<span style="display:inline-block;background:#E65100;'
+        "color:#fff;border-radius:50%;width:48px;height:48px;"
+        'line-height:48px;font-size:24px">&#128062;</span>'
+        '<h2 style="margin:8px 0 0">Bark</h2>'
+        "</div>"
+        "<p>Click the link below to verify your email address and "
+        "activate your Bark account:</p>"
+        f'<p><a href="{verification_url}">Verify my account</a></p>'
+        "<p>This link expires in 72 hours.</p>"
+        "<p><small>If you did not request this, you can "
+        "ignore this email.</small></p>"
+        "</div>"
+    )
+    cfg = smtp_config()
+    msg = EmailMessage()
+    msg["Subject"] = "Verify your Bark account"
+    msg["From"] = cfg["from_addr"] or cfg["user"] or "noreply@localhost"
+    msg["To"] = to
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
+
+    if use_smtp():
+        await send_via_smtp(msg)
+    else:
+        await send_via_sendmail(msg)

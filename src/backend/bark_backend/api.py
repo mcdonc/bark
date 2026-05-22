@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import sqlite3
+import time
 import zipfile
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
@@ -140,6 +141,45 @@ async def verify_email(token: str):
     roles = await user_store.get_user_roles(user_id)
     token = auth.create_token(user_id, user["email"], roles)
     return {"status": "verified", "access_token": token}
+
+
+_resend_timestamps: dict[str, float] = {}
+RESEND_COOLDOWN_SECONDS = 60
+
+
+@router.post("/auth/resend-verification")
+async def resend_verification(
+    req: auth.LoginRequest,
+    request: Request,
+):
+    """Resend verification email. Requires email+password to prevent abuse."""
+    user = await user_store.get_user_by_email(req.email)
+    if user is None or not auth.verify_password(
+        req.password, user["password_hash"]
+    ):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user.get("verified"):
+        raise HTTPException(status_code=400, detail="Account already verified")
+
+    # Rate limit: one resend per email per minute
+    now = time.time()
+    last = _resend_timestamps.get(req.email, 0)
+    if now - last < RESEND_COOLDOWN_SECONDS:
+        raise HTTPException(
+            status_code=429,
+            detail="Please wait before requesting another email",
+        )
+    _resend_timestamps[req.email] = now
+
+    hostname, proto, base_path = ws_handler.derive_hosting_info(
+        request.headers
+    )
+    verification_token = auth.create_verification_token(user["id"])
+    verification_url = (
+        f"{proto}://{hostname}{base_path}/#/verify?token={verification_token}"
+    )
+    await email_service.send_verification_email(req.email, verification_url)
+    return {"status": "sent"}
 
 
 @router.post("/auth/login", response_model=auth.TokenResponse)
