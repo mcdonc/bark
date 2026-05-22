@@ -107,7 +107,7 @@ bark/
       (ToolPlugin and ToolPluginRegistry are in the bark_plugin_api package)
       (Plugin registration is in the bark_plugins package at $BARK_PLUGINS_DIR/.dart/)
       auth/
-        auth_service.dart       # JWT storage, login/register/logout, async init, roles/isAdmin from JWT payload
+        auth_service.dart       # JWT storage, login/register/logout, async init, email/roles/isAdmin from JWT payload
         login_page.dart         # Login/register form with email validation
         verify_page.dart        # Email verification page (auto-login on success)
       admin/
@@ -159,7 +159,7 @@ bark/
 - Each workspace gets its own Docker container + bind-mounted directory
 - URL-based workspace routing (survives page reload via hash URL reading)
 - Deep link preservation: unauthenticated visits to protected URLs redirect to login with a `?redirect=` param, then return to the original URL after successful login
-- Workspace name shown in app bar and browser tab title
+- Workspace name and logged-in user email shown in app bar, browser tab title
 - Containers stop when navigating away (browser back, in-app back, logout)
 - Containers auto-restart transparently when user sends next prompt
 - Container lifecycle visible in debug panel

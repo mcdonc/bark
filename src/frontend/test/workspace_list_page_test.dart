@@ -21,6 +21,15 @@ void main() {
     testAuthHttpClientOverride = null;
   });
 
+  String makeJwt(Map<String, dynamic> payload) {
+    final header = base64Url
+        .encode(utf8.encode(jsonEncode({'alg': 'HS256', 'typ': 'JWT'})))
+        .replaceAll('=', '');
+    final body =
+        base64Url.encode(utf8.encode(jsonEncode(payload))).replaceAll('=', '');
+    return '$header.$body.fakesig';
+  }
+
   Widget buildPage() {
     return ChangeNotifierProvider(
       create: (_) => AuthService(),
@@ -322,6 +331,26 @@ void main() {
 
       expect(find.byType(Card), findsOneWidget);
       expect(find.byType(ListTile), findsOneWidget);
+    });
+
+    testWidgets('shows logged-in email in app bar', (tester) async {
+      final token = makeJwt({
+        'sub': 'user-1',
+        'email': 'alice@example.com',
+        'roles': ['user'],
+      });
+      SharedPreferences.setMockInitialValues({'bark_jwt': token});
+      testAuthHttpClientOverride = MockClient((request) async {
+        if (request.url.path == '/workspaces') {
+          return http.Response(jsonEncode([]), 200);
+        }
+        return http.Response('Not found', 404);
+      });
+
+      await tester.pumpWidget(buildPage());
+      await tester.pumpAndSettle();
+
+      expect(find.text('alice@example.com'), findsOneWidget);
     });
   });
 }

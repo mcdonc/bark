@@ -179,6 +179,46 @@ void main() {
     });
   });
 
+  group('AuthService JWT claims', () {
+    String makeJwt(Map<String, dynamic> payload) {
+      final header = base64Url
+          .encode(utf8.encode(jsonEncode({'alg': 'HS256', 'typ': 'JWT'})))
+          .replaceAll('=', '');
+      final body = base64Url
+          .encode(utf8.encode(jsonEncode(payload)))
+          .replaceAll('=', '');
+      return '$header.$body.fakesig';
+    }
+
+    test('email returns email from JWT payload', () async {
+      final token = makeJwt({
+        'sub': 'user-1',
+        'email': 'alice@example.com',
+        'roles': ['user'],
+      });
+      SharedPreferences.setMockInitialValues({'bark_jwt': token});
+      final service = AuthService();
+      await Future.delayed(Duration.zero);
+      expect(service.email, 'alice@example.com');
+    });
+
+    test('email returns null when not in payload', () async {
+      final token = makeJwt({
+        'sub': 'user-1',
+        'roles': ['user']
+      });
+      SharedPreferences.setMockInitialValues({'bark_jwt': token});
+      final service = AuthService();
+      await Future.delayed(Duration.zero);
+      expect(service.email, isNull);
+    });
+
+    test('email returns null when not logged in', () {
+      final service = AuthService();
+      expect(service.email, isNull);
+    });
+  });
+
   group('AuthService authenticated requests', () {
     test('authGet clears token on 401', () async {
       testAuthHttpClientOverride = MockClient((request) async {

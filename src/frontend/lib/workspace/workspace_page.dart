@@ -239,6 +239,16 @@ class _WorkspacePageState extends State<WorkspacePage> {
           ),
         ),
         actions: [
+          if (context.watch<AuthService>().email != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Center(
+                child: Text(
+                  context.watch<AuthService>().email!,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.logout, color: Color(0xFF1A237E)),
             tooltip: 'Logout',

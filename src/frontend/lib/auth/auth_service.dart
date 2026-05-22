@@ -41,6 +41,7 @@ class AuthService extends ChangeNotifier {
   }
 
   String? get userId => _payload?['sub'] as String?;
+  String? get email => _payload?['email'] as String?;
   List<String> get roles =>
       List<String>.from(_payload?['roles'] as List? ?? []);
   bool get isAdmin => roles.contains('admin');
