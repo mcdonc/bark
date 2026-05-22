@@ -531,7 +531,7 @@ test.describe("Bark E2E", () => {
     }
   });
 
-  test("container starts on workspace open and stops on navigate away", async ({
+  test("container starts on workspace open and survives navigate away", async ({
     page,
     request,
   }) => {
@@ -552,24 +552,19 @@ test.describe("Bark E2E", () => {
       // to be running when it returns.
       await openWorkspace(page, email, workspaceId);
 
-      expect(dockerContainersForWorkspace(workspaceId).length).toBeGreaterThan(
-        0,
-      );
+      const containersBefore = dockerContainersForWorkspace(workspaceId);
+      expect(containersBefore.length).toBeGreaterThan(0);
 
       // Navigate away (click back button)
       await flutterClick(page, 25, 28);
       await expect(page).toHaveTitle(/Workspaces/i, { timeout: 30_000 });
 
-      // Wait for container to stop (poll up to 30s)
-      let stopped = false;
-      for (let i = 0; i < 30; i++) {
-        if (dockerContainersForWorkspace(workspaceId).length === 0) {
-          stopped = true;
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      expect(stopped).toBeTruthy();
+      // Container should still be running after navigating away
+      // (idle timeout handles cleanup, not disconnect)
+      await page.waitForTimeout(3000);
+      const containersAfter = dockerContainersForWorkspace(workspaceId);
+      expect(containersAfter.length).toBe(1);
+      expect(containersAfter[0]).toBe(containersBefore[0]);
     } finally {
       await cleanup();
     }
