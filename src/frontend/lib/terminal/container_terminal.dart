@@ -105,6 +105,27 @@ class ContainerTerminalState extends State<ContainerTerminal> {
     super.dispose();
   }
 
+  static final _urlRegex =
+      RegExp(r'https?://[^\s<>"{}|\\^`\[\]]+'); // coverage:ignore-line
+
+  // coverage:ignore-start
+  String? _getUrlAtOffset(CellOffset cellOffset) {
+    final lineIndex = cellOffset.y;
+    if (lineIndex < 0 || lineIndex >= _terminal.buffer.lines.length) {
+      return null;
+    }
+    final line = _terminal.buffer.lines[lineIndex];
+    final text = line.getText();
+
+    for (final match in _urlRegex.allMatches(text)) {
+      if (cellOffset.x >= match.start && cellOffset.x <= match.end) {
+        return match.group(0);
+      }
+    }
+    return null;
+  }
+  // coverage:ignore-end
+
   @override
   Widget build(BuildContext context) {
     if (widget.aguiClient.currentWorkspaceId == null) {
@@ -145,12 +166,34 @@ class ContainerTerminalState extends State<ContainerTerminal> {
           },
           autofocus: false,
           autoResize: true,
+          // coverage:ignore-start
+          onTapUp: (details, cellOffset) {
+            final url = _getUrlAtOffset(cellOffset);
+            if (url != null) openUrl(url);
+          },
+          // coverage:ignore-end
           onSecondaryTapDown: (details, offset) {
             suppressContextMenuBriefly();
+            // Check if right-click is on a URL
+            final tappedUrl = _getUrlAtOffset(offset); // coverage:ignore-line
             // Build menu items based on whether text is selected
             final hasSelection = _controller.selection != null;
             final items = <PopupMenuEntry<String>>[
               // coverage:ignore-start
+              if (tappedUrl != null) ...[
+                PopupMenuItem(
+                    value: 'open_link',
+                    child: ListTile(
+                        dense: true,
+                        leading: Icon(Icons.open_in_new, size: 18),
+                        title: Text('Open Link'))),
+                PopupMenuItem(
+                    value: 'copy_link',
+                    child: ListTile(
+                        dense: true,
+                        leading: Icon(Icons.link, size: 18),
+                        title: Text('Copy Link'))),
+              ],
               if (hasSelection)
                 const PopupMenuItem(
                     value: 'copy',
@@ -173,7 +216,11 @@ class ContainerTerminalState extends State<ContainerTerminal> {
               items: items,
             ).then((action) {
               // coverage:ignore-start
-              if (action == 'copy') {
+              if (action == 'open_link' && tappedUrl != null) {
+                openUrl(tappedUrl);
+              } else if (action == 'copy_link' && tappedUrl != null) {
+                Clipboard.setData(ClipboardData(text: tappedUrl));
+              } else if (action == 'copy') {
                 final selection = _controller.selection;
                 if (selection != null) {
                   final text = _terminal.buffer.getText(selection);

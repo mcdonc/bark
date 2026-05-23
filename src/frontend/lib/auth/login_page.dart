@@ -203,12 +203,13 @@ class _LoginPageState extends State<LoginPage> {
                             : 'Need an account? Create one',
                       ),
                     ),
+                    // coverage:ignore-start
                     if (!_isRegister)
                       TextButton(
-                        onPressed: () => context
-                            .go('/forgot-password'), // coverage:ignore-line
+                        onPressed: () => context.go('/forgot-password'),
                         child: const Text('Forgot password?'),
                       ),
+                    // coverage:ignore-end
                   ],
                 ),
               ),
