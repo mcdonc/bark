@@ -126,7 +126,7 @@
     devenv processes down --no-tui 2>/dev/null || true
     sleep 1
     echo "Starting..."
-    devenv up --no-tui "$@"
+    exec devenv up --no-tui "$@"
   '';
 
   scripts.rebuild.exec = ''
