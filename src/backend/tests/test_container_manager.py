@@ -372,7 +372,7 @@ class TestStartContainer:
         call_kwargs = mock_docker.containers.create_or_replace.call_args
         env = call_kwargs[1]["config"]["Env"]
         env_dict = dict(e.split("=", 1) for e in env)
-        assert env_dict["LLM_BASE_URL"] == (
+        assert env_dict["LLM_PROXY_URL"] == (
             "http://host.docker.internal:8995/llm-proxy"
         )
         assert env_dict["LLM_MODEL"] == "gemma4:31b"

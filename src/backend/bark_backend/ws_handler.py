@@ -523,12 +523,14 @@ async def handle_terminal_start(ws: WebSocket, state: dict, msg: dict) -> None:
     rows = msg.get("rows", 24)
     session = TerminalSession(container_id)
     await session.start(cols, rows)
-    # Clear the screen to hide the double-prompt on startup
-    await session.write("clear\n")
     state["terminal_session"] = session
     state["terminal_task"] = asyncio.create_task(
         forward_terminal_output(ws, session, state)
     )
+    # Clear the screen to hide the double-prompt on startup.
+    # Sent directly to the frontend (not stdin) so it works even while
+    # bash.bashrc is waiting for the entrypoint to finish.
+    await ws.send_json({"type": "terminal_output", "data": "\x1b[2J\x1b[H"})
     container_manager.record_activity(container_id)
 
 

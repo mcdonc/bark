@@ -145,7 +145,7 @@ async def start_container(
     nginx_port = env_util.resolve_env_secret("BARK_NGINX_PORT", "8995")
     proxy_url = f"http://host.docker.internal:{nginx_port}/llm-proxy"
     ollama_model = env_util.resolve_env_secret("OLLAMA_MODEL", "")
-    env_vars.append(f"LLM_BASE_URL={proxy_url}")
+    env_vars.append(f"LLM_PROXY_URL={proxy_url}")
     if ollama_model:
         env_vars.append(f"LLM_MODEL={ollama_model}")
     env_vars.append("PI_SKIP_VERSION_CHECK=1")
