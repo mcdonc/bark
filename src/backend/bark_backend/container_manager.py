@@ -166,6 +166,12 @@ async def start_container(
             f"OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer {logfire_token}"
         )
         env_vars.append("OTEL_SERVICE_NAME=bark-pi-agent")
+        logfire_env = env_util.resolve_env_secret("LOGFIRE_ENVIRONMENT")
+        if logfire_env:
+            env_vars.append(
+                f"OTEL_RESOURCE_ATTRIBUTES="
+                f"deployment.environment={logfire_env}"
+            )
 
     # Tell the container the port mappings (container_port:host_port pairs)
     mappings = [

@@ -78,7 +78,13 @@ def setup_logfire(app: FastAPI) -> bool:
     import logfire
 
     base_url = resolve_env_secret("LOGFIRE_BASE_URL")
-    logfire.configure(base_url=base_url) if base_url else logfire.configure()
+    environment = resolve_env_secret("LOGFIRE_ENVIRONMENT")
+    kwargs: dict = {}
+    if base_url:
+        kwargs["base_url"] = base_url
+    if environment:
+        kwargs["environment"] = environment
+    logfire.configure(**kwargs)
     logfire.instrument_fastapi(app)
     logger.info("Logfire instrumentation enabled")
     return True

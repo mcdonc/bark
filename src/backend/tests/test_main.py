@@ -147,10 +147,25 @@ class TestSetupLogfire:
 
     def test_with_token_instruments_app(self, monkeypatch):
         monkeypatch.setenv("LOGFIRE_TOKEN", "test-token")
+        monkeypatch.delenv("LOGFIRE_BASE_URL", raising=False)
+        monkeypatch.delenv("LOGFIRE_ENVIRONMENT", raising=False)
         mock_logfire = MagicMock()
         with patch.dict("sys.modules", {"logfire": mock_logfire}):
             app = FastAPI()
             result = main.setup_logfire(app)
         assert result is True
-        mock_logfire.configure.assert_called_once()
+        mock_logfire.configure.assert_called_once_with()
         mock_logfire.instrument_fastapi.assert_called_once_with(app)
+
+    def test_with_base_url_and_environment(self, monkeypatch):
+        monkeypatch.setenv("LOGFIRE_TOKEN", "test-token")
+        monkeypatch.setenv("LOGFIRE_BASE_URL", "https://custom.logfire")
+        monkeypatch.setenv("LOGFIRE_ENVIRONMENT", "staging")
+        mock_logfire = MagicMock()
+        with patch.dict("sys.modules", {"logfire": mock_logfire}):
+            app = FastAPI()
+            main.setup_logfire(app)
+        mock_logfire.configure.assert_called_once_with(
+            base_url="https://custom.logfire",
+            environment="staging",
+        )

@@ -360,6 +360,7 @@ All settings can be overridden in `.env`. Defaults (where appropriate) are provi
 | `BARK_SENDMAIL_PATH`        | `sendmail`                           | Path to sendmail binary (used when BARK_SMTP_HOST is not set)                                                                                             |
 | `LOGFIRE_TOKEN`             |                                      | Pydantic Logfire write token (opt-in)                                                                                                                     |
 | `LOGFIRE_BASE_URL`          | `https://logfire-api.pydantic.dev`   | Logfire API base URL (for self-hosted instances)                                                                                                          |
+| `LOGFIRE_ENVIRONMENT`       |                                      | Logfire environment tag (e.g., `production`, `staging`) — filters traces in the dashboard. Also passed to containers via `OTEL_RESOURCE_ATTRIBUTES`.      |
 
 ### Ports
 
