@@ -60,6 +60,18 @@
         "${config.env.BARK_PLUGINS_DIR}/plugins.lock"
       ];
     };
+    "bark:kill-containers" = {
+      exec = ''
+        docker ps -a --filter "label=bark.instance=''${BARK_INSTANCE_ID}" -q | xargs -r docker rm -f
+      '';
+    };
+    "bark:kill-port-holders" = {
+      exec = ''
+        for port in $BARK_PORT $BARK_NGINX_PORT; do
+          fuser -k "$port/tcp" 2>/dev/null || true
+        done
+      '';
+    };
   };
 
   processes = {
@@ -70,6 +82,8 @@
       after = [
         "bark:flutter-build"
         "bark:docker-build"
+        "bark:kill-containers"
+        "bark:kill-port-holders"
       ];
     };
     nginx = {
@@ -77,6 +91,7 @@
       after = [
         "bark:flutter-build"
         "bark:docker-build"
+        "bark:kill-port-holders"
       ];
     };
   };
@@ -104,6 +119,14 @@
 
   scripts.kill-containers.exec = ''
     docker ps -a --filter "label=bark.instance=''${BARK_INSTANCE_ID}" -q | xargs -r docker rm -f
+  '';
+
+  scripts.restart.exec = ''
+    echo "Stopping devenv processes..."
+    devenv processes down --no-tui 2>/dev/null || true
+    sleep 1
+    echo "Starting..."
+    devenv up --no-tui "$@"
   '';
 
   scripts.rebuild.exec = ''
