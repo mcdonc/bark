@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fd-find \
     ripgrep \
     jq \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI (not in default Debian repos)

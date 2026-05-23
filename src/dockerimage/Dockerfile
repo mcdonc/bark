@@ -9,8 +9,8 @@ RUN mkdir -p /opt/bark/pi-agent/extensions
 COPY --from=plugin-extensions / /opt/bark/pi-agent/extensions/
 COPY builtin-extensions/ /opt/bark/pi-agent/extensions/
 
-# Install npm-based Pi extensions via pi install (writes to global npm prefix
-# and records packages in settings.json for Pi to discover at runtime)
+# Install npm-based Pi extensions globally via pi install.
+# Records packages in settings.json for Pi to discover at runtime.
 RUN PI_CODING_AGENT_DIR=/opt/bark/pi-agent pi install npm:pi-subagents \
     && PI_CODING_AGENT_DIR=/opt/bark/pi-agent pi install npm:@wirebabel/pi-web-access \
     && PI_CODING_AGENT_DIR=/opt/bark/pi-agent pi install npm:pi-otel-telemetry

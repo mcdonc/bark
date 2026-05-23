@@ -23,6 +23,10 @@ for d in "$BARK_PLUGINS_DIR"/*/; do
   fi
 done
 
+# Pull latest base image so builds pick up changes without --no-cache
+BASE_IMAGE=$(grep '^FROM ' src/dockerimage/Dockerfile | awk '{print $2}')
+docker pull "$BASE_IMAGE" 2>/dev/null || true
+
 # Remove old containers before rebuilding so they get recreated from the new image
 docker ps -a --filter "label=bark.instance=${BARK_INSTANCE_ID}" -q | xargs -r docker rm -f
 

@@ -5,7 +5,8 @@
 # --- Root phase: fix bind-mount ownership, then drop to bark ---
 if [ "$(id -u)" = "0" ]; then
   chown bark:bark /home/bark /work
-  exec su bark -s /bin/sh "$0" -- "$@"
+  # gosu execs directly (unlike su, which stays resident in the process list)
+  exec gosu bark "$0" "$@"
 fi
 
 # --- bark phase: all setup runs as bark, no root-owned files ---

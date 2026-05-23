@@ -1,6 +1,7 @@
 # TODO
 
 - **Lock npm extension versions**: The `pi install npm:pi-subagents` commands in the Dockerfile install whatever `latest` resolves to at build time, with no lock file. Pin to specific versions (e.g., `pi install npm:pi-subagents@0.25.0`) or find a way to lock versions so builds are reproducible.
+- **Rate-limit login attempts**: Add brute-force protection to the `/auth/login` endpoint. Track failed attempts per IP or email and temporarily lock out after N failures (e.g., 5 attempts in 5 minutes → 15 minute lockout). Consider using an in-memory store or SQLite table for attempt tracking.
 - **Stop button not showing during agent runs**: The chat send button should switch to a red stop button while the agent is running, but sometimes stays green for the entire 40+ second turn. The `_agentRunning` state is toggled by `runStarted`/`runFinished` AG-UI events — investigate whether the `runStarted` event is arriving late or not at all.
 
 - **Local files pane**: Add a browser-side file pane where users can upload files into an in-browser-memory filesystem (e.g., using the File System Access API or an in-memory store). These files would be accessible to client-side plugins and could be passed to the REPL as context without uploading to the server. Useful for working with sensitive files that shouldn't leave the browser, or for quick one-off analysis without persisting to the workspace.
