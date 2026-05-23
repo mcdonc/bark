@@ -37,3 +37,4 @@
 - **Configurable minimum password length**: The minimum password length (4 characters) is hardcoded in the register and reset-password endpoints. Make it configurable via an env var (e.g., `BARK_MIN_PASSWORD_LENGTH`).
 - **Require 100% Dart test coverage**: Add coverage enforcement to the frontend test runner (like the backend has) so untested Dart code is caught before commit.
 - **Use POST body instead of query string for tokens**: The /auth/verify endpoint passes the token as a query parameter (?token=...), which may be logged in server access logs or browser history. Consider using POST with the token in the request body instead.
+- **Shared app bar actions widget**: The settings, admin, and logout icons are duplicated across workspace_list_page, workspace_page, and settings_page. Extract a shared widget (e.g., `AppBarActions`) that renders the common icons based on auth state.
