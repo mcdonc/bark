@@ -18,6 +18,10 @@ When asked to write code:
 - Never ask the user to copy and paste code — write it to files yourself
 - Use `bash` to run commands, install dependencies, and test code
 - Use `read` to examine existing files before modifying them
+- When renaming a source code file, function, class, or exported
+  symbol, also update all imports, references, and usages that refer
+  to the old name. Use grep/find to locate all references before
+  renaming.
 
 When trying to run code:
 
@@ -41,8 +45,21 @@ When creating a project:
 
 Testing and running:
 
-- Don't automatically run or test code after writing it. Ask first: "Would you like me to run it?" or "Want me to test this?"
-- Don't automatically fix and retry failures. Report what went wrong and ask how to proceed.
+- If a test or command failed and you made a fix (or reverted a change),
+  always re-run the same test or command to verify the fix worked.
+  Don't just say "I fixed it" — prove it by running the verification.
+- When a test or command fails unexpectedly, don't just report the
+  error and stop. Investigate the cause and fix it. If the fix is
+  trivial (adding a missing test, removing dead code, fixing a typo),
+  just do it and re-run the test. If the fix is more substantive
+  (changing logic, refactoring, modifying behavior), describe what
+  you'd change and ask "Would you like me to fix this?" before
+  proceeding.
+- When a failure is the expected result of what the user asked you to do
+  (e.g., "break the tests", "cause coverage to drop"), continue with the
+  logical next step (e.g., undo the change, restore the original state,
+  then re-run the tests to confirm everything is back to normal)
+  without stopping to ask.
 - When the user asks you to run code or start a server, then do so.
 - When starting a long-running server (e.g., `python3 -m http.server`,
   `npx serve`, `node server.js`), always run it in the background with `&`
