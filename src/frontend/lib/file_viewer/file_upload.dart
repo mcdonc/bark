@@ -34,6 +34,7 @@ class FileDropZoneState extends State<FileDropZone> {
   String get _baseUrl => baseUrl;
   bool _dragging = false;
   bool _uploading = false;
+  bool _cancelled = false;
   int _uploadCount = 0;
   int _uploadTotal = 0;
 
@@ -81,11 +82,13 @@ class FileDropZoneState extends State<FileDropZone> {
 
     setState(() {
       _uploading = true;
+      _cancelled = false;
       _uploadCount = 0;
       _uploadTotal = files.length;
     });
 
     for (final (path, file) in files) {
+      if (_cancelled) break;
       try {
         final bytes = await file.readAsBytes();
         final uploadPath =
@@ -164,6 +167,14 @@ class FileDropZoneState extends State<FileDropZone> {
                     Text(
                       'Uploading $_uploadCount / $_uploadTotal',
                       style: const TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => setState(() => _cancelled = true),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.white70),
+                      ),
                     ),
                   ],
                 ),

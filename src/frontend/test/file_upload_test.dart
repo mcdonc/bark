@@ -279,6 +279,47 @@ void main() {
         expect(completed, isTrue);
       });
 
+      testWidgets('cancel stops remaining uploads', (tester) async {
+        final uploaded = <String>[];
+        final key = GlobalKey<FileDropZoneState>();
+        final firstCompleter = Completer<int>();
+
+        var callCount = 0;
+        testUploadOverride = (url, headers, filename, bytes) async {
+          callCount++;
+          if (callCount == 1) {
+            return firstCompleter.future;
+          }
+          uploaded.add(filename);
+          return 200;
+        };
+
+        await tester.pumpWidget(buildDropZone(key: key));
+
+        final files = [
+          makeFile('a.txt', [1]),
+          makeFile('b.txt', [2]),
+          makeFile('c.txt', [3]),
+        ];
+        key.currentState!.uploadFiles(makeDropDetails(files));
+        await tester.pump();
+
+        // Cancel button should be visible
+        expect(find.text('Cancel'), findsOneWidget);
+
+        // Tap cancel
+        await tester.tap(find.text('Cancel'));
+        await tester.pump();
+
+        // Complete the first upload
+        firstCompleter.complete(200);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+
+        // Only the first file should have been processed; b and c skipped
+        expect(uploaded, isEmpty);
+      });
+
       testWidgets('handles upload exception gracefully', (tester) async {
         bool completed = false;
         final key = GlobalKey<FileDropZoneState>();
