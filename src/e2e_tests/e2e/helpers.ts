@@ -36,6 +36,16 @@ export async function loginViaUI(page: Page, email: string, password: string) {
   const cx = width / 2;
   const f = fv(page);
 
+  // The "Enable accessibility" button (if present) can cover the center of
+  // the screen and intercept our login field clicks. Dismiss it first if visible.
+  const accessibilityBtn = page.locator("button", {
+    hasText: "Enable accessibility",
+  });
+  if (await accessibilityBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await accessibilityBtn.click();
+    await page.waitForTimeout(300);
+  }
+
   await f.click({ position: { x: cx, y: height * 0.52 }, force: true });
   await page.waitForTimeout(200);
   await page.keyboard.type(email);

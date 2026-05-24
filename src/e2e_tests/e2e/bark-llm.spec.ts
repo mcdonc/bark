@@ -11,7 +11,7 @@ import {
 // Retries up to 3 times to handle intermittent LLM response failures.
 
 test.describe("Bark LLM", () => {
-  test.describe.configure({ retries: 3 });
+  test.describe.configure({ retries: 3, mode: "serial" });
 
   test("get_hosted_url returns a hosted URL", async ({ page, request }) => {
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
