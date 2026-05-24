@@ -39,11 +39,12 @@ http {
 
     # LLM proxy: forward to the real LLM endpoint with API key injected.
     # Containers hit this instead of the real endpoint, so they never
-    # see the API key. Restricted to Docker subnets only.
+    # see the API key. Restricted to Docker subnets and localhost only.
     location /llm-proxy/ {
       allow 172.16.0.0/12;
       allow 192.168.0.0/16;
       allow 10.0.0.0/8;
+      allow 127.0.0.1;
       deny all;
       proxy_pass ${LLM_BASE_URL}/;
       proxy_set_header Authorization "Bearer ${LLM_API_KEY}";
