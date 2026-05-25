@@ -128,6 +128,28 @@ class TestAuth:
         assert cfg.auth.token == "jwt456"
         assert cfg.auth.email == "cli@test.com"
 
+    def test_login_with_password_file(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "cli.toml"
+        monkeypatch.setattr(
+            "bark_backend.cli.config._CONFIG_PATH", config_path
+        )
+        pw_file = tmp_path / "pw.txt"
+        pw_file.write_text("file-secret\n")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"access_token": "jwt789"}
+        with patch("httpx.post", return_value=mock_resp):
+            from bark_backend.cli import auth
+
+            auth.login(
+                "http://localhost:8997",
+                email="pw@test.com",
+                password=pw_file.read_text().strip(),
+            )
+        cfg = CLIConfig.load()
+        assert cfg.auth.token == "jwt789"
+        assert cfg.auth.email == "pw@test.com"
+
     def test_login_reuses_valid_token(self, tmp_path, monkeypatch):
         config_path = tmp_path / "cli.toml"
         monkeypatch.setattr(

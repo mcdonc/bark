@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 import asyncio
+from pathlib import Path
 
 import httpx
 import typer
@@ -61,11 +62,24 @@ def login_cmd(
         "--server",
         help="Bark server URL (e.g. http://localhost:8997)",
     ),
+    password_file: str | None = typer.Option(
+        None,
+        "--password-file",
+        help="Read password from file (use - for stdin)",
+    ),
 ) -> None:
     """Authenticate with the Bark server."""
     if server is None:  # pragma: no cover
         server = _cfg().server.url
-    login(server, email=email)
+    password = None
+    if password_file is not None:
+        if password_file == "-":
+            import sys
+
+            password = sys.stdin.readline().rstrip("\n")
+        else:
+            password = Path(password_file).read_text().strip()
+    login(server, email=email, password=password)
 
 
 @app.command()

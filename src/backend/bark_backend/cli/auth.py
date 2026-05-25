@@ -13,7 +13,11 @@ _err = Console(stderr=True)
 _out = Console()
 
 
-def login(server_url: str, email: str | None = None) -> None:
+def login(
+    server_url: str,
+    email: str | None = None,
+    password: str | None = None,
+) -> None:
     """Prompt for credentials, store JWT in config."""
     cfg = CLIConfig.load()
 
@@ -35,7 +39,7 @@ def login(server_url: str, email: str | None = None) -> None:
             pass  # Token invalid or server unreachable — fall through to prompt
 
     email = email or Prompt.ask("[bold]Email[/bold]")
-    password = Prompt.ask("[bold]Password[/bold]", password=True)
+    password = password or Prompt.ask("[bold]Password[/bold]", password=True)
 
     resp = httpx.post(
         f"{server_url}/auth/login",

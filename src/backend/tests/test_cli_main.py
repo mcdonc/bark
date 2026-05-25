@@ -60,10 +60,56 @@ class TestMainCLI:
                 "bark_backend.cli.auth.Prompt.ask",
                 side_effect=["u@test.com", "pw"],
             ):
-                login_cmd(email=None, server="http://localhost:8997")
+                login_cmd(
+                    email=None,
+                    server="http://localhost:8997",
+                    password_file=None,
+                )
         cfg = CLIConfig.load()
         assert cfg.auth.token == "new-token"
         assert cfg.auth.email == "u@test.com"
+
+    def test_login_cmd_with_password_file(self, tmp_path, monkeypatch):
+        from bark_backend.cli.main import login_cmd
+
+        config_path = tmp_path / "cli.toml"
+        monkeypatch.setattr(
+            "bark_backend.cli.config._CONFIG_PATH", config_path
+        )
+        pw_file = tmp_path / "pw.txt"
+        pw_file.write_text("file-pw\n")
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"access_token": "file-token"}
+        with patch("httpx.post", return_value=mock_resp):
+            login_cmd(
+                email="file@test.com",
+                server="http://localhost:8997",
+                password_file=str(pw_file),
+            )
+        cfg = CLIConfig.load()
+        assert cfg.auth.token == "file-token"
+
+    def test_login_cmd_with_password_stdin(self, tmp_path, monkeypatch):
+        from bark_backend.cli.main import login_cmd
+
+        config_path = tmp_path / "cli.toml"
+        monkeypatch.setattr(
+            "bark_backend.cli.config._CONFIG_PATH", config_path
+        )
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"access_token": "stdin-token"}
+        with patch("httpx.post", return_value=mock_resp):
+            with patch("sys.stdin") as mock_stdin:
+                mock_stdin.readline.return_value = "stdin-pw\n"
+                login_cmd(
+                    email="stdin@test.com",
+                    server="http://localhost:8997",
+                    password_file="-",
+                )
+        cfg = CLIConfig.load()
+        assert cfg.auth.token == "stdin-token"
 
     def test_require_auth_raises_when_not_logged_in(
         self, tmp_path, monkeypatch
