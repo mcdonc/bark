@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from io import BytesIO
 
@@ -105,6 +106,89 @@ class TestAuth:
         cfg = CLIConfig.load()
         assert cfg.auth.token == "jwt123"
         assert cfg.auth.email == "u@test.com"
+
+    def test_login_reuses_valid_token(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "cli.toml"
+        monkeypatch.setattr(
+            "bark_backend.cli.config._CONFIG_PATH", config_path
+        )
+        # Save a config with an existing token
+        cfg = CLIConfig()
+        cfg.server.url = "http://localhost:8997"
+        cfg.auth.token = "existing-token"
+        cfg.auth.email = "saved@test.com"
+        cfg.save()
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        with patch("httpx.get", return_value=mock_resp):
+            from bark_backend.cli import auth
+
+            auth.login("http://localhost:8997")
+
+        # Token should be unchanged — no prompt was shown
+        loaded = CLIConfig.load()
+        assert loaded.auth.token == "existing-token"
+        assert loaded.auth.email == "saved@test.com"
+
+    def test_login_network_error_falls_through(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "cli.toml"
+        monkeypatch.setattr(
+            "bark_backend.cli.config._CONFIG_PATH", config_path
+        )
+        cfg = CLIConfig()
+        cfg.server.url = "http://localhost:8997"
+        cfg.auth.token = "old-token"
+        cfg.auth.email = "old@test.com"
+        cfg.save()
+
+        # GET raises network error, then POST succeeds
+        post_resp = MagicMock()
+        post_resp.status_code = 200
+        post_resp.json.return_value = {"access_token": "fresh"}
+        with patch("httpx.get", side_effect=httpx.ConnectError("unreachable")):
+            with patch("httpx.post", return_value=post_resp):
+                with patch(
+                    "bark_backend.cli.auth.Prompt.ask",
+                    side_effect=["new@test.com", "pw"],
+                ):
+                    from bark_backend.cli import auth
+
+                    auth.login("http://localhost:8997")
+
+        loaded = CLIConfig.load()
+        assert loaded.auth.token == "fresh"
+
+    def test_login_expired_token_prompts(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "cli.toml"
+        monkeypatch.setattr(
+            "bark_backend.cli.config._CONFIG_PATH", config_path
+        )
+        cfg = CLIConfig()
+        cfg.server.url = "http://localhost:8997"
+        cfg.auth.token = "expired-token"
+        cfg.auth.email = "old@test.com"
+        cfg.save()
+
+        # GET returns 401 (expired), then POST succeeds with new token
+        get_resp = MagicMock()
+        get_resp.status_code = 401
+        post_resp = MagicMock()
+        post_resp.status_code = 200
+        post_resp.json.return_value = {"access_token": "new-token"}
+        with patch("httpx.get", return_value=get_resp):
+            with patch("httpx.post", return_value=post_resp):
+                with patch(
+                    "bark_backend.cli.auth.Prompt.ask",
+                    side_effect=["new@test.com", "pw"],
+                ):
+                    from bark_backend.cli import auth
+
+                    auth.login("http://localhost:8997")
+
+        loaded = CLIConfig.load()
+        assert loaded.auth.token == "new-token"
+        assert loaded.auth.email == "new@test.com"
 
     def test_login_failure(self, tmp_path, monkeypatch):
         config_path = tmp_path / "cli.toml"

@@ -3,16 +3,37 @@
 from __future__ import annotations
 
 
-import logging
-
 import httpx
+from rich.console import Console
 from rich.prompt import Prompt
 
 from .config import CLIConfig
 
+_err = Console(stderr=True)
+_out = Console()
+
 
 def login(server_url: str) -> None:
     """Prompt for credentials, store JWT in config."""
+    cfg = CLIConfig.load()
+
+    # If we already have a token for this server, verify it first.
+    if cfg.auth.token and cfg.server.url == server_url:
+        try:
+            resp = httpx.get(
+                f"{server_url}/workspaces",
+                headers={"Authorization": f"Bearer {cfg.auth.token}"},
+                timeout=5.0,
+            )
+            if resp.status_code == 200:
+                _out.print(
+                    f"Already logged in as"
+                    f" [bold]{cfg.auth.email or 'unknown'}[/bold]"
+                )
+                return
+        except httpx.HTTPError:
+            pass  # Token invalid or server unreachable — fall through to prompt
+
     email = Prompt.ask("[bold]Email[/bold]")
     password = Prompt.ask("[bold]Password[/bold]", password=True)
 
@@ -23,17 +44,16 @@ def login(server_url: str) -> None:
     )
     if resp.status_code != 200:
         detail = resp.json().get("detail", resp.text)
-        logging.error("Login failed: %s", detail)
+        _err.print(f"[red]Login failed:[/red] {detail}")
         raise SystemExit(1)
 
     token = resp.json()["access_token"]
 
-    cfg = CLIConfig.load()
     cfg.server.url = server_url
     cfg.auth.token = token
     cfg.auth.email = email
     cfg.save()
-    logging.info("Logged in as %s", email)
+    _out.print(f"Logged in as [bold]{email}[/bold]")
 
 
 def logout() -> None:
@@ -52,10 +72,11 @@ def logout() -> None:
                 timeout=5.0,
             )
         except httpx.HTTPError:
-            logging.warning(
-                "Logged out locally — server logout failed (network error)"
+            _err.print(
+                "[yellow]Logged out locally[/yellow]"
+                " — server logout failed (network error)"
             )
             return
     else:
         cfg.save()
-    logging.info("Logged out")
+    _out.print("Logged out")
