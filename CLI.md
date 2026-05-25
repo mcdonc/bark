@@ -135,7 +135,17 @@ email = "admin@example.com"
 - Upload uses the existing REST file upload API (`POST /workspaces/{id}/files/upload`)
 - Download uses the existing download API (`GET /workspaces/{id}/files/download`); for directories the backend returns a zip — the CLI automatically unzips it to the local destination
 
-### Phase 6 (future): Local Docker exec optimization
+### Phase 6 (future): File sync via rsync transport
+
+- `bark transport` command that acts as an rsync transport (like `ssh` in `rsync -e ssh`)
+- Usage: `rsync -avz -e "bark transport" ~/foo my-workspace:/bar`
+- Transport connects to Bark backend via WebSocket, spawns `docker exec rsync --server ...` in the target container, pipes stdin/stdout over the WebSocket
+- Backend needs a new raw exec WebSocket message type (like `terminal_start` but without PTY — raw byte stream)
+- Container image needs `rsync` installed
+- Works locally and remotely through the same WebSocket path — no SSH required
+- rsync handles all diffing, compression, and incremental transfer
+
+### Phase 7 (future): Local Docker exec optimization
 
 - Detect when backend is local
 - Use `docker exec` directly instead of WebSocket PTY for native performance
