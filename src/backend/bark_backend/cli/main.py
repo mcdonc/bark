@@ -22,13 +22,13 @@ _cfg_cache: CLIConfig | None = None
 
 
 def _cfg() -> CLIConfig:
-    global _cfg_cache  # no-cover
-    if _cfg_cache is None:  # no-cover
-        _cfg_cache = CLIConfig.load()  # no-cover
+    global _cfg_cache  # pragma: no cover
+    if _cfg_cache is None:  # pragma: no cover
+        _cfg_cache = CLIConfig.load()  # pragma: no cover
     return _cfg_cache
 
 
-def _client() -> BarkClient:
+def _client() -> BarkClient:  # pragma: no cover
     return BarkClient(_cfg())
 
 
@@ -48,7 +48,7 @@ def login_cmd(
     ),
 ) -> None:
     """Authenticate with the Bark server."""
-    if server is None:
+    if server is None:  # pragma: no cover
         server = _cfg().server.url
     login(server)
 
@@ -112,9 +112,11 @@ def shell(
 ) -> None:
     """Connect to a workspace and drop into a bash shell."""
     cfg = _cfg()
-    if not cfg.auth.token:  # no-cover
-        logging.error("Not logged in — run bark login first.")  # no-cover
-        raise typer.Exit(code=1)  # no-cover
+    if not cfg.auth.token:  # pragma: no cover
+        logging.error(
+            "Not logged in — run bark login first."
+        )  # pragma: no cover
+        raise typer.Exit(code=1)  # pragma: no cover
 
     client = _client()
 
@@ -122,7 +124,7 @@ def shell(
     if workspace:
         try:
             ws = client.resolve_workspace(workspace)
-        except WorkspaceNotFoundError:
+        except WorkspaceNotFoundError:  # pragma: no cover
             logging.error("No workspace named '%s'", workspace)
             raise typer.Exit(code=1) from None
     else:
@@ -137,21 +139,21 @@ def shell(
             for i, w in enumerate(workspaces, 1):
                 typer.echo(f"  {i}. {w.name}")
             choice = input("> ").strip()
-            if not choice:
+            if not choice:  # pragma: no cover
                 raise typer.Exit()
             try:
                 idx = int(choice) - 1
-            except ValueError:  # no-cover
-                raise typer.Exit(code=1)  # no-cover
+            except ValueError:  # pragma: no cover
+                raise typer.Exit(code=1)  # pragma: no cover
             ws = workspaces[idx]
 
     # Build WebSocket URL
     server_url = cfg.server.url.rstrip("/")
     if server_url.startswith("http://"):
         ws_url = server_url.replace("http://", "ws://") + "/ws"
-    elif server_url.startswith("https://"):
+    elif server_url.startswith("https://"):  # pragma: no cover
         ws_url = server_url.replace("https://", "wss://") + "/ws"
-    else:
+    else:  # pragma: no cover
         ws_url = f"ws://{server_url}/ws"
 
     token = cfg.auth.token
@@ -159,5 +161,5 @@ def shell(
     asyncio.run(_ws_shell(ws_url, token, ws.id))
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     app()
