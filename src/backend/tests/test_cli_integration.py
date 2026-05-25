@@ -5,6 +5,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import websockets
 
 from bark_backend.cli.config import CLIConfig
 
@@ -150,6 +151,23 @@ class TestRunShell:
             await task
         except asyncio.CancelledError:
             pass
+
+    @pytest.mark.asyncio
+    async def test_stdout_loop_connection_closed(self):
+        from bark_backend.cli.client import _run_shell
+
+        ws = AsyncMock()
+        ws.recv = AsyncMock(
+            side_effect=websockets.ConnectionClosed(None, None)
+        )
+        task = asyncio.create_task(_run_shell(ws, 80, 24))
+        await asyncio.sleep(0.3)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        # Should not raise — ConnectionClosed is caught cleanly
 
     @pytest.mark.asyncio
     async def test_stdin_loop_broken_pipe(self):

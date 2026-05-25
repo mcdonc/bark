@@ -250,23 +250,26 @@ async def _run_shell(
             )
 
     async def stdout_loop() -> None:
-        while not stop_event.is_set():
-            msg = await ws.recv()
-            if isinstance(msg, bytes):
-                msg = msg.decode("utf-8", errors="replace")
-            data = json.loads(msg)
-            if data.get("type") == "terminal_output":
-                stdout.write(data["data"])
-                stdout.flush()
-            elif data.get("type") == "event":
-                event = data.get("event", {})
-                if (
-                    event.get("type") == "CUSTOM"
-                    and event.get("name") == "container_stopped"
-                ):
-                    logging.info("[container stopped]")
-                    stop_event.set()
-                    break
+        try:
+            while not stop_event.is_set():
+                msg = await ws.recv()
+                if isinstance(msg, bytes):
+                    msg = msg.decode("utf-8", errors="replace")
+                data = json.loads(msg)
+                if data.get("type") == "terminal_output":
+                    stdout.write(data["data"])
+                    stdout.flush()
+                elif data.get("type") == "event":
+                    event = data.get("event", {})
+                    if (
+                        event.get("type") == "CUSTOM"
+                        and event.get("name") == "container_stopped"
+                    ):
+                        logging.info("[container stopped]")
+                        stop_event.set()
+                        break
+        except websockets.ConnectionClosed:
+            logging.info("[connection lost]")
         stop_event.set()
 
     async def resize_loop() -> None:
