@@ -50,12 +50,15 @@ class PiRpcClient:
         """
         buf = b""
         try:
-            while self._running and self._proc and self._proc.stdout:
-                if self._proc.stdout.at_eof():
+            while self._running:
+                proc = self._proc
+                if not proc or not proc.stdout:  # pragma: no cover
                     break
-                if self._proc.returncode is not None:
+                if proc.stdout.at_eof():
                     break
-                chunk = await self._proc.stdout.read(65536)
+                if proc.returncode is not None:
+                    break
+                chunk = await proc.stdout.read(65536)
                 if not chunk:
                     break
                 buf += chunk
@@ -167,11 +170,13 @@ class PiRpcClient:
         The container and Pi stay alive so the user can reconnect
         (e.g. on page refresh). The orphaned docker attach process
         will be cleaned up when the container eventually stops.
+
+        Sets _running = False so read_loop exits naturally on its
+        next iteration.  Does not cancel the task or null _proc to
+        avoid racing with read_loop mid-iteration.
         """
         self._running = False
-        if self._read_task:
-            self._read_task.cancel()
-            self._read_task = None
+        self._read_task = None
         self._proc = None
 
     async def disconnect(self) -> None:
