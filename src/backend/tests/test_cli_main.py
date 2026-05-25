@@ -16,7 +16,7 @@ def logged_in_cfg(tmp_path, monkeypatch):
     config_path = tmp_path / "cli.toml"
     monkeypatch.setattr("bark_backend.cli.config._CONFIG_PATH", config_path)
     cfg = CLIConfig()
-    cfg.server.url = "http://localhost:8997"
+    cfg.server.url = "http://localhost:8995"
     cfg.auth.token = "test-token"
     cfg.auth.email = "test@example.com"
     cfg.save()
@@ -62,7 +62,7 @@ class TestMainCLI:
             ):
                 login_cmd(
                     email=None,
-                    server="http://localhost:8997",
+                    server="http://localhost:8995",
                     password_file=None,
                 )
         cfg = CLIConfig.load()
@@ -84,7 +84,7 @@ class TestMainCLI:
         with patch("httpx.post", return_value=mock_resp):
             login_cmd(
                 email="file@test.com",
-                server="http://localhost:8997",
+                server="http://localhost:8995",
                 password_file=str(pw_file),
             )
         cfg = CLIConfig.load()
@@ -105,7 +105,7 @@ class TestMainCLI:
                 mock_stdin.readline.return_value = "stdin-pw\n"
                 login_cmd(
                     email="stdin@test.com",
-                    server="http://localhost:8997",
+                    server="http://localhost:8995",
                     password_file="-",
                 )
         cfg = CLIConfig.load()
@@ -341,7 +341,7 @@ class TestMainCLI:
 
         main.status(plain=True)
         output = capsys.readouterr().out
-        assert "server=http://localhost:8997" in output
+        assert "server=http://localhost:8995" in output
         assert "user=test@example.com" in output
         assert "status=logged_in" in output
 

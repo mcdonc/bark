@@ -13,7 +13,7 @@ _CONFIG_PATH = Path.home() / ".config" / "bark" / "cli.toml"
 
 @dataclass
 class ServerConfig:
-    url: str = "http://localhost:8997"
+    url: str = "http://localhost:8995"
 
 
 @dataclass
@@ -35,7 +35,7 @@ class CLIConfig:
         data = tomllib.loads(text)
         return cls(
             server=ServerConfig(
-                url=data.get("server", {}).get("url", "http://localhost:8997")
+                url=data.get("server", {}).get("url", "http://localhost:8995")
             ),
             auth=AuthConfig(
                 token=data.get("auth", {}).get("token"),

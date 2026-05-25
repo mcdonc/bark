@@ -60,7 +60,7 @@ def login_cmd(
     server: str | None = typer.Option(
         None,
         "--server",
-        help="Bark server URL (e.g. http://localhost:8997)",
+        help="Bark server URL (e.g. http://localhost:8995)",
     ),
     password_file: str | None = typer.Option(
         None,

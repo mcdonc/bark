@@ -30,7 +30,7 @@ class TestCLIConfig:
             Path("/nonexistent/config.toml"),
         )
         cfg = CLIConfig.load()
-        assert cfg.server.url == "http://localhost:8997"
+        assert cfg.server.url == "http://localhost:8995"
         assert cfg.auth.token is None
         assert cfg.auth.email is None
 
@@ -102,7 +102,7 @@ class TestAuth:
             ):
                 from bark_backend.cli import auth
 
-                auth.login("http://localhost:8997")
+                auth.login("http://localhost:8995")
         cfg = CLIConfig.load()
         assert cfg.auth.token == "jwt123"
         assert cfg.auth.email == "u@test.com"
@@ -123,7 +123,7 @@ class TestAuth:
             ):
                 from bark_backend.cli import auth
 
-                auth.login("http://localhost:8997", email="cli@test.com")
+                auth.login("http://localhost:8995", email="cli@test.com")
         cfg = CLIConfig.load()
         assert cfg.auth.token == "jwt456"
         assert cfg.auth.email == "cli@test.com"
@@ -142,7 +142,7 @@ class TestAuth:
             from bark_backend.cli import auth
 
             auth.login(
-                "http://localhost:8997",
+                "http://localhost:8995",
                 email="pw@test.com",
                 password=pw_file.read_text().strip(),
             )
@@ -157,7 +157,7 @@ class TestAuth:
         )
         # Save a config with an existing token
         cfg = CLIConfig()
-        cfg.server.url = "http://localhost:8997"
+        cfg.server.url = "http://localhost:8995"
         cfg.auth.token = "existing-token"
         cfg.auth.email = "saved@test.com"
         cfg.save()
@@ -167,7 +167,7 @@ class TestAuth:
         with patch("httpx.get", return_value=mock_resp):
             from bark_backend.cli import auth
 
-            auth.login("http://localhost:8997")
+            auth.login("http://localhost:8995")
 
         # Token should be unchanged — no prompt was shown
         loaded = CLIConfig.load()
@@ -180,7 +180,7 @@ class TestAuth:
             "bark_backend.cli.config._CONFIG_PATH", config_path
         )
         cfg = CLIConfig()
-        cfg.server.url = "http://localhost:8997"
+        cfg.server.url = "http://localhost:8995"
         cfg.auth.token = "old-token"
         cfg.auth.email = "old@test.com"
         cfg.save()
@@ -197,7 +197,7 @@ class TestAuth:
                 ):
                     from bark_backend.cli import auth
 
-                    auth.login("http://localhost:8997")
+                    auth.login("http://localhost:8995")
 
         loaded = CLIConfig.load()
         assert loaded.auth.token == "fresh"
@@ -208,7 +208,7 @@ class TestAuth:
             "bark_backend.cli.config._CONFIG_PATH", config_path
         )
         cfg = CLIConfig()
-        cfg.server.url = "http://localhost:8997"
+        cfg.server.url = "http://localhost:8995"
         cfg.auth.token = "expired-token"
         cfg.auth.email = "old@test.com"
         cfg.save()
@@ -227,7 +227,7 @@ class TestAuth:
                 ):
                     from bark_backend.cli import auth
 
-                    auth.login("http://localhost:8997")
+                    auth.login("http://localhost:8995")
 
         loaded = CLIConfig.load()
         assert loaded.auth.token == "new-token"
@@ -249,7 +249,7 @@ class TestAuth:
                 from bark_backend.cli import auth
 
                 with pytest.raises(SystemExit):
-                    auth.login("http://localhost:8997")
+                    auth.login("http://localhost:8995")
 
     def test_logout_clears_token(self, tmp_path, monkeypatch):
         config_path = tmp_path / "cli.toml"
@@ -453,9 +453,9 @@ class TestBarkClient:
 
 class TestShellProtocol:
     def test_ws_url_http_conversion(self):
-        url = "http://localhost:8997"
+        url = "http://localhost:8995"
         ws_url = url.replace("http://", "ws://").rstrip("/") + "/ws"
-        assert ws_url == "ws://localhost:8997/ws"
+        assert ws_url == "ws://localhost:8995/ws"
 
     def test_ws_url_https_conversion(self):
         url = "https://bark.example.com"
@@ -657,7 +657,7 @@ class TestMisc:
             ):
                 from bark_backend.cli import auth
 
-                auth.login("http://localhost:8997")
+                auth.login("http://localhost:8995")
         cfg = CLIConfig.load()
         assert cfg.auth.email == "admin@example.com"
         assert cfg.auth.token == "jwt"

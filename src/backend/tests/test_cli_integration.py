@@ -278,7 +278,7 @@ class TestAuthLines:
             "bark_backend.cli.config._CONFIG_PATH", config_path
         )
         cfg = CLIConfig()
-        cfg.server.url = "http://localhost:8997"
+        cfg.server.url = "http://localhost:8995"
         cfg.auth.token = "tok"
         cfg.auth.email = "x@y.com"
         cfg.save()
