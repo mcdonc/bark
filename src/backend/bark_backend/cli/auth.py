@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import getpass
 import logging
+import readline  # noqa: F401 — enables line editing for input()
 
 import httpx
 
