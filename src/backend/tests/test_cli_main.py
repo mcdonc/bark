@@ -167,6 +167,19 @@ class TestMainCLI:
             main.delete("my-ws")
         client.delete_workspace.assert_called_once_with("my-ws")
 
+    def test_delete_workspace_not_found(self, logged_in_cfg, monkeypatch):
+        import typer
+
+        from bark_backend.cli.client import WorkspaceNotFoundError
+        from bark_backend.cli import main
+
+        client = MagicMock()
+        client.delete_workspace.side_effect = WorkspaceNotFoundError("nope")
+        monkeypatch.setattr(main, "_client", lambda: client)
+
+        with pytest.raises(typer.Exit):
+            main.delete("nope")
+
     def test_shell_requires_auth(self, tmp_path, monkeypatch):
         import typer
         from bark_backend.cli import main

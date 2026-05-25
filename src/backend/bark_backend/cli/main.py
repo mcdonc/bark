@@ -133,7 +133,11 @@ def delete(
 ) -> None:
     """Delete a workspace."""
     _require_auth()
-    _client().delete_workspace(name)
+    try:
+        _client().delete_workspace(name)
+    except WorkspaceNotFoundError:
+        _err.print(f"[red]No workspace named[/red] '{name}'")
+        raise typer.Exit(code=1) from None
     typer.echo(f"Deleted workspace {name}")
 
 
