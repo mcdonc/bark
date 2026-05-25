@@ -36,6 +36,7 @@ class TestWorkspaces:
         assert ws["name"] == "my-workspace"
         assert ws["user_id"] == user["id"]
         assert "id" in ws
+        assert "created_at" in ws
 
     async def test_list_workspaces(self, user):
         await user_store.create_workspace(user["id"], "ws1")

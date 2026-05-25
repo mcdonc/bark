@@ -39,7 +39,7 @@ def _require_auth() -> None:
         raise typer.Exit(code=1)
 
 
-@app.command()
+@app.command("login")
 def login_cmd(
     server: str | None = typer.Option(
         None,

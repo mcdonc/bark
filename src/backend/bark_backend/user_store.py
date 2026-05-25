@@ -313,9 +313,11 @@ async def create_workspace(user_id: str, name: str) -> dict:
     db = await get_db()
     try:
         workspace_id = str(uuid.uuid4())
+        created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         await db.execute(
-            "INSERT INTO workspaces (id, user_id, name) VALUES (?, ?, ?)",
-            (workspace_id, user_id, name),
+            "INSERT INTO workspaces (id, user_id, name, created_at)"
+            " VALUES (?, ?, ?, ?)",
+            (workspace_id, user_id, name, created_at),
         )
         await db.commit()
         from . import container_manager
@@ -325,6 +327,7 @@ async def create_workspace(user_id: str, name: str) -> dict:
             "user_id": user_id,
             "name": name,
             "num_ports": container_manager.DEFAULT_PORTS_PER_WORKSPACE,
+            "created_at": created_at,
         }
     finally:
         await db.close()
