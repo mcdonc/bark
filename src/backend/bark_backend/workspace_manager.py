@@ -107,8 +107,7 @@ async def delete_workspace(workspace_id: str, user_id: str) -> bool:
     if deleted:
         for dir_fn in (workspace_path, home_path):
             p = dir_fn(user_id, workspace_id)
-            if p.exists():
-                await asyncio.to_thread(shutil.rmtree, p, True)
+            await asyncio.to_thread(shutil.rmtree, p, True)
     return deleted
 
 
