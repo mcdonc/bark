@@ -66,6 +66,8 @@ class ContainerRegistry:
 
     def __init__(self):
         self.states: dict[str, ContainerState] = {}
+        # Reverse lookup: container_id → workspace_id
+        self._cid_to_wsid: dict[str, str] = {}
         self.docker: aiodocker.Docker | None = None
         self.cleanup_task: asyncio.Task | None = None
         self.port_lock: asyncio.Lock = asyncio.Lock()
@@ -90,14 +92,19 @@ class ContainerRegistry:
             state = ContainerState(workspace_id, container_id)
             self.states[workspace_id] = state
         else:
+            # Remove old reverse mapping if container changed
+            if state.container_id != container_id:  # pragma: no cover
+                self._cid_to_wsid.pop(state.container_id, None)
             state.container_id = container_id
+        self._cid_to_wsid[container_id] = workspace_id
         state.record_activity()
 
     def record_activity(self, container_id: str) -> None:
-        for state in self.states.values():
-            if state.container_id == container_id:
+        ws_id = self._cid_to_wsid.get(container_id)
+        if ws_id:
+            state = self.states.get(ws_id)
+            if state:
                 state.record_activity()
-                return
 
     def get_state(self, workspace_id: str) -> ContainerState | None:
         return self.states.get(workspace_id)
@@ -144,7 +151,9 @@ class ContainerRegistry:
         self.on_workspace_killed = callback
 
     def remove_state(self, workspace_id: str) -> None:
-        self.states.pop(workspace_id, None)
+        state = self.states.pop(workspace_id, None)
+        if state:
+            self._cid_to_wsid.pop(state.container_id, None)
 
     # --- Port allocation ---
 
@@ -346,13 +355,8 @@ class ContainerRegistry:
                 container_id,
                 e,
             )
-        # Remove from states by container_id
-        to_remove = [
-            ws_id
-            for ws_id, s in self.states.items()
-            if s.container_id == container_id
-        ]
-        for ws_id in to_remove:
+        ws_id = self._cid_to_wsid.pop(container_id, None)
+        if ws_id:
             self.states.pop(ws_id, None)
 
     async def stop_user_containers(self, user_id: str) -> None:
@@ -451,10 +455,7 @@ class ContainerRegistry:
                 filters={"label": [f"bark.instance={INSTANCE_ID}"]},
             )
             for c in containers:
-                already = any(
-                    s.container_id == c.id for s in self.states.values()
-                )
-                if not already:
+                if c.id not in self._cid_to_wsid:
                     labels = (await c.show())["Config"]["Labels"]
                     workspace_id = labels.get("bark.workspace-id", "unknown")
                     self.track_activity(c.id, workspace_id)
@@ -475,7 +476,7 @@ class ContainerRegistry:
         if self.cleanup_task:
             self.cleanup_task.cancel()
             self.cleanup_task = None
-        tracked_ids = {s.container_id for s in self.states.values()}
+        tracked_ids = set(self._cid_to_wsid.keys())
         tasks = [self.stop_and_remove_container(cid) for cid in tracked_ids]
         try:
             docker = await self.get_docker()
