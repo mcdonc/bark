@@ -267,6 +267,45 @@ class TestReadLoop:
 
         assert await client._event_queue.get() is None
 
+    async def test_discards_oversized_buffer(self):
+        """Buffer is discarded when it exceeds MAX_LINE_BYTES without a newline."""
+        client = PiRpcClient("cid")
+        client._running = True
+
+        # Send data larger than MAX_LINE_BYTES without a newline,
+        # then a valid event. Use a small cap for testing.
+        original_max = PiRpcClient.MAX_LINE_BYTES
+        PiRpcClient.MAX_LINE_BYTES = 100
+
+        # First chunk: 120 bytes, no newline — triggers discard
+        # Second chunk: valid JSON event
+        event = {"type": "recovered"}
+        chunks = [b"x" * 120, json.dumps(event).encode() + b"\n", b""]
+        idx = [0]
+
+        async def fake_read(n):
+            if idx[0] < len(chunks):
+                data = chunks[idx[0]]
+                idx[0] += 1
+                return data
+            return b""
+
+        proc = _mock_proc()
+        proc.stdout.read = fake_read
+        proc.stdout.at_eof = MagicMock(return_value=False)
+        proc.returncode = None
+        client._proc = proc
+
+        try:
+            await client.read_loop()
+        finally:
+            PiRpcClient.MAX_LINE_BYTES = original_max
+
+        result = await client._event_queue.get()
+        assert result == event
+        sentinel = await client._event_queue.get()
+        assert sentinel is None
+
     async def test_handles_read_exception(self):
         client = PiRpcClient("cid")
         client._proc = _mock_proc()

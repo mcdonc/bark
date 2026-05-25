@@ -39,6 +39,8 @@ class PiRpcClient:
             "Attached to container %s via docker attach", self.container_id
         )
 
+    MAX_LINE_BYTES = 50 * 1024 * 1024  # 50 MB
+
     async def read_loop(self) -> None:
         """Read newline-delimited JSON events from stdout.
 
@@ -57,6 +59,15 @@ class PiRpcClient:
                 if not chunk:
                     break
                 buf += chunk
+                if b"\n" not in buf and len(buf) > self.MAX_LINE_BYTES:
+                    logger.error(
+                        "Pi line buffer exceeded %d bytes without "
+                        "newline for container %s, discarding",
+                        self.MAX_LINE_BYTES,
+                        self.container_id[:12],
+                    )
+                    buf = b""
+                    continue
                 while b"\n" in buf:
                     line, buf = buf.split(b"\n", 1)
                     text = line.decode("utf-8", errors="replace").strip()
