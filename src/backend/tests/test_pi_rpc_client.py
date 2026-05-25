@@ -334,12 +334,12 @@ class TestEvents:
 
 
 class TestDetach:
-    def test_detach_stops_reading_without_killing(self):
+    async def test_detach_stops_reading_without_killing(self):
         client = PiRpcClient("cid")
         proc = _mock_proc(returncode=None)
         client._proc = proc
         client._running = True
-        task = asyncio.get_event_loop().create_future()
+        task = asyncio.get_running_loop().create_future()
         client._read_task = task
 
         client.detach()
