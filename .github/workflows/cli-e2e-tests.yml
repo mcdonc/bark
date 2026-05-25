@@ -43,4 +43,8 @@ jobs:
             -t bark-pi src/dockerimage/
 
       - name: Run CLI E2E tests
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: https://ollama.com/v1
+          LLM_MODEL: gemma4:31b
         run: python -m pytest src/cli-e2e -v -p no:xdist --no-cov
