@@ -1,5 +1,7 @@
 """Tests for workspace_manager: workspace lifecycle, directory management, port allocation."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from bark_backend import workspace_manager, container_manager
@@ -30,6 +32,25 @@ class TestCreateWorkspace:
         await workspace_manager.create_workspace(user["id"], "unique")
         with pytest.raises(Exception):
             await workspace_manager.create_workspace(user["id"], "unique")
+
+    async def test_allocate_ports_failure_cleans_up(self, user):
+        """If allocate_ports raises, DB record and directories are removed."""
+        with patch.object(
+            container_manager.registry,
+            "allocate_ports",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("port exhaustion"),
+        ):
+            with pytest.raises(RuntimeError, match="port exhaustion"):
+                await workspace_manager.create_workspace(user["id"], "boom")
+
+        # DB record should have been cleaned up
+        result = await workspace_manager.list_workspaces(user["id"])
+        assert all(ws["name"] != "boom" for ws in result)
+
+        # Name should be reusable (proves full cleanup)
+        ws = await workspace_manager.create_workspace(user["id"], "boom")
+        assert ws["name"] == "boom"
 
 
 class TestListWorkspaces:

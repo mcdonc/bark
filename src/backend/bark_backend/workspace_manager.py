@@ -78,9 +78,16 @@ async def create_workspace(user_id: str, name: str) -> dict:
     home = home_path(user_id, workspace["id"])
     home.mkdir(parents=True, exist_ok=True)
     # Allocate ports at creation time so ranges are sequential
-    await container_manager.registry.allocate_ports(
-        workspace["id"], workspace["num_ports"]
-    )
+    try:
+        await container_manager.registry.allocate_ports(
+            workspace["id"], workspace["num_ports"]
+        )
+    except Exception:
+        # Clean up the DB record and directories on port allocation failure
+        await user_store.delete_workspace(workspace["id"], user_id)
+        shutil.rmtree(path, ignore_errors=True)
+        shutil.rmtree(home, ignore_errors=True)
+        raise
     return workspace
 
 
