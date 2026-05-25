@@ -21,6 +21,9 @@ _connections: dict[WebSocket, dict] = {}
 # Owned by the first connection, cleaned up by the last.
 # subscribers is a set of WebSockets that receive Pi AG-UI events.
 _workspace_state: dict[str, dict] = {}
+# Serializes workspace_connect for the same workspace to prevent races
+# where two connections both see conn_num==1 and both try to start Pi.
+_workspace_connect_lock: asyncio.Lock = asyncio.Lock()
 
 
 async def handle_websocket(ws: WebSocket) -> None:
@@ -193,33 +196,33 @@ async def start_workspace_container(
     state["workspace_id"] = workspace_id
     state["container_id"] = container_id
 
-    conn_num = container_manager.add_connection(workspace_id)
+    # Lock prevents two simultaneous workspace_connect calls from both
+    # seeing conn_num==1 and both trying to start Pi.
+    async with _workspace_connect_lock:
+        conn_num = container_manager.add_connection(workspace_id)
 
-    # Only the first connection to a workspace starts Pi and event forwarding.
-    # Subsequent connections (additional shells, exec, sync) skip Pi setup.
-    # Pi state is stored in _workspace_state so the last connection can clean it up.
-    if conn_num == 1:
-        pi_client = PiRpcClient(container_id)
-        await pi_client.connect()
+        if conn_num == 1:
+            pi_client = PiRpcClient(container_id)
+            await pi_client.connect()
 
-        ws_state = {
-            "pi_client": pi_client,
-            "container_id": container_id,
-            "agent_running": False,
-            "subscribers": {ws},
-            "event_task": asyncio.create_task(
-                forward_events(pi_client, workspace_id)
-            ),
-        }
-        _workspace_state[workspace_id] = ws_state
-        state["pi_client"] = pi_client
-    else:
-        # Share the Pi client and subscribe to events
-        ws_state = _workspace_state.get(workspace_id, {})
-        state["pi_client"] = ws_state.get("pi_client")
-        subscribers = ws_state.get("subscribers")
-        if subscribers is not None:
-            subscribers.add(ws)
+            ws_state = {
+                "pi_client": pi_client,
+                "container_id": container_id,
+                "agent_running": False,
+                "subscribers": {ws},
+                "event_task": asyncio.create_task(
+                    forward_events(pi_client, workspace_id)
+                ),
+            }
+            _workspace_state[workspace_id] = ws_state
+            state["pi_client"] = pi_client
+        else:
+            # Share the Pi client and subscribe to events
+            ws_state = _workspace_state.get(workspace_id, {})
+            state["pi_client"] = ws_state.get("pi_client")
+            subscribers = ws_state.get("subscribers")
+            if subscribers is not None:
+                subscribers.add(ws)
 
     # Register idle timeout notification (per-connection)
     async def on_idle(wid: str) -> None:
@@ -315,11 +318,9 @@ async def handle_workspace_connect(
 
 async def handle_workspace_disconnect(ws: WebSocket, state: dict) -> None:
     await cleanup_connection(ws, state)
-    # Container is intentionally left running — idle timeout will clean it up.
     state["workspace_id"] = None
     state["container_id"] = None
     state["pi_client"] = None
-    state["event_task"] = None
 
 
 async def handle_prompt(ws: WebSocket, state: dict, msg: dict) -> None:
@@ -664,7 +665,9 @@ async def forward_exec_output(
         await ws.send_json(
             {
                 "type": "exec_exit",
-                "code": session.returncode or 0,
+                "code": session.returncode
+                if session.returncode is not None
+                else 1,
             }
         )
     except asyncio.CancelledError:  # pragma: no cover
@@ -773,19 +776,18 @@ async def forward_events(pi_client: PiRpcClient, workspace_id: str) -> None:
 
                 etype = agui_event.get("type", "")
 
-                # Track agent running state
-                if etype == "RUN_STARTED":
-                    ws_state = _workspace_state.get(workspace_id, {})
-                    ws_state["agent_running"] = True
-                elif etype in ("RUN_FINISHED", "RUN_ERROR"):
-                    ws_state = _workspace_state.get(workspace_id, {})
-                    ws_state["agent_running"] = False
-
-                # Keep container alive while events are flowing
-                ws_state = _workspace_state.get(workspace_id, {})
-                cid = ws_state.get("container_id")
-                if cid:
-                    container_manager.record_activity(cid)
+                # Track agent running state and keep container alive.
+                # Use the real workspace_state dict, not a fallback —
+                # if it's been popped (cleanup raced us), skip updates.
+                ws_state = _workspace_state.get(workspace_id)
+                if ws_state is not None:
+                    if etype == "RUN_STARTED":
+                        ws_state["agent_running"] = True
+                    elif etype in ("RUN_FINISHED", "RUN_ERROR"):
+                        ws_state["agent_running"] = False
+                    cid = ws_state.get("container_id")
+                    if cid:
+                        container_manager.record_activity(cid)
 
                 # Accumulate and save to history
                 if etype == "TEXT_MESSAGE_CONTENT":
