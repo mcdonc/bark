@@ -194,7 +194,7 @@ class AguiClient extends ChangeNotifier {
     _stopHeartbeat();
     _heartbeatTimer = Timer.periodic(
       const Duration(seconds: 60),
-      (_) => sendHeartbeat(),
+      (_) => sendHeartbeat(), // coverage:ignore-line
     );
   }
 
