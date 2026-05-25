@@ -58,10 +58,6 @@ def workspace_path(user_id: str, workspace_id: str) -> Path:
     return WORKSPACES_ROOT / user_id / "work" / workspace_id
 
 
-def sessions_path(user_id: str, workspace_id: str) -> Path:
-    return WORKSPACES_ROOT / user_id / "sessions" / workspace_id
-
-
 def home_path(user_id: str, workspace_id: str) -> Path:
     return WORKSPACES_ROOT / user_id / "home" / workspace_id
 
@@ -70,8 +66,6 @@ async def create_workspace(user_id: str, name: str) -> dict:
     workspace = await user_store.create_workspace(user_id, name)
     path = workspace_path(user_id, workspace["id"])
     path.mkdir(parents=True, exist_ok=True)
-    sessions = sessions_path(user_id, workspace["id"])
-    sessions.mkdir(parents=True, exist_ok=True)
     home = home_path(user_id, workspace["id"])
     home.mkdir(parents=True, exist_ok=True)
     # Allocate ports at creation time so ranges are sequential
@@ -96,23 +90,15 @@ async def delete_workspace(workspace_id: str, user_id: str) -> bool:
 
     deleted = await user_store.delete_workspace(workspace_id, user_id)
     if deleted:
-        path = workspace_path(user_id, workspace_id)
-        if path.exists():
-            shutil.rmtree(path, ignore_errors=True)
-        sessions = sessions_path(user_id, workspace_id)
-        if sessions.exists():
-            shutil.rmtree(sessions, ignore_errors=True)
+        for dir_fn in (workspace_path, home_path):
+            p = dir_fn(user_id, workspace_id)
+            if p.exists():
+                shutil.rmtree(p, ignore_errors=True)
     return deleted
 
 
 def get_workspace_host_path(user_id: str, workspace_id: str) -> Path:
     path = workspace_path(user_id, workspace_id)
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def get_sessions_host_path(user_id: str, workspace_id: str) -> Path:
-    path = sessions_path(user_id, workspace_id)
     path.mkdir(parents=True, exist_ok=True)
     return path
 

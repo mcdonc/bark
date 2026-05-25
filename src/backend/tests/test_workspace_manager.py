@@ -16,9 +16,9 @@ class TestCreateWorkspace:
         assert data_path.exists()
         assert data_path.is_dir()
 
-        sessions_path = workspace_manager.sessions_path(user["id"], ws["id"])
-        assert sessions_path.exists()
-        assert sessions_path.is_dir()
+        home_dir = workspace_manager.home_path(user["id"], ws["id"])
+        assert home_dir.exists()
+        assert home_dir.is_dir()
 
     async def test_allocates_ports(self, user):
         ws = await workspace_manager.create_workspace(user["id"], "ported")
@@ -68,8 +68,9 @@ class TestDeleteWorkspace:
     async def test_delete_removes_db_and_dirs(self, user):
         ws = await workspace_manager.create_workspace(user["id"], "doomed")
         data_path = workspace_manager.workspace_path(user["id"], ws["id"])
-        sessions_path = workspace_manager.sessions_path(user["id"], ws["id"])
+        home_dir = workspace_manager.home_path(user["id"], ws["id"])
         (data_path / "file.txt").write_text("hello")
+        (home_dir / ".bashrc").write_text("# custom")
 
         deleted = await workspace_manager.delete_workspace(
             ws["id"], user["id"]
@@ -79,7 +80,7 @@ class TestDeleteWorkspace:
             await workspace_manager.get_workspace(ws["id"], user["id"]) is None
         )
         assert not data_path.exists()
-        assert not sessions_path.exists()
+        assert not home_dir.exists()
 
     async def test_delete_nonexistent(self, user):
         deleted = await workspace_manager.delete_workspace(
@@ -103,9 +104,9 @@ class TestDeleteWorkspace:
     async def test_delete_missing_dirs_ok(self, user):
         ws = await workspace_manager.create_workspace(user["id"], "no-dirs")
         data_path = workspace_manager.workspace_path(user["id"], ws["id"])
-        sessions_path = workspace_manager.sessions_path(user["id"], ws["id"])
+        home_dir = workspace_manager.home_path(user["id"], ws["id"])
         data_path.rmdir()
-        sessions_path.rmdir()
+        home_dir.rmdir()
 
         deleted = await workspace_manager.delete_workspace(
             ws["id"], user["id"]
@@ -119,8 +120,8 @@ class TestHostPaths:
         assert path.exists()
         assert path.is_dir()
 
-    def test_sessions_host_path_creates_dir(self, user, temp_data_dir):
-        path = workspace_manager.get_sessions_host_path(user["id"], "ws-1")
+    def test_home_host_path_creates_dir(self, user, temp_data_dir):
+        path = workspace_manager.get_home_host_path(user["id"], "ws-1")
         assert path.exists()
         assert path.is_dir()
 
@@ -133,5 +134,5 @@ class TestHostPaths:
         path = workspace_manager.get_workspace_host_path(user["id"], "ws-1")
         assert str(path).startswith(str(temp_data_dir))
 
-        sessions = workspace_manager.get_sessions_host_path(user["id"], "ws-1")
-        assert str(sessions).startswith(str(temp_data_dir))
+        home = workspace_manager.get_home_host_path(user["id"], "ws-1")
+        assert str(home).startswith(str(temp_data_dir))
