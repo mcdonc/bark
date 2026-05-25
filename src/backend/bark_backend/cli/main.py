@@ -4,7 +4,6 @@ from __future__ import annotations
 
 
 import asyncio
-import logging
 
 import typer
 from rich.console import Console
@@ -34,10 +33,15 @@ def _client() -> BarkClient:  # pragma: no cover
     return BarkClient(_cfg())
 
 
+_err = Console(stderr=True)
+
+
 def _require_auth() -> None:
     cfg = _cfg()
     if not cfg.auth.token:
-        logging.error("Not logged in — run bark login first.")
+        _err.print(
+            "[red]Not logged in[/red] — run [bold]bark login[/bold] first."
+        )
         raise typer.Exit(code=1)
 
 
@@ -142,8 +146,8 @@ def shell(
     """Connect to a workspace and drop into a bash shell."""
     cfg = _cfg()
     if not cfg.auth.token:  # pragma: no cover
-        logging.error(
-            "Not logged in — run bark login first."
+        _err.print(
+            "[red]Not logged in[/red] — run [bold]bark login[/bold] first."
         )  # pragma: no cover
         raise typer.Exit(code=1)  # pragma: no cover
 
@@ -154,7 +158,7 @@ def shell(
         try:
             ws = client.resolve_workspace(workspace)
         except WorkspaceNotFoundError:  # pragma: no cover
-            logging.error("No workspace named '%s'", workspace)
+            _err.print(f"[red]No workspace named[/red] '{workspace}'")
             raise typer.Exit(code=1) from None
     else:
         workspaces = client.list_workspaces()
@@ -186,7 +190,7 @@ def shell(
         ws_url = f"ws://{server_url}/ws"
 
     token = cfg.auth.token
-    logging.info("Connecting to %s...", ws.name)
+    _err.print(f"Connecting to [bold]{ws.name}[/bold]...")
     asyncio.run(_ws_shell(ws_url, token, ws.id))
 
 
