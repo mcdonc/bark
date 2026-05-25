@@ -9,9 +9,11 @@ import {
 
 // LLM-dependent tests: each test contacts the LLM provider and may be slow or flaky.
 // Retries up to 3 times to handle intermittent LLM response failures.
+// Tests run sequentially (fullyParallel: false in config) but without
+// fail-fast, so one failure doesn't skip the rest.
 
 test.describe("Bark LLM", () => {
-  test.describe.configure({ retries: 3, mode: "serial" });
+  test.describe.configure({ retries: 2 });
 
   test("get_hosted_url returns a hosted URL", async ({ page, request }) => {
     const { workspaceId, headers, cleanup } = await createAndOpenWorkspace(
@@ -34,7 +36,7 @@ test.describe("Bark LLM", () => {
 
       // Poll for a hosted URL in the assistant messages or tool output
       let hostedUrl: string | null = null;
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 15; i++) {
         await page.waitForTimeout(2000);
         const msgResp = await request.get(
           `${API_BASE}/workspaces/${workspaceId}/messages`,
@@ -87,7 +89,7 @@ test.describe("Bark LLM", () => {
 
       // Poll for the file to appear with the expected content
       let content: string | null = null;
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 15; i++) {
         await page.waitForTimeout(2000);
         const resp = await request.get(
           `${API_BASE}/workspaces/${workspaceId}/files/content?path=hello.txt`,

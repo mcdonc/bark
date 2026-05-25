@@ -28,8 +28,8 @@ const webkitUse = {
 
 // Browsers run sequentially (chromium → firefox → webkit) to avoid
 // overwhelming SQLite with concurrent writes from 60+ parallel tests.
-// Within each browser, LLM tests run first (while the LLM is warm from
-// global setup), then non-LLM tests run (parallel).
+// LLM and non-LLM tests run in separate dependency chains so a flaky
+// LLM test doesn't block the non-LLM suite.
 
 export default defineConfig({
   testDir: "./e2e",
@@ -49,42 +49,45 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    // Chromium: LLM first (LLM warm from setup), then non-LLM
+    // LLM chain: sequential within each browser, no fail-fast so one
+    // flaky test doesn't skip the rest (fullyParallel: false).
     {
       name: "chromium-llm",
       testMatch: "bark-llm.spec.ts",
+      fullyParallel: false,
       use: chromiumUse,
     },
-    {
-      name: "chromium",
-      testMatch: "bark.spec.ts",
-      dependencies: ["chromium-llm"],
-      use: chromiumUse,
-    },
-    // Firefox: after chromium completes
     {
       name: "firefox-llm",
       testMatch: "bark-llm.spec.ts",
-      dependencies: ["chromium"],
+      dependencies: ["chromium-llm"],
+      fullyParallel: false,
       use: firefoxUse,
+    },
+    {
+      name: "webkit-llm",
+      testMatch: "bark-llm.spec.ts",
+      dependencies: ["firefox-llm"],
+      fullyParallel: false,
+      use: webkitUse,
+    },
+    // Non-LLM chain: independent of LLM chain so LLM failures don't
+    // block these tests. May overlap with LLM tests.
+    {
+      name: "chromium",
+      testMatch: "bark.spec.ts",
+      use: chromiumUse,
     },
     {
       name: "firefox",
       testMatch: "bark.spec.ts",
-      dependencies: ["firefox-llm"],
+      dependencies: ["chromium"],
       use: firefoxUse,
-    },
-    // WebKit: after firefox completes
-    {
-      name: "webkit-llm",
-      testMatch: "bark-llm.spec.ts",
-      dependencies: ["firefox"],
-      use: webkitUse,
     },
     {
       name: "webkit",
       testMatch: "bark.spec.ts",
-      dependencies: ["webkit-llm"],
+      dependencies: ["firefox"],
       use: webkitUse,
     },
   ],
