@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 import tomllib
+import tomli_w
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -44,9 +45,16 @@ class CLIConfig:
 
     def save(self) -> None:
         _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        content = f'[server]\nurl = "{self.server.url}"\n\n[auth]\n'
-        if self.auth.token:
-            content += f'token = "{self.auth.token}"\n'
-        if self.auth.email:
-            content += f'email = "{self.auth.email}"\n'
+        data = {
+            "server": {"url": self.server.url},
+            "auth": {
+                k: v
+                for k, v in (
+                    ("token", self.auth.token),
+                    ("email", self.auth.email),
+                )
+                if v is not None
+            },
+        }
+        content = tomli_w.dumps(data)
         _CONFIG_PATH.write_text(content)

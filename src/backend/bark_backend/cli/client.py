@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import sys
 import termios
@@ -81,7 +82,7 @@ class BarkClient:
         ]
 
     def create_workspace(self, name: str) -> Workspace:
-        resp = self.post("/workspaces", json={"name": name})
+        resp = self.post("/workspaces", params={"name": name})
         if resp.status_code == 401:
             raise AuthError("Not logged in — run `bark login`")
         resp.raise_for_status()
@@ -91,12 +92,11 @@ class BarkClient:
         )
 
     def resolve_workspace(self, name: str) -> Workspace:
-        """Find a workspace by name. Exits if not found."""
+        """Find a workspace by name. Raises WorkspaceNotFoundError if not found."""
         ws = self.list_workspaces()
         match = next((w for w in ws if w.name == name), None)
         if match is None:
-            print(f"No workspace named '{name}'", file=sys.stderr)
-            sys.exit(1)
+            raise WorkspaceNotFoundError(name)
         return match
 
     def delete_workspace(self, name: str) -> None:
@@ -105,8 +105,12 @@ class BarkClient:
         if resp.status_code == 401:
             raise AuthError("Not logged in — run `bark login`")
         if not resp.is_success:
-            print(f"Failed to delete workspace: {resp.text}", file=sys.stderr)
+            logging.error("Failed to delete workspace: %s", resp.text)
             sys.exit(1)
+
+
+class WorkspaceNotFoundError(Exception):
+    pass
 
 
 class AuthError(Exception):
@@ -164,6 +168,10 @@ async def _ws_shell(
             msg = json.loads(await ws.recv())
             if msg.get("type") == "terminal_output":
                 break
+            msg_type = msg.get("type") or msg.get("cmd", "unknown")  # no-cover
+            logging.debug(
+                "[discarded startup message: %s]", msg_type
+            )  # no-cover
 
         # 4. Put terminal in raw mode, run shell, restore
         # raw_mode path: tcgetattr + tty.setraw + _raw_mode_exit + terminal_stop  # no-cover
@@ -230,7 +238,7 @@ async def _run_shell(ws, cols: int, rows: int) -> None:
                     event.get("type") == "CUSTOM"
                     and event.get("name") == "container_stopped"
                 ):
-                    print("\r\n[container stopped]\r\n", file=sys.stderr)
+                    logging.info("[container stopped]")
                     stop_event.set()
                     break
         stop_event.set()

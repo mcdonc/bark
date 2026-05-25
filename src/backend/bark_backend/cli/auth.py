@@ -1,7 +1,10 @@
 """Login / logout — authenticate and store JWT."""
 
+from __future__ import annotations
+
+
 import getpass
-import sys
+import logging
 
 import httpx
 
@@ -20,8 +23,8 @@ def login(server_url: str) -> None:
     )
     if resp.status_code != 200:
         detail = resp.json().get("detail", resp.text)
-        print(f"Login failed: {detail}", file=sys.stderr)
-        sys.exit(1)
+        logging.error("Login failed: %s", detail)
+        raise SystemExit(1)
 
     token = resp.json()["access_token"]
 
@@ -30,7 +33,7 @@ def login(server_url: str) -> None:
     cfg.auth.token = token
     cfg.auth.email = email
     cfg.save()
-    print(f"Logged in as {email}")
+    logging.info("Logged in as %s", email)
 
 
 def logout() -> None:
@@ -49,8 +52,10 @@ def logout() -> None:
                 timeout=5.0,
             )
         except httpx.HTTPError:
-            print("Logged out locally — server logout failed (network error)")
+            logging.warning(
+                "Logged out locally — server logout failed (network error)"
+            )
             return
     else:
         cfg.save()
-    print("Logged out")
+    logging.info("Logged out")

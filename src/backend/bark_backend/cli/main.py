@@ -4,12 +4,12 @@ from __future__ import annotations
 
 
 import asyncio
-import sys
+import logging
 
 import typer
 
 from .auth import login, logout as do_logout
-from .client import BarkClient, _ws_shell
+from .client import BarkClient, WorkspaceNotFoundError, _ws_shell
 from .config import CLIConfig
 
 app = typer.Typer(
@@ -35,10 +35,7 @@ def _client() -> BarkClient:
 def _require_auth() -> None:
     cfg = _cfg()
     if not cfg.auth.token:
-        print(
-            "Not logged in — run [cyan]bark login[/cyan] first.",
-            file=sys.stderr,
-        )
+        logging.error("Not logged in — run bark login first.")
         raise typer.Exit(code=1)
 
 
@@ -71,9 +68,7 @@ def status() -> None:
         typer.echo(f"Logged in as: {cfg.auth.email or 'unknown'}")
     else:
         typer.echo(f"Server:   {cfg.server.url}")
-        typer.echo(
-            "Not logged in — run [cyan]bark login[/cyan] to authenticate."
-        )
+        typer.echo("Not logged in — run bark login to authenticate.")
 
 
 @app.command("workspaces")
@@ -96,7 +91,7 @@ def create(
     """Create a new workspace."""
     _require_auth()
     ws = _client().create_workspace(name)
-    typer.echo(f"Created workspace [green]{name}[/green] ({ws.id[:12]})")
+    typer.echo(f"Created workspace {name} ({ws.id[:12]})")
 
 
 @app.command()
@@ -106,7 +101,7 @@ def delete(
     """Delete a workspace."""
     _require_auth()
     _client().delete_workspace(name)
-    typer.echo(f"Deleted workspace [red]{name}[/red]")
+    typer.echo(f"Deleted workspace {name}")
 
 
 @app.command()
@@ -117,24 +112,23 @@ def shell(
 ) -> None:
     """Connect to a workspace and drop into a bash shell."""
     cfg = _cfg()
-    if not cfg.auth.token:
-        print(
-            "Not logged in — run [cyan]bark login[/cyan] first.",
-            file=sys.stderr,
-        )
-        raise typer.Exit(code=1)
+    if not cfg.auth.token:  # no-cover
+        logging.error("Not logged in — run bark login first.")  # no-cover
+        raise typer.Exit(code=1)  # no-cover
 
     client = _client()
 
     # Resolve workspace
     if workspace:
-        ws = client.resolve_workspace(workspace)
+        try:
+            ws = client.resolve_workspace(workspace)
+        except WorkspaceNotFoundError:
+            logging.error("No workspace named '%s'", workspace)
+            raise typer.Exit(code=1) from None
     else:
         workspaces = client.list_workspaces()
         if not workspaces:
-            typer.echo(
-                "No workspaces found — create one with [cyan]bark create[/cyan]."
-            )
+            typer.echo("No workspaces found — create one with bark create.")
             raise typer.Exit(code=1)
         if len(workspaces) == 1:
             ws = workspaces[0]
@@ -145,9 +139,10 @@ def shell(
             choice = input("> ").strip()
             if not choice:
                 raise typer.Exit()
-            idx = int(choice) - 1
-            if idx < 0 or idx >= len(workspaces):
-                raise typer.Exit()
+            try:
+                idx = int(choice) - 1
+            except ValueError:  # no-cover
+                raise typer.Exit(code=1)  # no-cover
             ws = workspaces[idx]
 
     # Build WebSocket URL
@@ -160,12 +155,8 @@ def shell(
         ws_url = f"ws://{server_url}/ws"
 
     token = cfg.auth.token
-    print(f"Connecting to {ws.name}...", file=sys.stderr)
-
-    # Install signal handlers before going async
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(_ws_shell(ws_url, token, ws.id))
+    logging.info("Connecting to %s...", ws.name)
+    asyncio.run(_ws_shell(ws_url, token, ws.id))
 
 
 if __name__ == "__main__":

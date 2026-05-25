@@ -11,7 +11,12 @@ import pytest
 from io import BytesIO, StringIO
 
 from bark_backend.cli.config import CLIConfig
-from bark_backend.cli.client import AuthError, BarkClient, Workspace
+from bark_backend.cli.client import (
+    AuthError,
+    BarkClient,
+    Workspace,
+    WorkspaceNotFoundError,
+)
 
 
 # --- Config tests ---
@@ -206,7 +211,7 @@ class TestBarkClient:
         mock_resp.status_code = 200
         mock_resp.json.return_value = []
         with patch.object(client, "get", return_value=mock_resp):
-            with pytest.raises(SystemExit):
+            with pytest.raises(WorkspaceNotFoundError):
                 client.delete_workspace("nonexistent")
 
     def test_delete_workspace_success(self):
@@ -253,7 +258,7 @@ class TestBarkClient:
             ws = client.resolve_workspace("beta")
         assert ws.id == "ws2"
 
-    def test_resolve_workspace_not_found_exits(self):
+    def test_resolve_workspace_not_found_raises(self):
         cfg = CLIConfig()
         cfg.auth.token = "token"
         client = BarkClient(cfg)
@@ -267,7 +272,7 @@ class TestBarkClient:
             }
         ]
         with patch.object(client, "get", return_value=mock_resp):
-            with pytest.raises(SystemExit):
+            with pytest.raises(WorkspaceNotFoundError):
                 client.resolve_workspace("nonexistent")
 
     def test_delete_workspace_401_raises_auth_error(self):
