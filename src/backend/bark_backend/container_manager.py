@@ -461,17 +461,16 @@ async def shutdown() -> None:
         _cleanup_task.cancel()
         _cleanup_task = None
     # Stop all tracked containers in parallel
-    tasks = [
-        stop_and_remove_container(cid) for cid in list(_containers.keys())
-    ]
-    # Also stop any orphaned bark containers (not in _containers but have our label)
+    tracked_ids = set(_containers.keys())
+    tasks = [stop_and_remove_container(cid) for cid in tracked_ids]
+    # Also stop any orphaned bark containers (not tracked but have our label)
     try:
         docker = await get_docker()
         containers = await docker.containers.list(
             filters={"label": [f"bark.instance={INSTANCE_ID}"]},
         )
         for c in containers:
-            if c.id not in _containers:
+            if c.id not in tracked_ids:
                 logger.info("Removing orphaned bark container %s", c.id)
                 tasks.append(c.delete(force=True))
     except (aiodocker.exceptions.DockerError, OSError) as e:
