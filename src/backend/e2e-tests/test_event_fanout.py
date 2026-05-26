@@ -117,6 +117,11 @@ def server():
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
         proc.kill()
+    # Dump server log for CI debugging
+    if proc.stdout:
+        server_log = proc.stdout.read().decode("utf-8", errors="replace")
+        if server_log.strip():
+            print(f"\n=== Fanout E2E server log ===\n{server_log}\n===")
     if nginx_proc:
         try:
             nginx_proc.kill()
