@@ -55,6 +55,9 @@ class WorkspaceSession:
 # Active sessions keyed by workspace_id.
 _sessions: dict[str, WorkspaceSession] = {}
 
+# Pending browser-delegate requests: request_id -> asyncio.Future
+_pending_browser_requests: dict[str, asyncio.Future] = {}
+
 
 def get_session(workspace_id: str) -> WorkspaceSession | None:
     return _sessions.get(workspace_id)
@@ -154,6 +157,8 @@ async def handle_websocket(ws: WebSocket) -> None:
                 await handle_exec_stop(conn_state)
             elif cmd == "heartbeat":
                 await handle_heartbeat(conn_state)
+            elif cmd == "browser_response":
+                handle_browser_response(msg)
             else:
                 await send_error(ws, f"Unknown command: {cmd}")
 
@@ -713,6 +718,51 @@ async def handle_heartbeat(state: dict) -> None:
     container_id = state.get("container_id")
     if container_id is not None:
         container_manager.registry.record_activity(container_id)
+
+
+def handle_browser_response(msg: dict) -> None:
+    """Resolve a pending browser-delegate request."""
+    request_id = msg.get("id")
+    if not request_id:
+        return
+    future = _pending_browser_requests.pop(request_id, None)
+    if future and not future.done():
+        future.set_result(msg)
+
+
+async def dispatch_browser_request(
+    workspace_id: str, request: dict, timeout: float = 30.0
+) -> dict:
+    """Send a browser_request to all workspace subscribers and wait for the response.
+
+    Called by the /api/browser-delegate HTTP endpoint. Holds the connection
+    open until a browser_response arrives or the timeout expires.
+    """
+    import uuid
+
+    request_id = str(uuid.uuid4())
+    loop = asyncio.get_event_loop()
+    future: asyncio.Future = loop.create_future()
+    _pending_browser_requests[request_id] = future
+
+    session = get_session(workspace_id)
+    if not session or not session.subscribers:
+        _pending_browser_requests.pop(request_id, None)
+        return {"error": "No browser client connected to this workspace"}
+
+    message = {
+        "type": "browser_request",
+        "id": request_id,
+        **request,
+    }
+    await _broadcast(workspace_id, message)
+
+    try:
+        result = await asyncio.wait_for(future, timeout=timeout)
+        return result
+    except asyncio.TimeoutError:
+        _pending_browser_requests.pop(request_id, None)
+        return {"error": "Browser client did not respond within timeout"}
 
 
 async def stop_exec(state: dict) -> None:

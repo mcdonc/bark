@@ -15,6 +15,7 @@ from bark_backend import (
     container_manager,
     user_store,
     workspace_manager,
+    ws_handler,
 )
 
 
@@ -651,6 +652,34 @@ class TestMessageRoutes:
             "/workspaces/fake-id/messages", headers=headers
         )
         assert resp.status_code == 404
+
+
+# --- Browser bridge ---
+
+
+class TestBrowserBridge:
+    async def test_no_session_returns_502(self, client, user):
+        resp = await client.post(
+            "/api/browser-delegate",
+            json={"action": "fetch", "workspace_id": "nonexistent"},
+        )
+        assert resp.status_code == 502
+        assert "No browser client" in resp.json()["detail"]
+
+    async def test_success(self, client, user):
+        with patch.object(
+            ws_handler,
+            "dispatch_browser_request",
+            new_callable=AsyncMock,
+            return_value={"status": 200, "body": "ok"},
+        ) as mock:
+            resp = await client.post(
+                "/api/browser-delegate",
+                json={"action": "celebrate", "workspace_id": "ws-1"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["body"] == "ok"
+        mock.assert_awaited_once()
 
 
 # --- File routes ---

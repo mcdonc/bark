@@ -2118,6 +2118,112 @@ class TestHandleHeartbeat:
         await ws_handler.handle_heartbeat(state)
 
 
+class TestBrowserBridge:
+    async def test_dispatch_browser_response(self, user):
+        from bark_backend import auth as auth_mod
+
+        token = auth_mod.create_token(user["id"], user["email"])
+        ws = _mock_ws(query_params={"token": token})
+        ws.receive_text = AsyncMock(
+            side_effect=[
+                json.dumps({"cmd": "browser_response", "id": "req-1"}),
+                WebSocketDisconnect(),
+            ]
+        )
+        with patch.object(
+            ws_handler,
+            "handle_browser_response",
+            wraps=ws_handler.handle_browser_response,
+        ) as mock:
+            await handle_websocket(ws)
+        mock.assert_called_once()
+
+    async def test_handle_browser_response_resolves_future(self):
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        ws_handler._pending_browser_requests["req-1"] = future
+
+        ws_handler.handle_browser_response(
+            {"id": "req-1", "status": 200, "body": "hello"}
+        )
+
+        assert future.done()
+        result = future.result()
+        assert result["body"] == "hello"
+
+    async def test_handle_browser_response_missing_id(self):
+        # Should not raise
+        ws_handler.handle_browser_response({})
+
+    async def test_handle_browser_response_unknown_id(self):
+        # Should not raise
+        ws_handler.handle_browser_response({"id": "unknown"})
+
+    async def test_dispatch_browser_request_no_session(self):
+        result = await ws_handler.dispatch_browser_request(
+            "nonexistent-ws", {"action": "fetch", "url": "http://example.com"}
+        )
+        assert "error" in result
+        assert "No browser client" in result["error"]
+
+    async def test_dispatch_browser_request_no_subscribers(self):
+        ws_handler.get_or_create_session("ws-empty")
+        try:
+            result = await ws_handler.dispatch_browser_request(
+                "ws-empty", {"action": "fetch", "url": "http://example.com"}
+            )
+            assert "error" in result
+            assert "No browser client" in result["error"]
+        finally:
+            ws_handler._sessions.pop("ws-empty", None)
+
+    async def test_dispatch_browser_request_success(self):
+        session = ws_handler.get_or_create_session("ws-bridge")
+        mock_ws = AsyncMock()
+        session.subscribers.add(mock_ws)
+
+        async def respond_later():
+            await asyncio.sleep(0.1)
+            # Find the pending request and resolve it
+            for req_id, future in ws_handler._pending_browser_requests.items():
+                if not future.done():
+                    future.set_result(
+                        {"id": req_id, "status": 200, "body": "response-data"}
+                    )
+                    break
+
+        task = asyncio.create_task(respond_later())
+        try:
+            result = await ws_handler.dispatch_browser_request(
+                "ws-bridge",
+                {"action": "fetch", "url": "http://example.com"},
+                timeout=5.0,
+            )
+            assert result["body"] == "response-data"
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            ws_handler._sessions.pop("ws-bridge", None)
+
+    async def test_dispatch_browser_request_timeout(self):
+        session = ws_handler.get_or_create_session("ws-timeout")
+        mock_ws = AsyncMock()
+        session.subscribers.add(mock_ws)
+        try:
+            result = await ws_handler.dispatch_browser_request(
+                "ws-timeout",
+                {"action": "fetch", "url": "http://example.com"},
+                timeout=0.1,
+            )
+            assert "error" in result
+            assert "timeout" in result["error"].lower()
+        finally:
+            ws_handler._sessions.pop("ws-timeout", None)
+
+
 class TestResetWorkspaceState:
     async def test_resets_pi_and_refcount(self):
         pi = _mock_pi_client()
