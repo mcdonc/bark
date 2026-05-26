@@ -4,6 +4,9 @@ Tests that Pi events are broadcast to all WebSocket connections
 for the same workspace, and that connections can join/leave
 without disrupting others.
 
+Each test creates its own workspace to avoid shared container
+state between tests.
+
 Requires: Docker running, bark-pi image built.
 
 Run with: devenv shell -- test-cli-e2e
@@ -155,7 +158,7 @@ def server():
 
 @pytest.fixture(scope="module")
 def auth(server):
-    """Login and return token + workspace ID."""
+    """Login and return token + headers."""
     url = server["url"]
     resp = httpx.post(
         f"{url}/auth/login",
@@ -165,29 +168,39 @@ def auth(server):
     assert resp.status_code == 200
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
+    return {"token": token, "headers": headers}
 
+
+_ws_counter = 0
+
+
+def create_workspace(server, auth):
+    """Create a unique workspace, return (workspace_id, cleanup_fn)."""
+    global _ws_counter  # noqa: PLW0603
+    _ws_counter += 1
+    name = f"fanout-{_ws_counter}"
+    url = server["url"]
     resp = httpx.post(
         f"{url}/workspaces",
-        headers=headers,
-        json={"name": "fanout-test"},
+        headers=auth["headers"],
+        json={"name": name},
         timeout=10,
     )
     assert resp.status_code == 200
     workspace_id = resp.json()["id"]
 
-    yield {
-        "token": token,
-        "headers": headers,
-        "workspace_id": workspace_id,
-    }
+    def cleanup():
+        httpx.delete(
+            f"{url}/workspaces/{workspace_id}",
+            headers=auth["headers"],
+            timeout=10,
+        )
 
-    httpx.delete(
-        f"{url}/workspaces/{workspace_id}", headers=headers, timeout=10
-    )
+    return workspace_id, cleanup
 
 
-async def ws_connect(server, auth):
-    """Open a WebSocket, connect to workspace, return (ws, first_msg)."""
+async def ws_connect(server, auth, workspace_id):
+    """Open a WebSocket, connect to workspace, return ws."""
     ws_url = server["url"].replace("http://", "ws://")
     ws = await websockets.connect(
         f"{ws_url}/ws?token={auth['token']}", max_size=2**20
@@ -196,7 +209,7 @@ async def ws_connect(server, auth):
         json.dumps(
             {
                 "cmd": "workspace_connect",
-                "workspaceId": auth["workspace_id"],
+                "workspaceId": workspace_id,
             }
         )
     )
@@ -228,262 +241,175 @@ class TestEventFanout:
         self, server, auth
     ):
         """Two connections to the same workspace both get events."""
-        ws1 = await ws_connect(server, auth)
-        ws2 = await ws_connect(server, auth)
-
+        workspace_id, cleanup = create_workspace(server, auth)
         try:
-            # Both should receive the container_ready event from ui_ready.
-            # ws1 got it when it connected; ws2 should get one too.
-            # Drain messages from both looking for container_ready.
-            def is_container_ready(msg):
-                if msg.get("type") != "event":
-                    return False
-                event = msg.get("event", {})
-                return (
-                    event.get("type") == "CUSTOM"
-                    and event.get("name") == "container_ready"
-                )
+            ws1 = await ws_connect(server, auth, workspace_id)
+            ws2 = await ws_connect(server, auth, workspace_id)
 
-            msgs1 = await recv_until(ws1, is_container_ready, timeout=10)
-            msgs2 = await recv_until(ws2, is_container_ready, timeout=10)
+            try:
 
-            # At least one of them should have gotten container_ready
-            # (ws1 always gets it; ws2 gets it if the backend sends it
-            # as part of the workspace_connect response)
-            all_msgs = msgs1 + msgs2
-            assert any(is_container_ready(m) for m in all_msgs)
+                def is_container_ready(msg):
+                    if msg.get("type") != "event":
+                        return False
+                    event = msg.get("event", {})
+                    return (
+                        event.get("type") == "CUSTOM"
+                        and event.get("name") == "container_ready"
+                    )
+
+                msgs1 = await recv_until(ws1, is_container_ready, timeout=10)
+                msgs2 = await recv_until(ws2, is_container_ready, timeout=10)
+
+                all_msgs = msgs1 + msgs2
+                assert any(is_container_ready(m) for m in all_msgs)
+            finally:
+                await ws1.close()
+                await ws2.close()
         finally:
-            await ws1.close()
-            await ws2.close()
+            cleanup()
 
     @pytest.mark.asyncio
     async def test_exec_output_only_goes_to_requester(self, server, auth):
         """exec_output goes only to the connection that started the exec,
         not to all subscribers (exec is per-connection, not broadcast)."""
-        ws1 = await ws_connect(server, auth)
-        ws2 = await ws_connect(server, auth)
-
+        workspace_id, cleanup = create_workspace(server, auth)
         try:
-            # Drain initial messages
-            await asyncio.sleep(1)
+            ws1 = await ws_connect(server, auth, workspace_id)
+            ws2 = await ws_connect(server, auth, workspace_id)
 
-            # ws1 starts an exec
-            await ws1.send(
-                json.dumps(
-                    {"cmd": "exec_start", "command": ["echo", "from-ws1"]}
-                )
-            )
-
-            # ws1 should get exec_output + exec_exit
-            def is_exec_exit(msg):
-                return msg.get("type") == "exec_exit"
-
-            msgs1 = await recv_until(ws1, is_exec_exit, timeout=15)
-            exec_outputs = [m for m in msgs1 if m.get("type") == "exec_output"]
-            assert len(exec_outputs) > 0
-
-            # ws2 should NOT have exec_output (it's per-connection)
-            ws2_msgs = []
             try:
-                while True:
-                    msg = await asyncio.wait_for(ws2.recv(), timeout=2)
-                    ws2_msgs.append(json.loads(msg))
-            except asyncio.TimeoutError:
-                pass
+                await asyncio.sleep(1)
 
-            ws2_exec = [m for m in ws2_msgs if m.get("type") == "exec_output"]
-            assert len(ws2_exec) == 0
+                await ws1.send(
+                    json.dumps(
+                        {"cmd": "exec_start", "command": ["echo", "from-ws1"]}
+                    )
+                )
+
+                def is_exec_exit(msg):
+                    return msg.get("type") == "exec_exit"
+
+                msgs1 = await recv_until(ws1, is_exec_exit, timeout=15)
+                exec_outputs = [
+                    m for m in msgs1 if m.get("type") == "exec_output"
+                ]
+                assert len(exec_outputs) > 0
+
+                ws2_msgs = []
+                try:
+                    while True:
+                        msg = await asyncio.wait_for(ws2.recv(), timeout=2)
+                        ws2_msgs.append(json.loads(msg))
+                except asyncio.TimeoutError:
+                    pass
+
+                ws2_exec = [
+                    m for m in ws2_msgs if m.get("type") == "exec_output"
+                ]
+                assert len(ws2_exec) == 0
+            finally:
+                await ws1.close()
+                await ws2.close()
         finally:
-            await ws1.close()
-            await ws2.close()
+            cleanup()
 
     @pytest.mark.asyncio
     async def test_first_disconnect_does_not_kill_second(self, server, auth):
         """When the first connection disconnects, the second can still exec."""
-        ws1 = await ws_connect(server, auth)
-        ws2 = await ws_connect(server, auth)
-
+        workspace_id, cleanup = create_workspace(server, auth)
         try:
-            # Drain initial messages
-            await asyncio.sleep(1)
+            ws1 = await ws_connect(server, auth, workspace_id)
+            ws2 = await ws_connect(server, auth, workspace_id)
 
-            # First connection disconnects
-            await ws1.close()
-            await asyncio.sleep(1)
+            try:
+                await asyncio.sleep(1)
 
-            # Second connection should still work
-            await ws2.send(
-                json.dumps(
-                    {
-                        "cmd": "exec_start",
-                        "command": ["echo", "still-alive"],
-                    }
+                await ws1.close()
+                await asyncio.sleep(1)
+
+                await ws2.send(
+                    json.dumps(
+                        {
+                            "cmd": "exec_start",
+                            "command": ["echo", "still-alive"],
+                        }
+                    )
                 )
-            )
 
-            def is_exec_exit(msg):
-                return msg.get("type") == "exec_exit"
+                def is_exec_exit(msg):
+                    return msg.get("type") == "exec_exit"
 
-            msgs = await recv_until(ws2, is_exec_exit, timeout=15)
-            exec_outputs = [m for m in msgs if m.get("type") == "exec_output"]
-            assert len(exec_outputs) > 0
+                msgs = await recv_until(ws2, is_exec_exit, timeout=15)
+                exec_outputs = [
+                    m for m in msgs if m.get("type") == "exec_output"
+                ]
+                assert len(exec_outputs) > 0
+            finally:
+                await ws2.close()
         finally:
-            await ws2.close()
+            cleanup()
 
     @pytest.mark.asyncio
     async def test_prompt_response_reaches_both_connections(
         self, server, auth
     ):
         """When one connection sends a prompt, both receive the Pi events."""
-        ws1 = await ws_connect(server, auth)
-
-        # Wait for Pi to fully initialize — drain messages until we stop
-        # receiving them (Pi startup can take 10-20s on slow CI).
-        for _ in range(30):
-            try:
-                await asyncio.wait_for(ws1.recv(), timeout=2)
-            except asyncio.TimeoutError:
-                break
-
-        ws2 = await ws_connect(server, auth)
-        await asyncio.sleep(1)
-
+        workspace_id, cleanup = create_workspace(server, auth)
         try:
-            # Diagnostic: check available memory and running containers
-            with open("/proc/meminfo") as f:
-                meminfo = [
-                    ln
-                    for ln in f.readlines()
-                    if "MemAvailable" in ln or "MemTotal" in ln
-                ]
-            sys.stderr.write(
-                f"\n=== Memory before prompt ===\n{''.join(meminfo)}"
-            )
-            containers = subprocess.run(
-                ["docker", "ps", "--format", "{{.ID}} {{.Names}} {{.Status}}"],
-                capture_output=True,
-                text=True,
-            )
-            sys.stderr.write(
-                f"=== Running containers ===\n{containers.stdout}\n"
-            )
+            ws1 = await ws_connect(server, auth, workspace_id)
 
-            # Start docker events monitoring in background
-            docker_events = subprocess.Popen(
-                [
-                    "docker",
-                    "events",
-                    "--filter",
-                    "type=container",
-                    "--format",
-                    "{{.Time}} {{.Action}} {{.Actor.Attributes.name}}",
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+            # Wait for Pi to fully initialize — drain messages until we stop
+            # receiving them (Pi startup can take 10-20s on slow CI).
+            for _ in range(30):
+                try:
+                    await asyncio.wait_for(ws1.recv(), timeout=2)
+                except asyncio.TimeoutError:
+                    break
 
-            # ws1 sends a prompt
-            await ws1.send(json.dumps({"cmd": "prompt", "text": "say hello"}))
+            ws2 = await ws_connect(server, auth, workspace_id)
+            await asyncio.sleep(1)
 
-            # Both should receive RUN_STARTED (or TEXT_MESSAGE_CONTENT)
-            def is_pi_event(msg):
-                if msg.get("type") != "event":
-                    return False
-                etype = msg.get("event", {}).get("type", "")
-                return etype in (
-                    "RUN_STARTED",
-                    "TEXT_MESSAGE_START",
-                    "TEXT_MESSAGE_CONTENT",
+            try:
+                await ws1.send(
+                    json.dumps({"cmd": "prompt", "text": "say hello"})
                 )
 
-            msgs1, msgs2 = await asyncio.gather(
-                recv_until(ws1, is_pi_event, timeout=60),
-                recv_until(ws2, is_pi_event, timeout=60),
-            )
-
-            def event_types(msgs):
-                return [
-                    m.get("event", {}).get("type", m.get("type")) for m in msgs
-                ]
-
-            # Diagnostic: check containers and memory after waiting
-            dead = subprocess.run(
-                [
-                    "docker",
-                    "ps",
-                    "-a",
-                    "--filter",
-                    "label=bark.instance=fanout-e2e",
-                    "--format",
-                    "{{.ID}} {{.Status}}",
-                ],
-                capture_output=True,
-                text=True,
-            )
-            sys.stderr.write(
-                f"\n=== Containers after recv ===\n{dead.stdout}\n"
-            )
-            # Stop docker events and dump
-            docker_events.kill()
-            events_out = docker_events.stdout.read().decode(
-                "utf-8", errors="replace"
-            )
-            if events_out.strip():
-                sys.stderr.write(f"=== Docker events ===\n{events_out}\n")
-            for line in dead.stdout.strip().split("\n"):
-                if line and "Exited" in line:
-                    cid = line.split()[0]
-                    inspect = subprocess.run(
-                        [
-                            "docker",
-                            "inspect",
-                            "--format",
-                            "{{.State.OOMKilled}} {{.State.ExitCode}} {{.State.Error}}",
-                            cid,
-                        ],
-                        capture_output=True,
-                        text=True,
+                def is_pi_event(msg):
+                    if msg.get("type") != "event":
+                        return False
+                    etype = msg.get("event", {}).get("type", "")
+                    return etype in (
+                        "RUN_STARTED",
+                        "TEXT_MESSAGE_START",
+                        "TEXT_MESSAGE_CONTENT",
                     )
-                    sys.stderr.write(
-                        f"Container {cid}: OOMKilled/ExitCode/Error = {inspect.stdout.strip()}\n"
-                    )
-            with open("/proc/meminfo") as f:
-                meminfo = [
-                    ln
-                    for ln in f.readlines()
-                    if "MemAvailable" in ln or "MemTotal" in ln
-                ]
-            sys.stderr.write(f"=== Memory after recv ===\n{''.join(meminfo)}")
-            dmesg = subprocess.run(
-                ["dmesg", "--since", "-5min"],
-                capture_output=True,
-                text=True,
-            )
-            oom_lines = [
-                line
-                for line in dmesg.stdout.splitlines()
-                if "oom" in line.lower() or "killed" in line.lower()
-            ]
-            if oom_lines:
-                sys.stderr.write(
-                    "=== dmesg OOM/kill entries ===\n"
-                    + "\n".join(oom_lines)
-                    + "\n"
+
+                msgs1, msgs2 = await asyncio.gather(
+                    recv_until(ws1, is_pi_event, timeout=60),
+                    recv_until(ws2, is_pi_event, timeout=60),
                 )
 
-            assert any(is_pi_event(m) for m in msgs1), (
-                f"ws1 did not receive Pi event. Got: {event_types(msgs1)}"
-            )
-            assert any(is_pi_event(m) for m in msgs2), (
-                f"ws2 did not receive Pi event. Got: {event_types(msgs2)}"
-            )
+                def event_types(msgs):
+                    return [
+                        m.get("event", {}).get("type", m.get("type"))
+                        for m in msgs
+                    ]
+
+                assert any(is_pi_event(m) for m in msgs1), (
+                    f"ws1 did not receive Pi event. Got: {event_types(msgs1)}"
+                )
+                assert any(is_pi_event(m) for m in msgs2), (
+                    f"ws2 did not receive Pi event. Got: {event_types(msgs2)}"
+                )
+            finally:
+                for ws in (ws1, ws2):
+                    try:
+                        await ws.send(json.dumps({"cmd": "abort"}))
+                    except Exception:
+                        pass
+                    try:
+                        await ws.close()
+                    except Exception:
+                        pass
         finally:
-            for ws in (ws1, ws2):
-                try:
-                    await ws.send(json.dumps({"cmd": "abort"}))
-                except Exception:
-                    pass
-                try:
-                    await ws.close()
-                except Exception:
-                    pass
+            cleanup()
