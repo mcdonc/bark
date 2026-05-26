@@ -74,6 +74,8 @@ class ContainerRegistry:
         self.states: dict[str, ContainerState] = {}
         # Reverse lookup: container_id → workspace_id
         self._cid_to_wsid: dict[str, str] = {}
+        # Bridge token → workspace_id (for browser-delegate auth)
+        self._bridge_tokens: dict[str, str] = {}
         self.docker: aiodocker.Docker | None = None
         self.cleanup_task: asyncio.Task | None = None
         self.port_lock: asyncio.Lock = asyncio.Lock()
@@ -111,6 +113,26 @@ class ContainerRegistry:
             state = self.states.get(ws_id)
             if state:
                 state.record_activity()
+
+    def create_bridge_token(self, workspace_id: str) -> str:
+        """Generate a unique token that maps to a workspace_id."""
+        import uuid
+
+        token = str(uuid.uuid4())
+        self._bridge_tokens[token] = workspace_id
+        return token
+
+    def resolve_bridge_token(self, token: str) -> str | None:
+        """Look up the workspace_id for a bridge token."""
+        return self._bridge_tokens.get(token)
+
+    def revoke_bridge_token(self, workspace_id: str) -> None:
+        """Remove all bridge tokens for a workspace."""
+        to_remove = [
+            t for t, ws in self._bridge_tokens.items() if ws == workspace_id
+        ]
+        for t in to_remove:
+            del self._bridge_tokens[t]
 
     def get_state(self, workspace_id: str) -> ContainerState | None:
         return self.states.get(workspace_id)
@@ -282,9 +304,11 @@ class ContainerRegistry:
         ]
         env_vars.append(f"BARK_PORT_MAPPINGS={','.join(mappings)}")
         env_vars.append(f"BARK_WORKSPACE_ID={workspace_id}")
+        bridge_token = self.create_bridge_token(workspace_id)
         env_vars.append(
             f"BARK_BRIDGE_URL=http://host.docker.internal:{nginx_port}"
         )
+        env_vars.append(f"BARK_BRIDGE_TOKEN={bridge_token}")
         env_vars.append(f"BARK_HOSTING_HOSTNAME={hosting_hostname}")
         env_vars.append(f"BARK_HOSTING_PROTO={hosting_proto}")
         env_vars.append(f"BARK_HOSTING_BASE_PATH={hosting_base_path}")
@@ -374,6 +398,7 @@ class ContainerRegistry:
             )
         ws_id = self._cid_to_wsid.pop(container_id, None)
         if ws_id:
+            self.revoke_bridge_token(ws_id)
             self.states.pop(ws_id, None)
 
     async def stop_user_containers(self, user_id: str) -> None:

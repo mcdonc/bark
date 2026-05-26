@@ -27,5 +27,5 @@ if (await isBridgeAvailable()) {
 
 Set automatically by the Bark container entrypoint:
 
-- `BARK_BRIDGE_URL` — URL of the Bark backend bridge endpoint
-- `BARK_WORKSPACE_ID` — ID of the current workspace
+- `BARK_BRIDGE_URL` — URL of the Bark backend (via nginx)
+- `BARK_BRIDGE_TOKEN` — Opaque token that identifies this container's workspace

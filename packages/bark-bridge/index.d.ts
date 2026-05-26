@@ -20,7 +20,7 @@ export interface BrowserActionResponse {
  * The request is routed through the Bark backend to the Flutter client,
  * which makes the HTTP request with the browser's cookies and session.
  *
- * Requires BARK_BRIDGE_URL and BARK_WORKSPACE_ID environment variables
+ * Requires BARK_BRIDGE_URL and BARK_BRIDGE_TOKEN environment variables
  * (set automatically by the Bark container entrypoint).
  */
 export function browserFetch(
@@ -40,6 +40,7 @@ export function browserAction(
 
 /**
  * Check whether the browser bridge is available.
- * Returns true if BARK_BRIDGE_URL is set and the bridge endpoint is reachable.
+ * Returns true if BARK_BRIDGE_URL and BARK_BRIDGE_TOKEN are set
+ * and the bridge endpoint is reachable.
  */
 export function isBridgeAvailable(): Promise<boolean>;

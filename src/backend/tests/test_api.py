@@ -658,28 +658,44 @@ class TestMessageRoutes:
 
 
 class TestBrowserBridge:
-    async def test_no_session_returns_502(self, client, user):
+    async def test_invalid_token_returns_403(self, client, user):
         resp = await client.post(
             "/api/browser-delegate",
-            json={"action": "fetch", "workspace_id": "nonexistent"},
+            json={"action": "fetch", "token": "bad-token"},
         )
-        assert resp.status_code == 502
-        assert "No browser client" in resp.json()["detail"]
+        assert resp.status_code == 403
+        assert "Invalid bridge token" in resp.json()["detail"]
 
-    async def test_success(self, client, user):
-        with patch.object(
-            ws_handler,
-            "dispatch_browser_request",
-            new_callable=AsyncMock,
-            return_value={"status": 200, "body": "ok"},
-        ) as mock:
+    async def test_valid_token_success(self, client, user):
+        token = container_manager.registry.create_bridge_token("ws-1")
+        try:
+            with patch.object(
+                ws_handler,
+                "dispatch_browser_request",
+                new_callable=AsyncMock,
+                return_value={"status": 200, "body": "ok"},
+            ) as mock:
+                resp = await client.post(
+                    "/api/browser-delegate",
+                    json={"action": "celebrate", "token": token},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["body"] == "ok"
+            mock.assert_awaited_once_with("ws-1", {"action": "celebrate"})
+        finally:
+            container_manager.registry.revoke_bridge_token("ws-1")
+
+    async def test_valid_token_no_subscribers_returns_502(self, client, user):
+        token = container_manager.registry.create_bridge_token("ws-nosub")
+        try:
             resp = await client.post(
                 "/api/browser-delegate",
-                json={"action": "celebrate", "workspace_id": "ws-1"},
+                json={"action": "fetch", "token": token},
             )
-        assert resp.status_code == 200
-        assert resp.json()["body"] == "ok"
-        mock.assert_awaited_once()
+            assert resp.status_code == 502
+            assert "No browser client" in resp.json()["detail"]
+        finally:
+            container_manager.registry.revoke_bridge_token("ws-nosub")
 
 
 # --- File routes ---

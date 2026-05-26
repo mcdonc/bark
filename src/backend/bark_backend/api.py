@@ -571,20 +571,24 @@ async def upload_file(
 
 class BrowserDelegateRequest(BaseModel):
     action: str
-    workspace_id: str
+    token: str
 
 
 @router.post("/api/browser-delegate")
 async def browser_delegate(body: BrowserDelegateRequest):
     """Bridge endpoint for Pi extensions to delegate actions to the browser.
 
-    The container calls this endpoint; the backend relays the request to
-    the Flutter client over WebSocket and returns the browser's response.
-    No user auth — the request comes from inside a container, not a browser.
+    The container calls this endpoint with a bridge token (set as
+    BARK_BRIDGE_TOKEN in the container env). The backend resolves the
+    token to a workspace_id, relays the request to the Flutter client
+    over WebSocket, and returns the browser's response.
     """
+    workspace_id = container_manager.registry.resolve_bridge_token(body.token)
+    if workspace_id is None:
+        raise HTTPException(status_code=403, detail="Invalid bridge token")
     result = await ws_handler.dispatch_browser_request(
-        body.workspace_id,
-        body.model_dump(),
+        workspace_id,
+        body.model_dump(exclude={"token"}),
     )
     if "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])

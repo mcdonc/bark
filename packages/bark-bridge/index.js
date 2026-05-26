@@ -6,7 +6,7 @@
  */
 
 const BRIDGE_URL = process.env.BARK_BRIDGE_URL;
-const WORKSPACE_ID = process.env.BARK_WORKSPACE_ID;
+const BRIDGE_TOKEN = process.env.BARK_BRIDGE_TOKEN;
 
 function getConfig() {
   if (!BRIDGE_URL) {
@@ -15,13 +15,16 @@ function getConfig() {
         "Are you running inside a Bark container?",
     );
   }
-  if (!WORKSPACE_ID) {
+  if (!BRIDGE_TOKEN) {
     throw new Error(
-      "@bark/bridge: BARK_WORKSPACE_ID is not set. " +
+      "@bark/bridge: BARK_BRIDGE_TOKEN is not set. " +
         "Are you running inside a Bark container?",
     );
   }
-  return { bridgeUrl: `${BRIDGE_URL}/api/browser-delegate`, WORKSPACE_ID };
+  return {
+    bridgeUrl: `${BRIDGE_URL}/api/browser-delegate`,
+    token: BRIDGE_TOKEN,
+  };
 }
 
 /**
@@ -35,14 +38,14 @@ function getConfig() {
  * @returns {Promise<{status: number, headers: Record<string, string>, body: string}>}
  */
 async function browserFetch(url, options = {}) {
-  const { bridgeUrl, WORKSPACE_ID: wsId } = getConfig();
+  const { bridgeUrl, token } = getConfig();
 
   const resp = await fetch(bridgeUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       action: "fetch",
-      workspace_id: wsId,
+      token,
       url,
       method: options.method || "GET",
       headers: options.headers || {},
@@ -68,14 +71,14 @@ async function browserFetch(url, options = {}) {
  * @returns {Promise<{status: string}>}
  */
 async function browserAction(action, payload = {}) {
-  const { bridgeUrl, WORKSPACE_ID: wsId } = getConfig();
+  const { bridgeUrl, token } = getConfig();
 
   const resp = await fetch(bridgeUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       action,
-      workspace_id: wsId,
+      token,
       ...payload,
     }),
   });
@@ -95,7 +98,7 @@ async function browserAction(action, payload = {}) {
  * @returns {Promise<boolean>}
  */
 async function isBridgeAvailable() {
-  if (!BRIDGE_URL || !WORKSPACE_ID) return false;
+  if (!BRIDGE_URL || !BRIDGE_TOKEN) return false;
   try {
     const resp = await fetch(`${BRIDGE_URL}/health`, {
       signal: AbortSignal.timeout(2000),
