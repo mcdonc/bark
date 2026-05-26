@@ -1,10 +1,10 @@
-"""Tests for exec_session: raw docker exec without PTY."""
+"""Tests for dockerexec: raw docker exec without PTY."""
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-from bark_backend.exec_session import ExecSession
+from bark_backend.dockerexec import ExecSession
 
 
 def _mock_proc(stdout_data=b"", returncode=None):

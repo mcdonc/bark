@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from . import workspace_manager
+from . import workspaces
 
 
 def resolve_path(user_id: str, workspace_id: str, relative_path: str) -> Path:
     """Resolve a relative path within a workspace, preventing directory traversal."""
-    root = workspace_manager.get_workspace_host_path(user_id, workspace_id)
+    root = workspaces.get_workspace_host_path(user_id, workspace_id)
     resolved = (root / relative_path).resolve()
     if not str(resolved).startswith(str(root.resolve())):
         raise ValueError("Path traversal not allowed")
@@ -29,7 +29,7 @@ def list_files(
                 "name": entry.name,
                 "path": str(
                     entry.relative_to(
-                        workspace_manager.get_workspace_host_path(
+                        workspaces.get_workspace_host_path(
                             user_id, workspace_id
                         )
                     )
@@ -72,7 +72,7 @@ def delete_path(user_id: str, workspace_id: str, relative_path: str) -> str:
         path.unlink()
     return str(
         path.relative_to(
-            workspace_manager.get_workspace_host_path(user_id, workspace_id)
+            workspaces.get_workspace_host_path(user_id, workspace_id)
         )
     )
 
@@ -91,7 +91,7 @@ def rename_path(
     src.rename(dst)
     return str(
         dst.relative_to(
-            workspace_manager.get_workspace_host_path(user_id, workspace_id)
+            workspaces.get_workspace_host_path(user_id, workspace_id)
         )
     )
 
@@ -105,6 +105,6 @@ def write_file(
     path.write_bytes(content)
     return str(
         path.relative_to(
-            workspace_manager.get_workspace_host_path(user_id, workspace_id)
+            workspaces.get_workspace_host_path(user_id, workspace_id)
         )
     )

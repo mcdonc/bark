@@ -1,16 +1,16 @@
-"""Tests for email_service: SMTP and sendmail sending."""
+"""Tests for emailsvc: SMTP and sendmail sending."""
 
 from email.message import EmailMessage
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from bark_backend import email_service
+from bark_backend import emailsvc
 
 
 class TestBuildMessage:
     def test_builds_message(self):
-        msg = email_service.build_message("to@example.com", "Subject", "Body")
+        msg = emailsvc.build_message("to@example.com", "Subject", "Body")
         assert isinstance(msg, EmailMessage)
         assert msg["To"] == "to@example.com"
         assert msg["Subject"] == "Subject"
@@ -18,50 +18,50 @@ class TestBuildMessage:
 
     def test_from_uses_smtp_from(self, monkeypatch):
         monkeypatch.setenv("BARK_SMTP_FROM", "custom@example.com")
-        msg = email_service.build_message("to@example.com", "Hi", "Body")
+        msg = emailsvc.build_message("to@example.com", "Hi", "Body")
         assert msg["From"] == "custom@example.com"
 
     def test_from_falls_back_to_smtp_user(self, monkeypatch):
         monkeypatch.delenv("BARK_SMTP_FROM", raising=False)
         monkeypatch.setenv("BARK_SMTP_USER", "user@example.com")
-        msg = email_service.build_message("to@example.com", "Hi", "Body")
+        msg = emailsvc.build_message("to@example.com", "Hi", "Body")
         assert msg["From"] == "user@example.com"
 
     def test_from_falls_back_to_noreply(self, monkeypatch):
         monkeypatch.delenv("BARK_SMTP_FROM", raising=False)
         monkeypatch.delenv("BARK_SMTP_USER", raising=False)
-        msg = email_service.build_message("to@example.com", "Hi", "Body")
+        msg = emailsvc.build_message("to@example.com", "Hi", "Body")
         assert msg["From"] == "noreply@localhost"
 
 
 class TestResolvePassword:
     def test_plain_password(self, monkeypatch):
         monkeypatch.setenv("BARK_SMTP_PASSWORD", "secret123")
-        assert email_service._resolve_password() == "secret123"
+        assert emailsvc._resolve_password() == "secret123"
 
     def test_file_prefix_reads_file(self, monkeypatch, tmp_path):
         pw_file = tmp_path / "smtp_pass"
         pw_file.write_text("file-secret\n")
         monkeypatch.setenv("BARK_SMTP_PASSWORD", f"file:{pw_file}")
-        assert email_service._resolve_password() == "file-secret"
+        assert emailsvc._resolve_password() == "file-secret"
 
     def test_file_missing_returns_none(self, monkeypatch):
         monkeypatch.setenv("BARK_SMTP_PASSWORD", "file:/nonexistent/file")
-        assert email_service._resolve_password() is None
+        assert emailsvc._resolve_password() is None
 
     def test_no_password(self, monkeypatch):
         monkeypatch.delenv("BARK_SMTP_PASSWORD", raising=False)
-        assert email_service._resolve_password() is None
+        assert emailsvc._resolve_password() is None
 
 
 class TestUseSmtp:
     def test_uses_smtp_when_host_set(self, monkeypatch):
         monkeypatch.setenv("BARK_SMTP_HOST", "mail.example.com")
-        assert email_service.use_smtp() is True
+        assert emailsvc.use_smtp() is True
 
     def test_uses_sendmail_when_no_host(self, monkeypatch):
         monkeypatch.delenv("BARK_SMTP_HOST", raising=False)
-        assert email_service.use_smtp() is False
+        assert emailsvc.use_smtp() is False
 
 
 class TestSendViaSmtp:
@@ -73,9 +73,9 @@ class TestSendViaSmtp:
         monkeypatch.setenv("BARK_SMTP_USE_TLS", "true")
 
         mock_send = AsyncMock()
-        with patch.object(email_service.aiosmtplib, "send", mock_send):
-            msg = email_service.build_message("to@example.com", "Hi", "Body")
-            await email_service.send_via_smtp(msg)
+        with patch.object(emailsvc.aiosmtplib, "send", mock_send):
+            msg = emailsvc.build_message("to@example.com", "Hi", "Body")
+            await emailsvc.send_via_smtp(msg)
 
         mock_send.assert_awaited_once()
         kwargs = mock_send.call_args[1]
@@ -93,9 +93,9 @@ class TestSendViaSmtp:
         monkeypatch.setenv("BARK_SMTP_USE_TLS", "false")
 
         mock_send = AsyncMock()
-        with patch.object(email_service.aiosmtplib, "send", mock_send):
-            msg = email_service.build_message("to@example.com", "Hi", "Body")
-            await email_service.send_via_smtp(msg)
+        with patch.object(emailsvc.aiosmtplib, "send", mock_send):
+            msg = emailsvc.build_message("to@example.com", "Hi", "Body")
+            await emailsvc.send_via_smtp(msg)
 
         kwargs = mock_send.call_args[1]
         assert "username" not in kwargs
@@ -112,8 +112,8 @@ class TestSendViaSendmail:
         with patch(
             "asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec:
-            msg = email_service.build_message("to@example.com", "Hi", "Body")
-            await email_service.send_via_sendmail(msg)
+            msg = emailsvc.build_message("to@example.com", "Hi", "Body")
+            await emailsvc.send_via_sendmail(msg)
 
         mock_exec.assert_awaited_once()
         assert mock_exec.call_args[0][0] == "sendmail"
@@ -129,8 +129,8 @@ class TestSendViaSendmail:
         with patch(
             "asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec:
-            msg = email_service.build_message("to@example.com", "Hi", "Body")
-            await email_service.send_via_sendmail(msg)
+            msg = emailsvc.build_message("to@example.com", "Hi", "Body")
+            await emailsvc.send_via_sendmail(msg)
 
         assert (
             mock_exec.call_args[0][0] == "/run/current-system/sw/bin/sendmail"
@@ -142,24 +142,24 @@ class TestSendViaSendmail:
         mock_proc.returncode = 1
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
-            msg = email_service.build_message("to@example.com", "Hi", "Body")
+            msg = emailsvc.build_message("to@example.com", "Hi", "Body")
             with pytest.raises(RuntimeError, match="exited with code 1"):
-                await email_service.send_via_sendmail(msg)
+                await emailsvc.send_via_sendmail(msg)
 
 
 class TestSendEmail:
     async def test_uses_smtp_when_configured(self, monkeypatch):
         monkeypatch.setenv("BARK_SMTP_HOST", "smtp.example.com")
         mock_smtp = AsyncMock()
-        with patch.object(email_service, "send_via_smtp", mock_smtp):
-            await email_service.send_email("to@example.com", "Hi", "Body")
+        with patch.object(emailsvc, "send_via_smtp", mock_smtp):
+            await emailsvc.send_email("to@example.com", "Hi", "Body")
         mock_smtp.assert_awaited_once()
 
     async def test_uses_sendmail_when_no_smtp(self, monkeypatch):
         monkeypatch.delenv("BARK_SMTP_HOST", raising=False)
         mock_sendmail = AsyncMock()
-        with patch.object(email_service, "send_via_sendmail", mock_sendmail):
-            await email_service.send_email("to@example.com", "Hi", "Body")
+        with patch.object(emailsvc, "send_via_sendmail", mock_sendmail):
+            await emailsvc.send_email("to@example.com", "Hi", "Body")
         mock_sendmail.assert_awaited_once()
 
 
@@ -167,8 +167,8 @@ class TestSendVerificationEmail:
     async def test_sends_verification_email(self, monkeypatch):
         monkeypatch.delenv("BARK_SMTP_HOST", raising=False)
         mock_sendmail = AsyncMock()
-        with patch.object(email_service, "send_via_sendmail", mock_sendmail):
-            await email_service.send_verification_email(
+        with patch.object(emailsvc, "send_via_sendmail", mock_sendmail):
+            await emailsvc.send_verification_email(
                 "user@example.com",
                 "https://bark.example.com/#/verify?token=abc123",
             )
@@ -195,8 +195,8 @@ class TestSendVerificationEmail:
         monkeypatch.setenv("BARK_SMTP_USER", "user")
         monkeypatch.setenv("BARK_SMTP_PASSWORD", "pass")
         mock_smtp = AsyncMock()
-        with patch.object(email_service, "send_via_smtp", mock_smtp):
-            await email_service.send_verification_email(
+        with patch.object(emailsvc, "send_via_smtp", mock_smtp):
+            await emailsvc.send_verification_email(
                 "user@example.com",
                 "https://bark.example.com/#/verify?token=abc",
             )
@@ -207,8 +207,8 @@ class TestSendPasswordResetEmail:
     async def test_sends_reset_email(self, monkeypatch):
         monkeypatch.delenv("BARK_SMTP_HOST", raising=False)
         mock_sendmail = AsyncMock()
-        with patch.object(email_service, "send_via_sendmail", mock_sendmail):
-            await email_service.send_password_reset_email(
+        with patch.object(emailsvc, "send_via_sendmail", mock_sendmail):
+            await emailsvc.send_password_reset_email(
                 "user@example.com",
                 "https://bark.example.com/#/reset-password?token=xyz",
             )
@@ -230,8 +230,8 @@ class TestSendPasswordResetEmail:
         monkeypatch.setenv("BARK_SMTP_USER", "user")
         monkeypatch.setenv("BARK_SMTP_PASSWORD", "pass")
         mock_smtp = AsyncMock()
-        with patch.object(email_service, "send_via_smtp", mock_smtp):
-            await email_service.send_password_reset_email(
+        with patch.object(emailsvc, "send_via_smtp", mock_smtp):
+            await emailsvc.send_password_reset_email(
                 "user@example.com",
                 "https://bark.example.com/#/reset-password?token=xyz",
             )

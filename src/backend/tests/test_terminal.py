@@ -1,4 +1,4 @@
-"""Tests for terminal_manager: PTY session lifecycle, I/O, resize."""
+"""Tests for terminal: PTY session lifecycle, I/O, resize."""
 
 import asyncio
 import os
@@ -6,8 +6,8 @@ import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from bark_backend import terminal_manager
-from bark_backend.terminal_manager import TerminalSession
+from bark_backend import terminal
+from bark_backend.terminal import TerminalSession
 
 
 def _mock_proc(returncode=None):
@@ -37,12 +37,12 @@ def mock_os(real_pipe):
     r, w = real_pipe
     with (
         patch.object(
-            terminal_manager, "openpty", return_value=(r, w)
+            terminal, "openpty", return_value=(r, w)
         ) as mopenpty,
-        patch.object(terminal_manager, "set_winsize") as m_winsize,
-        patch.object(terminal_manager, "fd_read", return_value=b"") as m_read,
-        patch.object(terminal_manager, "fd_write", return_value=0) as m_write,
-        patch.object(terminal_manager, "fd_close") as m_close,
+        patch.object(terminal, "set_winsize") as m_winsize,
+        patch.object(terminal, "fd_read", return_value=b"") as m_read,
+        patch.object(terminal, "fd_write", return_value=0) as m_write,
+        patch.object(terminal, "fd_close") as m_close,
     ):
         yield {
             "openpty": mopenpty,

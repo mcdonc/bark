@@ -26,7 +26,7 @@ def temp_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("BARK_DATA_DIR", str(tmp_path))
     # Re-import to pick up the new env var
     import bark_backend.model as us
-    import bark_backend.workspace_manager as wm
+    import bark_backend.workspaces as wm
 
     us._data_dir = tmp_path
     us.DB_PATH = tmp_path / "bark.db"

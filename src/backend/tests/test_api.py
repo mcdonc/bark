@@ -12,10 +12,10 @@ from httpx import AsyncClient, ASGITransport
 from bark_backend import (
     api,
     auth,
-    container_manager,
+    container,
     model,
-    workspace_manager,
-    ws_handler,
+    workspaces as ws_mod,
+    wshandler,
 )
 
 
@@ -74,7 +74,7 @@ class TestAuthRoutes:
         )
         token = login_resp.json()["access_token"]
         with patch.object(
-            api.email_service,
+            api.emailsvc,
             "send_verification_email",
             new_callable=AsyncMock,
         ):
@@ -101,7 +101,7 @@ class TestAuthRoutes:
     async def test_register_unauthenticated(self, client, db):
         """Registration is open — no auth required (verification gates access)."""
         with patch.object(
-            api.email_service,
+            api.emailsvc,
             "send_verification_email",
             new_callable=AsyncMock,
         ):
@@ -116,7 +116,7 @@ class TestAuthRoutes:
         """If verification email fails, user creation is rolled back."""
         with (
             patch.object(
-                api.email_service,
+                api.emailsvc,
                 "send_verification_email",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("sendmail not found"),
@@ -201,7 +201,7 @@ class TestAuthRoutes:
     async def test_logout(self, client, user):
         headers = await _auth_headers(client)
         with patch.object(
-            api.container_manager.registry,
+            api.container.registry,
             "stop_user_containers",
             new_callable=AsyncMock,
         ):
@@ -227,7 +227,7 @@ class TestResendVerification:
     async def test_resend_success(self, client, db):
         await self._create_unverified_user()
         with patch.object(
-            api.email_service,
+            api.emailsvc,
             "send_verification_email",
             new_callable=AsyncMock,
         ) as mock_send:
@@ -279,7 +279,7 @@ class TestResendVerification:
         api._resend_timestamps.pop("unverified@example.com", None)
         await self._create_unverified_user()
         with patch.object(
-            api.email_service,
+            api.emailsvc,
             "send_verification_email",
             new_callable=AsyncMock,
         ):
@@ -312,7 +312,7 @@ class TestForgotPassword:
     async def test_forgot_sends_email(self, client, db):
         await self._create_user()
         with patch.object(
-            api.email_service,
+            api.emailsvc,
             "send_password_reset_email",
             new_callable=AsyncMock,
         ) as mock_send:
@@ -336,7 +336,7 @@ class TestForgotPassword:
     async def test_forgot_rate_limited(self, client, db):
         await self._create_user()
         with patch.object(
-            api.email_service,
+            api.emailsvc,
             "send_password_reset_email",
             new_callable=AsyncMock,
         ):
@@ -460,7 +460,7 @@ class TestChangeEmail:
     async def test_change_email_success(self, client, user):
         headers = await _auth_headers(client)
         with patch.object(
-            api.email_service,
+            api.emailsvc,
             "send_verification_email",
             new_callable=AsyncMock,
         ) as mock_send:
@@ -590,7 +590,7 @@ class TestWorkspaceRoutes:
         ws_id = create_resp.json()["id"]
 
         with patch.object(
-            api.container_manager.registry,
+            api.container.registry,
             "stop_and_remove_container",
             new_callable=AsyncMock,
         ):
@@ -613,7 +613,7 @@ class TestWorkspaceRoutes:
         await model.update_workspace_container(ws_id, "fake-container-id")
 
         with patch.object(
-            api.container_manager.registry,
+            api.container.registry,
             "stop_and_remove_container",
             new_callable=AsyncMock,
         ) as mock_rm:
@@ -642,10 +642,10 @@ class TestBrowserBridge:
         assert "Invalid bridge token" in resp.json()["detail"]
 
     async def test_valid_token_success(self, client, user):
-        token = container_manager.registry.create_bridge_token("ws-1")
+        token = container.registry.create_bridge_token("ws-1")
         try:
             with patch.object(
-                ws_handler,
+                wshandler,
                 "dispatch_browser_request",
                 new_callable=AsyncMock,
                 return_value={"status": 200, "body": "ok"},
@@ -658,10 +658,10 @@ class TestBrowserBridge:
             assert resp.json()["body"] == "ok"
             mock.assert_awaited_once_with("ws-1", {"action": "celebrate"})
         finally:
-            container_manager.registry.revoke_bridge_token("ws-1")
+            container.registry.revoke_bridge_token("ws-1")
 
     async def test_valid_token_no_subscribers_returns_502(self, client, user):
-        token = container_manager.registry.create_bridge_token("ws-nosub")
+        token = container.registry.create_bridge_token("ws-nosub")
         try:
             resp = await client.post(
                 "/api/browser-delegate",
@@ -670,7 +670,7 @@ class TestBrowserBridge:
             assert resp.status_code == 502
             assert "No browser client" in resp.json()["detail"]
         finally:
-            container_manager.registry.revoke_bridge_token("ws-nosub")
+            container.registry.revoke_bridge_token("ws-nosub")
 
 
 # --- File routes ---
@@ -723,8 +723,8 @@ class TestFileRoutes:
         ws_id = await self._create_workspace(client, headers)
         cid = "cid-upload-test"
         await model.update_workspace_container(ws_id, cid)
-        container_manager.registry.track_activity(cid, ws_id)
-        container_manager.registry.states[ws_id].last_activity = 0.0
+        container.registry.track_activity(cid, ws_id)
+        container.registry.states[ws_id].last_activity = 0.0
 
         await client.post(
             f"/workspaces/{ws_id}/files/upload?path=test.txt",
@@ -732,9 +732,9 @@ class TestFileRoutes:
             files={"file": ("test.txt", b"data", "text/plain")},
         )
 
-        assert container_manager.registry.states[ws_id].last_activity > 0.0
-        container_manager.registry.states.pop(ws_id, None)
-        container_manager.registry._cid_to_wsid.pop(cid, None)
+        assert container.registry.states[ws_id].last_activity > 0.0
+        container.registry.states.pop(ws_id, None)
+        container.registry._cid_to_wsid.pop(cid, None)
 
     async def test_read_nonexistent(self, client, user):
         headers = await _auth_headers(client)
@@ -977,17 +977,17 @@ class TestFileRoutes:
 class TestSetIdleTimeout:
     async def test_set_idle_timeout_global(self, db):
         """Setting global idle timeout changes the module-level variable."""
-        original_timeout = container_manager.IDLE_TIMEOUT_SECONDS
+        original_timeout = container.IDLE_TIMEOUT_SECONDS
         try:
-            container_manager.IDLE_TIMEOUT_SECONDS = 42
-            assert container_manager.IDLE_TIMEOUT_SECONDS == 42
+            container.IDLE_TIMEOUT_SECONDS = 42
+            assert container.IDLE_TIMEOUT_SECONDS == 42
             # Per-workspace lookup falls back to global
             assert (
-                container_manager.registry.get_workspace_idle_timeout("any")
+                container.registry.get_workspace_idle_timeout("any")
                 == 42
             )
         finally:
-            container_manager.IDLE_TIMEOUT_SECONDS = original_timeout
+            container.IDLE_TIMEOUT_SECONDS = original_timeout
 
     async def test_endpoint_missing_without_test_mode(self, client):
         """Without BARK_TEST_MODE, the endpoints should not exist."""
@@ -1000,43 +1000,43 @@ class TestSetIdleTimeout:
 
     async def test_set_idle_timeout_per_workspace(self, db):
         """Per-workspace idle timeout should not affect global."""
-        original_timeout = container_manager.IDLE_TIMEOUT_SECONDS
+        original_timeout = container.IDLE_TIMEOUT_SECONDS
         try:
-            container_manager.registry.track_activity("cid-test", "ws-test")
-            container_manager.registry.set_workspace_idle_timeout("ws-test", 5)
+            container.registry.track_activity("cid-test", "ws-test")
+            container.registry.set_workspace_idle_timeout("ws-test", 5)
             assert (
-                container_manager.registry.get_workspace_idle_timeout(
+                container.registry.get_workspace_idle_timeout(
                     "ws-test"
                 )
                 == 5
             )
-            assert container_manager.IDLE_TIMEOUT_SECONDS == original_timeout
+            assert container.IDLE_TIMEOUT_SECONDS == original_timeout
             # Unknown workspace returns global default
             assert (
-                container_manager.registry.get_workspace_idle_timeout(
+                container.registry.get_workspace_idle_timeout(
                     "ws-other"
                 )
                 == original_timeout
             )
         finally:
-            container_manager.registry.states.pop("ws-test", None)
+            container.registry.states.pop("ws-test", None)
 
     async def test_cleanup_loop_adapts_to_short_timeout(self, db):
         """Cleanup loop interval adapts when per-workspace timeouts exist."""
         try:
-            container_manager.registry.track_activity("cid-fast", "ws-fast")
-            container_manager.registry.set_workspace_idle_timeout("ws-fast", 6)
+            container.registry.track_activity("cid-fast", "ws-fast")
+            container.registry.set_workspace_idle_timeout("ws-fast", 6)
             # With a 6s per-workspace timeout, the minimum is 6, so
             # the loop should sleep max(2, 6//2) = 3 seconds.
-            state = container_manager.registry.states["ws-fast"]
+            state = container.registry.states["ws-fast"]
             assert state.idle_timeout == 6
             # Global CHECK_INTERVAL_SECONDS should be unchanged
             assert (
-                container_manager.CHECK_INTERVAL_SECONDS
-                == container_manager.parse_idle_timeout()[1]
+                container.CHECK_INTERVAL_SECONDS
+                == container.parse_idle_timeout()[1]
             )
         finally:
-            container_manager.registry.states.pop("ws-fast", None)
+            container.registry.states.pop("ws-fast", None)
 
 
 # --- Roles ---
@@ -1190,12 +1190,12 @@ class TestAdminEndpoints:
         headers = await self._admin_headers(client)
         with (
             patch.object(
-                container_manager.registry,
+                container.registry,
                 "stop_user_containers",
                 new_callable=AsyncMock,
             ),
             patch.object(
-                workspace_manager, "archive_user_data", new_callable=AsyncMock
+                ws_mod, "archive_user_data", new_callable=AsyncMock
             ),
         ):
             resp = await client.delete(
@@ -1224,7 +1224,7 @@ class TestAdminEndpoints:
     async def test_delete_user_cascades_workspaces(
         self, client, admin_user, user
     ):
-        """Deleting a user cascades to their workspaces."""
+        """Deleting a user cascades to their ws_mod."""
         headers = await self._admin_headers(client)
         # Create a workspace for the user
         user_login = await client.post(
@@ -1240,7 +1240,7 @@ class TestAdminEndpoints:
         assert ws_resp.status_code == 200
         # Delete the user
         with patch.object(
-            container_manager.registry,
+            container.registry,
             "stop_user_containers",
             new_callable=AsyncMock,
         ):
@@ -1328,12 +1328,12 @@ class TestArchiveUserData:
     async def test_archive_creates_tarball(self, temp_data_dir, user):
         """Archive creates a .tar.xz file and removes the original dir."""
         # Create some workspace data
-        user_dir = workspace_manager.WORKSPACES_ROOT / user["id"]
+        user_dir = ws_mod.WORKSPACES_ROOT / user["id"]
         data_dir = user_dir / "data" / "ws1"
         data_dir.mkdir(parents=True)
         (data_dir / "hello.txt").write_text("test content")
 
-        result = await workspace_manager.archive_user_data(
+        result = await ws_mod.archive_user_data(
             user["id"], user["email"]
         )
         assert result is not None
@@ -1344,14 +1344,14 @@ class TestArchiveUserData:
 
     async def test_archive_no_data_dir(self, temp_data_dir, user):
         """Returns None if user has no data directory."""
-        result = await workspace_manager.archive_user_data(
+        result = await ws_mod.archive_user_data(
             user["id"], user["email"]
         )
         assert result is None
 
     async def test_archive_tar_nonzero_exit(self, temp_data_dir, user):
         """Returns None if tar exits with non-zero status."""
-        user_dir = workspace_manager.WORKSPACES_ROOT / user["id"]
+        user_dir = ws_mod.WORKSPACES_ROOT / user["id"]
         user_dir.mkdir(parents=True)
 
         mock_proc = AsyncMock()
@@ -1359,36 +1359,36 @@ class TestArchiveUserData:
         mock_proc.returncode = 1
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
-            result = await workspace_manager.archive_user_data(
+            result = await ws_mod.archive_user_data(
                 user["id"], user["email"]
             )
         assert result is None
 
     async def test_archive_tar_oserror(self, temp_data_dir, user):
         """Returns None if tar fails to start."""
-        user_dir = workspace_manager.WORKSPACES_ROOT / user["id"]
+        user_dir = ws_mod.WORKSPACES_ROOT / user["id"]
         user_dir.mkdir(parents=True)
 
         with patch(
             "asyncio.create_subprocess_exec", side_effect=OSError("no tar")
         ):
-            result = await workspace_manager.archive_user_data(
+            result = await ws_mod.archive_user_data(
                 user["id"], user["email"]
             )
         assert result is None
 
     async def test_archive_sanitizes_email(self, temp_data_dir, user):
         """Email with path separators is sanitized in archive filename."""
-        user_dir = workspace_manager.WORKSPACES_ROOT / user["id"]
+        user_dir = ws_mod.WORKSPACES_ROOT / user["id"]
         data_dir = user_dir / "data"
         data_dir.mkdir(parents=True)
 
-        result = await workspace_manager.archive_user_data(
+        result = await ws_mod.archive_user_data(
             user["id"], "user/../../etc/passwd"
         )
         assert result is not None
         # Archive must be under WORKSPACES_ROOT, not escaped
         assert result.resolve().is_relative_to(
-            workspace_manager.WORKSPACES_ROOT.resolve()
+            ws_mod.WORKSPACES_ROOT.resolve()
         )
         assert ".." not in result.name

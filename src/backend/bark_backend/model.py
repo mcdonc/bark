@@ -48,7 +48,7 @@ async def init_db() -> None:
                 user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
                 container_id TEXT,
-                num_ports INTEGER NOT NULL DEFAULT 5,  -- see container_manager.DEFAULT_PORTS_PER_WORKSPACE
+                num_ports INTEGER NOT NULL DEFAULT 5,  -- see container.DEFAULT_PORTS_PER_WORKSPACE
                 image TEXT,  -- custom Docker image; NULL means use default
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(user_id, name)
@@ -306,14 +306,14 @@ async def create_workspace(
             (workspace_id, user_id, name, image, created_at),
         )
         await db.commit()
-        from . import container_manager
+        from . import container
 
         return {
             "id": workspace_id,
             "user_id": user_id,
             "name": name,
             "image": image,
-            "num_ports": container_manager.DEFAULT_PORTS_PER_WORKSPACE,
+            "num_ports": container.DEFAULT_PORTS_PER_WORKSPACE,
             "created_at": created_at,
         }
     finally:

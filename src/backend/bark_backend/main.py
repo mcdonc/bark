@@ -9,10 +9,10 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import container_manager, model
+from . import container, model
 from .api import router
 from .util import resolve_env_secret
-from .ws_handler import handle_websocket
+from .wshandler import handle_websocket
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -59,16 +59,16 @@ async def seed_default_user() -> None:
 async def lifespan(app: FastAPI):
     await model.init_db()
     await seed_default_user()
-    from . import ws_handler
+    from . import wshandler
 
-    container_manager.registry.set_on_workspace_killed(
-        ws_handler.reset_workspace_state
+    container.registry.set_on_workspace_killed(
+        wshandler.reset_workspace_state
     )
-    await container_manager.registry.adopt_orphaned_containers()
-    container_manager.registry.start_cleanup_loop()
+    await container.registry.adopt_orphaned_containers()
+    container.registry.start_cleanup_loop()
     logger.info("Bark backend started")
     yield
-    await container_manager.registry.shutdown()
+    await container.registry.shutdown()
     logger.info("Bark backend stopped")
 
 

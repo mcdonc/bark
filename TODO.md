@@ -17,8 +17,10 @@
 
 ## Backend
 
-- **Clean up global mutable state in ws_handler.py**: `_connections`, `_sessions`, `_pending_browser_requests` are module-level dicts. Consider consolidating into a class or making them attributes of a handler instance for testability and cleanup.
-- **Rename backend modules**: Rename `container_manager.py` to `container.py`, `terminal_manager.py` to `terminal.py`, and `workspace_manager.py` to `workspace.py` for consistency with the `model.py` rename.
+- **Sessions singleton class in wshandler.py**: Extract `_sessions`, `_pending_browser_requests`, `get_session`, `get_or_create_session`, `remove_session` into a `Sessions` singleton class for better encapsulation and testability.
+- **Clean up global mutable state in wshandler.py**: `_connections` is still a module-level dict. Consider consolidating remaining global state into the Sessions class or a handler instance.
+- **Increase default terminal font size**: The terminal text is too small at the default 14px. Consider 16px or make it configurable.
+- **Mount S3 bucket as filesystem**: Allow workspaces to mount an S3 bucket (via s3fs-fuse or goofys) for persistent shared storage across containers and restarts.
 - **Update plugin docs to reflect new architecture**: "Bark plugins" are now just normal Pi extensions (npm packages with `pi.registerTool()`) that optionally include a `bark/` subdirectory with Dart code for browser-side actions. Update ARCHITECTURE.md plugin section, remove references to AG-UI `HOST_TOOL_REQUEST` delegation, and document the browser bridge flow (`@bark/bridge` → backend → WebSocket → Flutter plugin registry).
 - **Handle unsupported extension_ui_request methods**: Pi extensions like pi-subagents send `extension_ui_request` with methods the backend doesn't handle (e.g., `setWidget` with `widgetKey: "subagent-async"`). Pi blocks waiting for a response that never comes, causing a timeout. Either respond with an error/empty value so Pi can continue, or filter out extensions that rely on TUI-only features.
 - **Hosted app URLs should respect external headers**: The `get_hosted_url` tool generates URLs using `BARK_HOSTING_*` env vars passed to the container. These are derived from `X-Forwarded-Host`/`X-Forwarded-Proto` headers at WebSocket connect time, but if the hosting environment changes (e.g., different reverse proxy), the container's cached values become stale. Consider re-deriving hosting info on each `get_hosted_url` call or providing a mechanism to update the container's env vars without restart.

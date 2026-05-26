@@ -12,12 +12,12 @@ from pydantic import BaseModel
 
 from . import (
     auth,
-    container_manager,
-    email_service,
-    file_service,
-    ws_handler,
+    container,
+    emailsvc,
+    files,
+    wshandler,
     model,
-    workspace_manager,
+    workspaces,
 )
 from .util import resolve_env_secret
 
@@ -40,11 +40,11 @@ if resolve_env_secret("BARK_TEST_MODE"):  # pragma: no cover
         """Get the idle timeout (per-workspace or global default)."""
         if workspace_id:
             return {
-                "idle_timeout_seconds": container_manager.registry.get_workspace_idle_timeout(
+                "idle_timeout_seconds": container.registry.get_workspace_idle_timeout(
                     workspace_id
                 )
             }
-        return {"idle_timeout_seconds": container_manager.IDLE_TIMEOUT_SECONDS}
+        return {"idle_timeout_seconds": container.IDLE_TIMEOUT_SECONDS}
 
     class SetIdleTimeoutRequest(BaseModel):
         seconds: int
@@ -56,12 +56,12 @@ if resolve_env_secret("BARK_TEST_MODE"):  # pragma: no cover
         seconds = body.seconds
         workspace_id = body.workspace_id
         if workspace_id:
-            container_manager.registry.set_workspace_idle_timeout(
+            container.registry.set_workspace_idle_timeout(
                 workspace_id, seconds
             )
         else:
-            container_manager.IDLE_TIMEOUT_SECONDS = seconds
-            container_manager.CHECK_INTERVAL_SECONDS = max(
+            container.IDLE_TIMEOUT_SECONDS = seconds
+            container.CHECK_INTERVAL_SECONDS = max(
                 10, min(60, seconds // 3)
             )
         return {"idle_timeout_seconds": seconds}
@@ -105,7 +105,7 @@ async def register(
     password_hash = auth.hash_password(req.password)
     user_id = str(uuid.uuid4())
 
-    hostname, proto, base_path = ws_handler.derive_hosting_info(
+    hostname, proto, base_path = wshandler.derive_hosting_info(
         request.headers
     )
     logger.info(
@@ -128,7 +128,7 @@ async def register(
             (user_id, req.email, password_hash),
         )
         logger.info("User inserted (uncommitted): %s", req.email)
-        await email_service.send_verification_email(
+        await emailsvc.send_verification_email(
             req.email, verification_url
         )
         logger.info("Verification email sent, committing user: %s", req.email)
@@ -181,14 +181,14 @@ async def resend_verification(
         )
     _resend_timestamps[req.email] = now
 
-    hostname, proto, base_path = ws_handler.derive_hosting_info(
+    hostname, proto, base_path = wshandler.derive_hosting_info(
         request.headers
     )
     verification_token = auth.create_verification_token(user["id"])
     verification_url = (
         f"{proto}://{hostname}{base_path}/#/verify?token={verification_token}"
     )
-    await email_service.send_verification_email(req.email, verification_url)
+    await emailsvc.send_verification_email(req.email, verification_url)
     return {"status": "sent"}
 
 
@@ -218,14 +218,14 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request):
         )
     _reset_timestamps[req.email] = now
 
-    hostname, proto, base_path = ws_handler.derive_hosting_info(
+    hostname, proto, base_path = wshandler.derive_hosting_info(
         request.headers
     )
     reset_token = auth.create_password_reset_token(user["id"])
     reset_url = (
         f"{proto}://{hostname}{base_path}/#/reset-password?token={reset_token}"
     )
-    await email_service.send_password_reset_email(req.email, reset_url)
+    await emailsvc.send_password_reset_email(req.email, reset_url)
     return {"status": "sent"}
 
 
@@ -324,18 +324,18 @@ async def change_email(
     finally:
         await db.close()
 
-    hostname, proto, base_path = ws_handler.derive_hosting_info(
+    hostname, proto, base_path = wshandler.derive_hosting_info(
         request.headers
     )
     token = auth.create_verification_token(user["id"])
     url = f"{proto}://{hostname}{base_path}/#/verify?token={token}"
-    await email_service.send_verification_email(req.email, url)
+    await emailsvc.send_verification_email(req.email, url)
     return {"status": "updated", "needs_verification": True}
 
 
 @router.post("/auth/logout")
 async def logout(user: dict = Depends(auth.get_current_user)):
-    await container_manager.registry.stop_user_containers(user["id"])
+    await container.registry.stop_user_containers(user["id"])
     return {"status": "ok"}
 
 
@@ -344,7 +344,7 @@ async def logout(user: dict = Depends(auth.get_current_user)):
 
 @router.get("/workspaces")
 async def list_workspaces(user: dict = Depends(auth.get_current_user)):
-    return await workspace_manager.list_workspaces(user["id"])
+    return await workspaces.list_workspaces(user["id"])
 
 
 class CreateWorkspaceRequest(BaseModel):
@@ -355,8 +355,8 @@ class CreateWorkspaceRequest(BaseModel):
 @router.get("/images")
 async def list_images(_user: dict = Depends(auth.get_current_user)):
     return {
-        "default": container_manager.IMAGE_NAME,
-        "allowed": sorted(container_manager.ALLOWED_IMAGES),
+        "default": container.IMAGE_NAME,
+        "allowed": sorted(container.ALLOWED_IMAGES),
     }
 
 
@@ -364,14 +364,14 @@ async def list_images(_user: dict = Depends(auth.get_current_user)):
 async def create_workspace(
     body: CreateWorkspaceRequest, user: dict = Depends(auth.get_current_user)
 ):
-    if body.image and body.image not in container_manager.ALLOWED_IMAGES:
+    if body.image and body.image not in container.ALLOWED_IMAGES:
         raise HTTPException(
             status_code=400,
             detail=f"Image {body.image!r} is not allowed. "
-            f"Allowed: {sorted(container_manager.ALLOWED_IMAGES)}",
+            f"Allowed: {sorted(container.ALLOWED_IMAGES)}",
         )
     try:
-        return await workspace_manager.create_workspace(
+        return await workspaces.create_workspace(
             user["id"], body.name, image=body.image
         )
     except sqlite3.IntegrityError:
@@ -387,17 +387,17 @@ async def create_workspace(
 async def delete_workspace(
     workspace_id: str, user: dict = Depends(auth.get_current_user)
 ):
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     if workspace.get("container_id"):
-        await container_manager.registry.stop_and_remove_container(
+        await container.registry.stop_and_remove_container(
             workspace["container_id"]
         )
-    await ws_handler.reset_workspace_state(workspace_id)
+    await wshandler.reset_workspace_state(workspace_id)
 
-    deleted = await workspace_manager.delete_workspace(
+    deleted = await workspaces.delete_workspace(
         workspace_id, user["id"]
     )
     if not deleted:  # pragma: no cover — race between get and delete
@@ -414,11 +414,11 @@ async def list_files(
     path: str = ".",
     user: dict = Depends(auth.get_current_user),
 ):
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        return file_service.list_files(user["id"], workspace_id, path)
+        return files.list_files(user["id"], workspace_id, path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -429,11 +429,11 @@ async def read_file(
     path: str,
     user: dict = Depends(auth.get_current_user),
 ):
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        content = file_service.read_file(user["id"], workspace_id, path)
+        content = files.read_file(user["id"], workspace_id, path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if content is None:
@@ -449,11 +449,11 @@ async def delete_file(
     path: str,
     user: dict = Depends(auth.get_current_user),
 ):
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        deleted = file_service.delete_path(user["id"], workspace_id, path)
+        deleted = files.delete_path(user["id"], workspace_id, path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError:
@@ -472,11 +472,11 @@ async def rename_file(
     body: RenameFileRequest,
     user: dict = Depends(auth.get_current_user),
 ):
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        renamed = file_service.rename_path(
+        renamed = files.rename_path(
             user["id"], workspace_id, body.old_path, body.new_path
         )
     except ValueError as e:
@@ -496,11 +496,11 @@ async def download_file(
     path: str,
     user: dict = Depends(auth.get_current_user),
 ):
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
-        resolved = file_service.resolve_path(user["id"], workspace_id, path)
+        resolved = files.resolve_path(user["id"], workspace_id, path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not resolved.exists():
@@ -529,7 +529,7 @@ async def upload_file(
     path: str = "",
     user: dict = Depends(auth.get_current_user),
 ):
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
@@ -541,11 +541,11 @@ async def upload_file(
 
     container_id = workspace.get("container_id")
     if container_id is not None:
-        container_manager.registry.record_activity(container_id)
+        container.registry.record_activity(container_id)
 
     content = await file.read()
     try:
-        saved_path = file_service.write_file(
+        saved_path = files.write_file(
             user["id"], workspace_id, filename, content
         )
     except ValueError as e:
@@ -571,10 +571,10 @@ async def browser_delegate(body: BrowserDelegateRequest):
     token to a workspace_id, relays the request to the Flutter client
     over WebSocket, and returns the browser's response.
     """
-    workspace_id = container_manager.registry.resolve_bridge_token(body.token)
+    workspace_id = container.registry.resolve_bridge_token(body.token)
     if workspace_id is None:
         raise HTTPException(status_code=403, detail="Invalid bridge token")
-    result = await ws_handler.dispatch_browser_request(
+    result = await wshandler.dispatch_browser_request(
         workspace_id,
         body.model_dump(exclude={"token"}),
     )
@@ -601,9 +601,9 @@ async def delete_user(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     # Stop all containers for this user before deleting
-    await container_manager.registry.stop_user_containers(user_id)
+    await container.registry.stop_user_containers(user_id)
     # Archive workspace data before deletion
-    await workspace_manager.archive_user_data(user_id, user["email"])
+    await workspaces.archive_user_data(user_id, user["email"])
     deleted = await model.delete_user(user_id)
     if not deleted:  # pragma: no cover — race between get and delete
         raise HTTPException(status_code=404, detail="User not found")

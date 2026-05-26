@@ -8,10 +8,10 @@ import uuid
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from . import auth, container_manager, workspace_manager
+from . import auth, container, workspaces
 from .util import resolve_env_secret
-from .exec_session import ExecSession
-from .terminal_manager import TerminalSession
+from .dockerexec import ExecSession
+from .terminal import TerminalSession
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ async def handle_websocket(ws: WebSocket) -> None:
         "container_id": None,
         "terminal_session": None,
         "terminal_task": None,
-        "exec_session": None,
+        "dockerexec": None,
         "exec_task": None,
     }
     _connections[ws] = conn_state
@@ -188,10 +188,10 @@ async def start_workspace_container(
     """Start/restart container for a workspace."""
     user = state["user"]
     host_path = str(
-        workspace_manager.get_workspace_host_path(user["id"], workspace_id)
+        workspaces.get_workspace_host_path(user["id"], workspace_id)
     )
     home_path = str(
-        workspace_manager.get_home_host_path(user["id"], workspace_id)
+        workspaces.get_home_host_path(user["id"], workspace_id)
     )
 
     # Find the most recent Pi session file to resume (if any).
@@ -209,14 +209,14 @@ async def start_workspace_container(
     (
         container_id,
         container_status,
-    ) = await container_manager.registry.start_container(
+    ) = await container.registry.start_container(
         workspace_id,
         host_path,
         home_path,
         workspace.get("container_id"),
         resume_session=resume_session,
         num_ports=workspace.get(
-            "num_ports", container_manager.DEFAULT_PORTS_PER_WORKSPACE
+            "num_ports", container.DEFAULT_PORTS_PER_WORKSPACE
         ),
         hosting_hostname=hosting_hostname,
         hosting_proto=hosting_proto,
@@ -229,7 +229,7 @@ async def start_workspace_container(
 
     session = get_or_create_session(workspace_id)
     async with session.lock:
-        container_manager.registry.add_connection(workspace_id)
+        container.registry.add_connection(workspace_id)
         session.container_id = container_id
         session.subscribers.add(ws)
 
@@ -250,7 +250,7 @@ async def start_workspace_container(
             pass
 
     state["_idle_cb"] = on_idle
-    container_manager.registry.on_idle_stop(workspace_id, on_idle)
+    container.registry.on_idle_stop(workspace_id, on_idle)
 
     # Cache workspace info for auto-restart
     state["workspace"] = workspace
@@ -267,7 +267,7 @@ async def handle_workspace_connect(
         return
 
     user = state["user"]
-    workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
+    workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         await send_error(ws, "Workspace not found")
         return
@@ -277,10 +277,10 @@ async def handle_workspace_connect(
 
     await start_workspace_container(ws, state, workspace_id, workspace)
 
-    ports = await container_manager.registry.get_workspace_ports(workspace_id)
+    ports = await container.registry.get_workspace_ports(workspace_id)
     status = state.get("container_status", "created")
     container_name = (
-        f"bark-{container_manager.INSTANCE_ID}-{workspace_id[:12]}"
+        f"bark-{container.INSTANCE_ID}-{workspace_id[:12]}"
     )
     ports_str = f" (ports {','.join(str(p) for p in ports)})" if ports else ""
     status_msg = {
@@ -289,7 +289,7 @@ async def handle_workspace_connect(
         "created": f"Created new container {container_name}{ports_str}",
     }.get(status, "Container ready")
 
-    timeout_mins = container_manager.IDLE_TIMEOUT_SECONDS / 60
+    timeout_mins = container.IDLE_TIMEOUT_SECONDS / 60
     if timeout_mins == int(timeout_mins):
         status_msg += f" — idle timeout: {int(timeout_mins)}m"
     else:
@@ -346,7 +346,7 @@ async def handle_restart_container(ws: WebSocket, state: dict) -> None:
         logger.warning("Cleanup error during restart: %s", e)
 
     if workspace is None:
-        workspace = await workspace_manager.get_workspace(
+        workspace = await workspaces.get_workspace(
             workspace_id, user["id"]
         )
     if workspace is None:
@@ -354,16 +354,16 @@ async def handle_restart_container(ws: WebSocket, state: dict) -> None:
         return
 
     await start_workspace_container(ws, state, workspace_id, workspace)
-    container_manager.registry.record_activity(state["container_id"])
+    container.registry.record_activity(state["container_id"])
 
-    ports = await container_manager.registry.get_workspace_ports(workspace_id)
+    ports = await container.registry.get_workspace_ports(workspace_id)
     ports_str = f" (ports {','.join(str(p) for p in ports)})" if ports else ""
     container_name = (
-        f"bark-{container_manager.INSTANCE_ID}-{workspace_id[:12]}"
+        f"bark-{container.INSTANCE_ID}-{workspace_id[:12]}"
     )
     status_msg = f"Container restarted {container_name}{ports_str}"
 
-    timeout_mins = container_manager.IDLE_TIMEOUT_SECONDS / 60
+    timeout_mins = container.IDLE_TIMEOUT_SECONDS / 60
     if timeout_mins == int(timeout_mins):
         status_msg += f" — idle timeout: {int(timeout_mins)}m"
     else:
@@ -402,14 +402,14 @@ async def handle_terminal_start(ws: WebSocket, state: dict, msg: dict) -> None:
     )
     # Clear the screen to hide the double-prompt on startup.
     await ws.send_json({"type": "terminal_output", "data": "\x1b[2J\x1b[H"})
-    container_manager.registry.record_activity(container_id)
+    container.registry.record_activity(container_id)
 
 
 async def handle_terminal_input(state: dict, msg: dict) -> None:
     session: TerminalSession | None = state.get("terminal_session")
     if session is None or not session.is_alive:
         return
-    container_manager.registry.record_activity(state["container_id"])
+    container.registry.record_activity(state["container_id"])
     await session.write(msg.get("data", ""))
 
 
@@ -435,18 +435,18 @@ async def handle_exec_start(ws: WebSocket, state: dict, msg: dict) -> None:
         return
     session = ExecSession(container_id)
     await session.start(command)
-    state["exec_session"] = session
+    state["dockerexec"] = session
     state["exec_task"] = asyncio.create_task(
         forward_exec_output(ws, session, state)
     )
-    container_manager.registry.record_activity(container_id)
+    container.registry.record_activity(container_id)
 
 
 async def handle_exec_input(state: dict, msg: dict) -> None:
-    session: ExecSession | None = state.get("exec_session")
+    session: ExecSession | None = state.get("dockerexec")
     if session is None or not session.is_alive:
         return
-    container_manager.registry.record_activity(state["container_id"])
+    container.registry.record_activity(state["container_id"])
     import base64
 
     raw = base64.b64decode(msg.get("data", ""))
@@ -454,7 +454,7 @@ async def handle_exec_input(state: dict, msg: dict) -> None:
 
 
 async def handle_exec_close_stdin(state: dict) -> None:
-    session: ExecSession | None = state.get("exec_session")
+    session: ExecSession | None = state.get("dockerexec")
     if session is None:
         return
     await session.close_stdin()
@@ -467,7 +467,7 @@ async def handle_exec_stop(state: dict) -> None:
 async def handle_heartbeat(state: dict) -> None:
     container_id = state.get("container_id")
     if container_id is not None:
-        container_manager.registry.record_activity(container_id)
+        container.registry.record_activity(container_id)
 
 
 def handle_browser_response(msg: dict) -> None:
@@ -532,10 +532,10 @@ async def stop_exec(state: dict) -> None:
         except asyncio.CancelledError:
             pass
         state["exec_task"] = None
-    session: ExecSession | None = state.get("exec_session")
+    session: ExecSession | None = state.get("dockerexec")
     if session:
         await session.stop()
-        state["exec_session"] = None
+        state["dockerexec"] = None
 
 
 async def forward_exec_output(
@@ -554,7 +554,7 @@ async def forward_exec_output(
             )
             container_id = state.get("container_id")
             if container_id:
-                container_manager.registry.record_activity(container_id)
+                container.registry.record_activity(container_id)
         # Process exited — send exit code
         await ws.send_json(
             {
@@ -594,7 +594,7 @@ async def forward_terminal_output(
             await ws.send_json({"type": "terminal_output", "data": data})
             container_id = state.get("container_id")
             if container_id:
-                container_manager.registry.record_activity(container_id)
+                container.registry.record_activity(container_id)
         # Stream ended without cancellation — container likely died
         await ws.send_json(
             {
@@ -653,7 +653,7 @@ async def cleanup_connection(ws: WebSocket, state: dict) -> None:
     workspace_id = state.get("workspace_id")
     idle_cb = state.get("_idle_cb")
     if workspace_id and idle_cb:
-        container_manager.registry.remove_idle_callback(workspace_id, idle_cb)
+        container.registry.remove_idle_callback(workspace_id, idle_cb)
         state["_idle_cb"] = None
 
     await stop_terminal(state)
@@ -668,14 +668,14 @@ async def cleanup_connection(ws: WebSocket, state: dict) -> None:
     # destroys the container.
     remaining = 0
     if workspace_id:
-        remaining = container_manager.registry.remove_connection(workspace_id)
+        remaining = container.registry.remove_connection(workspace_id)
 
     if remaining == 0 and workspace_id:
         await remove_session(workspace_id)
 
         container_id = state.get("container_id")
         if container_id:
-            await container_manager.registry.stop_and_remove_container(
+            await container.registry.stop_and_remove_container(
                 container_id
             )
 
@@ -687,7 +687,7 @@ async def reset_workspace_state(workspace_id: str) -> None:
     manual stop) so the next workspace_connect starts fresh.
     """
     await remove_session(workspace_id)
-    container_manager.registry.remove_state(workspace_id)
+    container.registry.remove_state(workspace_id)
     logger.info("Reset workspace state for %s", workspace_id)
 
 

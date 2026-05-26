@@ -3,7 +3,7 @@ import logging
 import shutil
 from pathlib import Path
 
-from . import container_manager, model
+from . import container, model
 from .util import resolve_env_secret
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ async def create_workspace(
     home.mkdir(parents=True, exist_ok=True)
     # Allocate ports at creation time so ranges are sequential
     try:
-        await container_manager.registry.allocate_ports(
+        await container.registry.allocate_ports(
             workspace["id"], workspace["num_ports"]
         )
     except Exception:
