@@ -1,38 +1,45 @@
-import { Type } from "@sinclair/typebox";
+const BRIDGE_URL = process.env.BARK_BRIDGE_URL;
+const BRIDGE_TOKEN = process.env.BARK_BRIDGE_TOKEN;
 
 export default function (pi: any) {
+  if (!BRIDGE_URL || !BRIDGE_TOKEN) return;
+
   pi.registerTool({
     name: "beep",
-    label: "Beep",
     description:
-      "Play a beep sound in the user's browser. Use when the user asks for an audible alert, notification, or beep.",
-    parameters: Type.Object({
-      frequency: Type.Optional(
-        Type.Number({ description: "Frequency in Hz (default 440)" }),
-      ),
-      duration: Type.Optional(
-        Type.Number({ description: "Duration in milliseconds (default 200)" }),
-      ),
-    }),
+      "Play a beep sound to get the user's attention or signal completion.",
+    parameters: {},
     async execute(
       _toolCallId: string,
-      params: { frequency?: number; duration?: number },
+      _params: Record<string, never>,
       _signal: AbortSignal | undefined,
       _onUpdate: any,
-      ctx: any,
+      _ctx: any,
     ) {
-      const freq = params.frequency || 440;
-      const dur = params.duration || 600;
-      const request = JSON.stringify({
-        action: "beep",
-        frequency: freq,
-        duration: dur,
-      });
-      const response = await ctx.ui.input("HOST_TOOL_REQUEST", request);
+      try {
+        const resp = await fetch(`${BRIDGE_URL}/api/browser-delegate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "beep",
+            token: BRIDGE_TOKEN,
+          }),
+        });
+
+        if (resp.ok) {
+          return {
+            content: [{ type: "text", text: "Beep played." }],
+            details: {},
+          };
+        }
+      } catch {
+        // Bridge unreachable — fall through to terminal bell
+      }
+
+      // No browser connected or bridge failed — terminal bell fallback
+      process.stdout.write("\x07");
       return {
-        content: [
-          { type: "text", text: response || `Beep! (${freq}Hz, ${dur}ms)` },
-        ],
+        content: [{ type: "text", text: "Beep played." }],
         details: {},
       };
     },
