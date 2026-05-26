@@ -147,87 +147,6 @@ export function vp(page: Page) {
   return page.viewportSize() || { width: 1280, height: 720 };
 }
 
-/** Type a prompt into the chat input and verify it was received by the backend.
- *  On slower environments (CI, WebKit), the Flutter chat widget may not be
- *  fully wired up when container_ready fires. This function retries once
- *  if the user message doesn't appear in the backend within 10s. */
-export async function sendPrompt(
-  page: Page,
-  request: APIRequestContext,
-  workspaceId: string,
-  headers: Record<string, string>,
-  text: string,
-) {
-  const { height } = vp(page);
-
-  const typeAndSend = async () => {
-    await flutterClick(page, 240, height - 30);
-    await page.waitForTimeout(500);
-    // Select all + delete to clear any leftover text from a failed attempt
-    await page.keyboard.press("Control+a");
-    await page.keyboard.press("Backspace");
-    await page.waitForTimeout(200);
-    await page.keyboard.type(text);
-    await page.waitForTimeout(300);
-    await page.keyboard.press("Enter");
-  };
-
-  const checkReceived = async (): Promise<boolean> => {
-    for (let i = 0; i < 5; i++) {
-      await page.waitForTimeout(1000);
-      const msgResp = await request.get(
-        `${API_BASE}/workspaces/${workspaceId}/messages`,
-        { headers },
-      );
-      if (msgResp.ok()) {
-        const messages = await msgResp.json();
-        if (messages.some((m: any) => m.entry_type === "user")) return true;
-      }
-    }
-    return false;
-  };
-
-  await typeAndSend();
-  if (await checkReceived()) return;
-  // Retry once — the chat widget may not have been ready
-  await typeAndSend();
-  if (await checkReceived()) return;
-  throw new Error(
-    `Prompt "${text}" was not received by the backend after 2 attempts`,
-  );
-}
-
-/** Poll until the agent has finished responding (an assistant or tool_call
- *  message with is_complete=true exists, or timeout is reached).
- *  Returns all messages at the time of completion. */
-export async function waitForAgentDone(
-  page: Page,
-  request: APIRequestContext,
-  workspaceId: string,
-  headers: Record<string, string>,
-  timeoutMs: number = 60_000,
-): Promise<any[]> {
-  const deadline = Date.now() + timeoutMs;
-  let messages: any[] = [];
-  while (Date.now() < deadline) {
-    await page.waitForTimeout(2000);
-    const msgResp = await request.get(
-      `${API_BASE}/workspaces/${workspaceId}/messages`,
-      { headers },
-    );
-    if (msgResp.ok()) {
-      messages = await msgResp.json();
-      const hasComplete = messages.some(
-        (m: any) =>
-          (m.entry_type === "assistant" || m.entry_type === "tool_call") &&
-          m.is_complete,
-      );
-      if (hasComplete) return messages;
-    }
-  }
-  return messages;
-}
-
 /** Click the terminal area, wait for it to be interactive, then type a command and press Enter. */
 export async function terminalType(
   page: Page,
@@ -236,7 +155,7 @@ export async function terminalType(
   termY?: number,
 ) {
   const { width, height } = vp(page);
-  const x = termX ?? (492 + width) / 2;
+  const x = termX ?? width / 2;
   const y = termY ?? height / 2;
   const f = fv(page);
 
@@ -348,9 +267,6 @@ export function dockerContainersForWorkspace(workspaceId: string): string[] {
 }
 
 // Layout coordinates at 1280x720:
-// Chat panel: x 0-486 (38%)
-// Right panel: x 492-1280
-// Tab bar (Terminal/Files): y ~0-32 in right panel
-// Chat input: bottom of left panel, ~y 690
-// Debug bar: bottom of right panel
+// Terminal/Files panel: full width (x 0-1280)
+// Tab bar (Terminal/Files): y ~0-32
 // Back button: x ~25, y ~28

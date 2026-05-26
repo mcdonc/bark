@@ -45,6 +45,7 @@ def server():
         "BARK_TEST_MODE": "1",
         "BARK_INSTANCE_ID": "cli-e2e",
         "BARK_IDLE_TIMEOUT_SECONDS": "300",
+        "BARK_PORT_RANGE_START": "9000",
         "LOGFIRE_TOKEN": "",
     }
     proc = subprocess.Popen(
@@ -87,17 +88,6 @@ def server():
     except subprocess.TimeoutExpired:
         proc.kill()
     # Clean up containers
-    subprocess.run(
-        [
-            "docker",
-            "ps",
-            "-a",
-            "--filter",
-            "label=bark.instance=cli-e2e",
-            "-q",
-        ],
-        capture_output=True,
-    )
     result = subprocess.run(
         [
             "docker",
@@ -187,11 +177,11 @@ class TestLogin:
 class TestWorkspaceCRUD:
     def test_create_workspace(self, cli_config):
         result = _run(
-            ["bark", "ws", "create", "e2e-test"],
+            ["bark", "ws", "create", "e2e-crud"],
             env=cli_config["env"],
         )
         assert result.returncode == 0
-        assert "e2e-test" in result.stdout
+        assert "e2e-crud" in result.stdout
 
     def test_list_workspaces(self, cli_config):
         result = _run(
@@ -199,11 +189,11 @@ class TestWorkspaceCRUD:
             env=cli_config["env"],
         )
         assert result.returncode == 0
-        assert "e2e-test" in result.stdout
+        assert "e2e-crud" in result.stdout
 
     def test_create_duplicate_fails(self, cli_config):
         result = _run(
-            ["bark", "ws", "create", "e2e-test"],
+            ["bark", "ws", "create", "e2e-crud"],
             env=cli_config["env"],
         )
         assert result.returncode != 0
@@ -215,11 +205,32 @@ class TestWorkspaceCRUD:
         )
         assert result.returncode != 0
 
+    def test_delete_workspace(self, cli_config):
+        result = _run(
+            ["bark", "ws", "delete", "e2e-crud"],
+            env=cli_config["env"],
+        )
+        assert result.returncode == 0
+        assert "Deleted" in result.stdout
+
+    def test_list_after_delete(self, cli_config):
+        result = _run(
+            ["bark", "ws", "list", "--plain"],
+            env=cli_config["env"],
+        )
+        assert "e2e-crud" not in result.stdout
+
 
 class TestExec:
+    @pytest.fixture(autouse=True, scope="class")
+    def workspace(self, cli_config):
+        _run(["bark", "ws", "create", "e2e-exec"], env=cli_config["env"])
+        yield
+        _run(["bark", "ws", "delete", "e2e-exec"], env=cli_config["env"])
+
     def test_exec_echo(self, cli_config):
         result = _run(
-            ["bark", "ws", "exec", "e2e-test", "echo", "hello from exec"],
+            ["bark", "ws", "exec", "e2e-exec", "echo", "hello from exec"],
             env=cli_config["env"],
             timeout=60,
         )
@@ -228,7 +239,7 @@ class TestExec:
 
     def test_exec_piped_stdin(self, cli_config):
         result = _run(
-            ["bark", "ws", "exec", "e2e-test", "cat"],
+            ["bark", "ws", "exec", "e2e-exec", "cat"],
             input="piped data\n",
             env=cli_config["env"],
             timeout=60,
@@ -238,7 +249,7 @@ class TestExec:
 
     def test_exec_exit_code(self, cli_config):
         result = _run(
-            ["bark", "ws", "exec", "e2e-test", "false"],
+            ["bark", "ws", "exec", "e2e-exec", "false"],
             env=cli_config["env"],
             timeout=60,
         )
@@ -246,6 +257,12 @@ class TestExec:
 
 
 class TestSync:
+    @pytest.fixture(autouse=True, scope="class")
+    def workspace(self, cli_config):
+        _run(["bark", "ws", "create", "e2e-sync"], env=cli_config["env"])
+        yield
+        _run(["bark", "ws", "delete", "e2e-sync"], env=cli_config["env"])
+
     def test_sync_to_container(self, cli_config, tmp_path):
         # Create local files
         src = tmp_path / "sync-src"
@@ -259,7 +276,7 @@ class TestSync:
                 "ws",
                 "sync",
                 str(src) + "/",
-                "e2e-test:/work/synced/",
+                "e2e-sync:/work/synced/",
             ],
             env=cli_config["env"],
             timeout=60,
@@ -272,7 +289,7 @@ class TestSync:
                 "bark",
                 "ws",
                 "exec",
-                "e2e-test",
+                "e2e-sync",
                 "cat",
                 "/work/synced/file1.txt",
             ],
@@ -289,7 +306,7 @@ class TestSync:
                 "bark",
                 "ws",
                 "exec",
-                "e2e-test",
+                "e2e-sync",
                 "bash",
                 "-c",
                 "echo remote-data > /work/remote-file.txt",
@@ -306,7 +323,7 @@ class TestSync:
                 "bark",
                 "ws",
                 "sync",
-                "e2e-test:/work/remote-file.txt",
+                "e2e-sync:/work/remote-file.txt",
                 str(dest) + "/",
             ],
             env=cli_config["env"],
@@ -314,23 +331,6 @@ class TestSync:
         )
         assert result.returncode == 0
         assert (dest / "remote-file.txt").read_text().strip() == "remote-data"
-
-
-class TestDeleteWorkspace:
-    def test_delete_workspace(self, cli_config):
-        result = _run(
-            ["bark", "ws", "delete", "e2e-test"],
-            env=cli_config["env"],
-        )
-        assert result.returncode == 0
-        assert "Deleted" in result.stdout
-
-    def test_list_after_delete(self, cli_config):
-        result = _run(
-            ["bark", "ws", "list", "--plain"],
-            env=cli_config["env"],
-        )
-        assert "e2e-test" not in result.stdout
 
 
 class TestLogout:

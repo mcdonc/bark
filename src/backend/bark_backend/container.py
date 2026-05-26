@@ -43,7 +43,9 @@ def parse_idle_timeout() -> tuple[int, int]:
 
 IDLE_TIMEOUT_SECONDS, CHECK_INTERVAL_SECONDS = parse_idle_timeout()
 
-PORT_RANGE_START = 9000
+PORT_RANGE_START = int(
+    util.resolve_env_secret("BARK_PORT_RANGE_START") or "9000"
+)
 CONTAINER_PORT_START = 8000
 DEFAULT_PORTS_PER_WORKSPACE = 5
 

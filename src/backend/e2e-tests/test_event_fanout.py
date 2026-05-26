@@ -82,6 +82,7 @@ def server():
         "BARK_TEST_MODE": "1",
         "BARK_INSTANCE_ID": "fanout-e2e",
         "BARK_IDLE_TIMEOUT_SECONDS": "300",
+        "BARK_PORT_RANGE_START": "9100",
         "LOGFIRE_TOKEN": "",
     }
     proc = subprocess.Popen(

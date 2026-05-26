@@ -27,9 +27,7 @@ const webkitUse = {
 };
 
 // Browsers run sequentially (chromium → firefox → webkit) to avoid
-// overwhelming SQLite with concurrent writes from 60+ parallel tests.
-// LLM and non-LLM tests run in separate dependency chains so a flaky
-// LLM test doesn't block the non-LLM suite.
+// overwhelming SQLite with concurrent writes from parallel tests.
 
 export default defineConfig({
   testDir: "./e2e",
@@ -49,46 +47,21 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    // LLM tests run first (Ollama is warm from global setup), sequential
-    // within each browser, no fail-fast (fullyParallel: false without
-    // mode: "serial") so one flaky test doesn't skip the rest.
-    // Non-LLM tests follow each browser's LLM tests.
-    {
-      name: "chromium-llm",
-      testMatch: "bark-llm.spec.ts",
-      fullyParallel: false,
-      use: chromiumUse,
-    },
     {
       name: "chromium",
       testMatch: "bark.spec.ts",
-      dependencies: ["chromium-llm"],
       use: chromiumUse,
-    },
-    {
-      name: "firefox-llm",
-      testMatch: "bark-llm.spec.ts",
-      dependencies: ["chromium"],
-      fullyParallel: false,
-      use: firefoxUse,
     },
     {
       name: "firefox",
       testMatch: "bark.spec.ts",
-      dependencies: ["firefox-llm"],
+      dependencies: ["chromium"],
       use: firefoxUse,
-    },
-    {
-      name: "webkit-llm",
-      testMatch: "bark-llm.spec.ts",
-      dependencies: ["firefox"],
-      fullyParallel: false,
-      use: webkitUse,
     },
     {
       name: "webkit",
       testMatch: "bark.spec.ts",
-      dependencies: ["webkit-llm"],
+      dependencies: ["firefox"],
       use: webkitUse,
     },
   ],

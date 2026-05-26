@@ -10,7 +10,6 @@ import {
   flutterClick,
   waitForFile,
   vp,
-  sendPrompt,
   terminalType,
   createWorkspace,
   openWorkspace,
@@ -92,8 +91,7 @@ test.describe("Bark E2E", () => {
 
     try {
       const { width, height } = vp(page);
-      const f = fv(page);
-      const termX = (492 + width) / 2;
+      const termX = width / 2;
       const termY = height / 2;
 
       await terminalType(
@@ -187,8 +185,7 @@ test.describe("Bark E2E", () => {
 
     try {
       const { width, height } = vp(page);
-      const f = fv(page);
-      const termX = (492 + width) / 2;
+      const termX = width / 2;
       const termY = height / 2;
 
       await terminalType(page, 'echo "foo" > /work/foo.txt', termX, termY);
@@ -426,12 +423,6 @@ test.describe("Bark E2E", () => {
       { headers },
     );
     expect(filesResp.status()).toBe(401);
-
-    const msgResp = await request.get(
-      `${API_BASE}/workspaces/fake-id/messages`,
-      { headers },
-    );
-    expect(msgResp.status()).toBe(401);
   });
 
   test("no token returns 401 from API", async ({ request }) => {
@@ -451,11 +442,9 @@ test.describe("Bark E2E", () => {
 
     try {
       const { width, height } = vp(page);
-      const f = fv(page);
-      const termX = (492 + width) / 2;
+      const termX = width / 2;
       const termY = height / 2;
 
-      // Click in terminal
       // Run a multi-command sequence
       await terminalType(
         page,
@@ -493,24 +482,28 @@ test.describe("Bark E2E", () => {
     try {
       const { width, height } = vp(page);
       const f = fv(page);
-      const rightCenter = (492 + width) / 2;
+
+      // Tabs span full width now (no chat panel). Terminal tab is on the
+      // left half, Files tab is on the right half of the tab bar.
+      const termTabX = width / 4;
+      const filesTabX = (width * 3) / 4;
 
       // Switch to Files tab
-      await f.click({ position: { x: rightCenter + 200, y: 16 }, force: true });
+      await f.click({ position: { x: filesTabX, y: 16 }, force: true });
       await page.waitForTimeout(500);
 
       // Switch back to Terminal tab
-      await f.click({ position: { x: rightCenter - 200, y: 16 }, force: true });
+      await f.click({ position: { x: termTabX, y: 16 }, force: true });
       await page.waitForTimeout(500);
 
       // Switch to Files again and back
-      await f.click({ position: { x: rightCenter + 200, y: 16 }, force: true });
+      await f.click({ position: { x: filesTabX, y: 16 }, force: true });
       await page.waitForTimeout(500);
-      await f.click({ position: { x: rightCenter - 200, y: 16 }, force: true });
+      await f.click({ position: { x: termTabX, y: 16 }, force: true });
       await page.waitForTimeout(1000);
 
       // Terminal should still work — run a command
-      const termX = rightCenter;
+      const termX = width / 2;
       const termY = 200;
       await terminalType(
         page,
