@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import container_manager, user_store
 from .api import router
-from .env_util import resolve_env_secret
+from .util import resolve_env_secret
 from .ws_handler import handle_websocket
 
 logging.basicConfig(level=logging.INFO)

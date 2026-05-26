@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .env_util import resolve_env_secret
+from .util import resolve_env_secret
 
 _data_dir = Path(
     resolve_env_secret("BARK_DATA_DIR", str(Path.home() / ".bark" / "data"))

@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 from . import container_manager, user_store
-from .env_util import resolve_env_secret
+from .util import resolve_env_secret
 
 logger = logging.getLogger(__name__)
 

@@ -19,7 +19,7 @@ from . import (
     user_store,
     workspace_manager,
 )
-from .env_util import resolve_env_secret
+from .util import resolve_env_secret
 
 logger = logging.getLogger(__name__)
 

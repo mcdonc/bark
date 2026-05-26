@@ -9,7 +9,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 
 from . import user_store
-from .env_util import resolve_env_secret
+from .util import resolve_env_secret
 
 # --- Rate limiting constants ---
 LOGIN_LOCKOUT_WINDOW = int(

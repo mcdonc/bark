@@ -38,5 +38,4 @@
 - **Build a second Docker image for testing image selection**: Create an alternative workspace image (e.g., a minimal image without Pi, or a data-science image with Jupyter) to test the custom image feature interactively. Currently only `bark-pi` exists so there's nothing to select from.
 - **Clean up stale FIFO stderr warning in pi_rpc_client**: The `read_loop` logs a warning about "expected ENOENT for settings.json FIFO after startup read" but we no longer use a FIFO for settings.json. Update or remove the warning message.
 - **Rename user_store.py**: `user_store.py` contains all database access — users, workspaces, messages, ports, roles, login attempts. Rename to `db.py` or `model.py` to better reflect its scope.
-- **Rename env_util.py to util.py**: The module may grow beyond just env var helpers.
 - **Remove SOLIPLEX_URL references**: Soliplex integration is handled by a plugin, but the backend still passes `SOLIPLEX_URL` as an env var to containers. Remove the references from `container_manager.py` and related code.

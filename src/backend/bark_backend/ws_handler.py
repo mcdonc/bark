@@ -7,7 +7,7 @@ import logging
 from fastapi import WebSocket, WebSocketDisconnect
 
 from . import auth, container_manager, user_store, workspace_manager
-from .env_util import resolve_env_secret
+from .util import resolve_env_secret
 from .agui_translator import translate_event
 from .pi_rpc_client import PiDeadError, PiRpcClient
 from .exec_session import ExecSession

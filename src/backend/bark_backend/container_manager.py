@@ -6,14 +6,14 @@ import time
 
 import aiodocker
 
-from . import env_util, user_store
+from . import util, user_store
 
 logger = logging.getLogger(__name__)
 
-IMAGE_NAME = env_util.resolve_env_secret("BARK_IMAGE_NAME", "bark-pi")
-INSTANCE_ID = env_util.resolve_env_secret("BARK_INSTANCE_ID", "default")
+IMAGE_NAME = util.resolve_env_secret("BARK_IMAGE_NAME", "bark-pi")
+INSTANCE_ID = util.resolve_env_secret("BARK_INSTANCE_ID", "default")
 
-_allowed_images_env = env_util.resolve_env_secret("BARK_ALLOWED_IMAGES", "")
+_allowed_images_env = util.resolve_env_secret("BARK_ALLOWED_IMAGES", "")
 ALLOWED_IMAGES: set[str] = {
     img.strip() for img in _allowed_images_env.split(",") if img.strip()
 }
@@ -22,7 +22,7 @@ ALLOWED_IMAGES.add(IMAGE_NAME)  # default image is always allowed
 
 def parse_idle_timeout() -> tuple[int, int]:
     default = 30 * 60
-    env_val = env_util.resolve_env_secret("BARK_IDLE_TIMEOUT_SECONDS")
+    env_val = util.resolve_env_secret("BARK_IDLE_TIMEOUT_SECONDS")
     if env_val is not None:
         try:
             timeout = int(env_val)
@@ -244,9 +244,9 @@ class ContainerRegistry:
                 host_ports = host_ports[:num_ports]
 
         env_vars = []
-        nginx_port = env_util.resolve_env_secret("BARK_NGINX_PORT", "8995")
+        nginx_port = util.resolve_env_secret("BARK_NGINX_PORT", "8995")
         proxy_url = f"http://host.docker.internal:{nginx_port}/llm-proxy"
-        llm_model = env_util.resolve_env_secret("LLM_MODEL", "")
+        llm_model = util.resolve_env_secret("LLM_MODEL", "")
         env_vars.append(f"LLM_PROXY_URL={proxy_url}")
         if llm_model:
             env_vars.append(f"LLM_MODEL={llm_model}")
@@ -257,9 +257,9 @@ class ContainerRegistry:
             llm_model,
         )
 
-        logfire_token = env_util.resolve_env_secret("LOGFIRE_TOKEN")
+        logfire_token = util.resolve_env_secret("LOGFIRE_TOKEN")
         if logfire_token:
-            logfire_base = env_util.resolve_env_secret(
+            logfire_base = util.resolve_env_secret(
                 "LOGFIRE_BASE_URL",
                 "https://logfire-api.pydantic.dev",
             )
@@ -269,7 +269,7 @@ class ContainerRegistry:
                 f"Authorization=Bearer {logfire_token}"
             )
             env_vars.append("OTEL_SERVICE_NAME=bark-pi-agent")
-            logfire_env = env_util.resolve_env_secret("LOGFIRE_ENVIRONMENT")
+            logfire_env = util.resolve_env_secret("LOGFIRE_ENVIRONMENT")
             if logfire_env:
                 env_vars.append(
                     "OTEL_RESOURCE_ATTRIBUTES="

@@ -1,6 +1,6 @@
-"""Tests for env_util: file-backed secret resolution."""
+"""Tests for util: file-backed secret resolution."""
 
-from bark_backend.env_util import resolve_env_secret
+from bark_backend.util import resolve_env_secret
 
 
 class TestResolveEnvSecret:
