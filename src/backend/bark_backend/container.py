@@ -59,7 +59,6 @@ class ContainerState:
         self.last_activity = time.time()
         self.idle_timeout: int | None = None
         self.idle_callbacks: list = []
-        self.connection_count = 0
 
     def record_activity(self) -> None:
         self.last_activity = time.time()
@@ -141,24 +140,6 @@ class ContainerRegistry:
 
     def get_state(self, workspace_id: str) -> ContainerState | None:
         return self.states.get(workspace_id)
-
-    def add_connection(self, workspace_id: str) -> int:
-        state = self.states.get(workspace_id)
-        if state:
-            state.connection_count += 1
-            return state.connection_count
-        return 1  # pragma: no cover
-
-    def remove_connection(self, workspace_id: str) -> int:
-        state = self.states.get(workspace_id)
-        if state:
-            state.connection_count = max(0, state.connection_count - 1)
-            return state.connection_count
-        return 0
-
-    def connection_count(self, workspace_id: str) -> int:
-        state = self.states.get(workspace_id)
-        return state.connection_count if state else 0
 
     # --- Idle callbacks ---
 

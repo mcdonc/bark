@@ -1083,43 +1083,6 @@ class TestStartCleanupLoop:
         container.registry.cleanup_task.cancel()
 
 
-class TestConnectionRefcount:
-    def setup_method(self):
-        container.registry.states.clear()
-
-    def teardown_method(self):
-        container.registry.states.clear()
-
-    def test_add_connection(self):
-        ws_id = "refcount-test-1"
-        container.registry.track_activity("cid-1", ws_id)
-        assert container.registry.add_connection(ws_id) == 1
-        assert container.registry.add_connection(ws_id) == 2
-        assert container.registry.connection_count(ws_id) == 2
-
-    def test_remove_connection_to_zero(self):
-        ws_id = "refcount-test-2"
-        container.registry.track_activity("cid-2", ws_id)
-        container.registry.add_connection(ws_id)
-        assert container.registry.remove_connection(ws_id) == 0
-        assert container.registry.connection_count(ws_id) == 0
-
-    def test_remove_connection_decrement(self):
-        ws_id = "refcount-test-3"
-        container.registry.track_activity("cid-3", ws_id)
-        container.registry.add_connection(ws_id)
-        container.registry.add_connection(ws_id)
-        assert container.registry.remove_connection(ws_id) == 1
-        assert container.registry.connection_count(ws_id) == 1
-
-    def test_remove_connection_already_zero(self):
-        ws_id = "refcount-test-4"
-        assert container.registry.remove_connection(ws_id) == 0
-
-    def test_connection_count_unknown(self):
-        assert container.registry.connection_count("nonexistent") == 0
-
-
 class TestAdoptOrphanedContainers:
     def setup_method(self):
         container.registry.states.clear()

@@ -375,7 +375,7 @@ def _teardown_workspace_state(workspace_id):
 
 
 class TestCleanupConnection:
-    async def test_cleanup_full_last_connection(self):
+    async def test_cleanup_last_subscriber_removes_session(self):
         ws = _mock_ws()
         t = _mock_terminal()
         state = _base_state()
@@ -385,33 +385,28 @@ class TestCleanupConnection:
         state["terminal_session"] = t
         state["terminal_task"] = asyncio.create_task(asyncio.sleep(10))
 
-        # Simulate: one connection, shared Pi state
         container.registry.track_activity("ctr-full", "ws-cleanup-1")
-        container.registry.add_connection("ws-cleanup-1")
         session = WorkspaceSession("ws-cleanup-1")
+        session.subscribers.add(ws)
         wshandler._sessions["ws-cleanup-1"] = session
         container.registry.states["ws-cleanup-1"].idle_callbacks.append(
             state["_idle_cb"]
         )
 
-        with patch.object(
-            container.registry,
-            "stop_and_remove_container",
-            new_callable=AsyncMock,
-        ) as mock_stop:
-            await cleanup_connection(ws, state)
+        await cleanup_connection(ws, state)
 
         t.stop.assert_awaited_once()
-        mock_stop.assert_awaited_once_with("ctr-full")
         assert state["_idle_cb"] is None
         assert state["terminal_session"] is None
+        # Session removed when last subscriber disconnects
         assert "ws-cleanup-1" not in wshandler._sessions
 
         container.registry.states.pop("ws-cleanup-1", None)
 
-    async def test_cleanup_not_last_connection(self):
-        """When other connections remain, Pi and container survive."""
+    async def test_cleanup_other_subscribers_remain(self):
+        """When other subscribers remain, session stays alive."""
         ws = _mock_ws()
+        other_ws = _mock_ws()
         t = _mock_terminal()
         state = _base_state()
         state["container_id"] = "ctr-shared"
@@ -420,54 +415,33 @@ class TestCleanupConnection:
         state["terminal_session"] = t
         state["terminal_task"] = asyncio.create_task(asyncio.sleep(10))
 
-        # Two connections
         container.registry.track_activity("ctr-shared", "ws-cleanup-2")
-        container.registry.add_connection("ws-cleanup-2")
-        container.registry.add_connection("ws-cleanup-2")
         session = WorkspaceSession("ws-cleanup-2")
+        session.subscribers.add(ws)
+        session.subscribers.add(other_ws)
         wshandler._sessions["ws-cleanup-2"] = session
         container.registry.states["ws-cleanup-2"].idle_callbacks.append(
             state["_idle_cb"]
         )
 
-        with patch.object(
-            container.registry,
-            "stop_and_remove_container",
-            new_callable=AsyncMock,
-        ) as mock_stop:
-            await cleanup_connection(ws, state)
+        await cleanup_connection(ws, state)
 
-        # Pi should NOT be disconnected — other connection still using it
-        mock_stop.assert_not_awaited()
         # Terminal for THIS connection should be stopped
         t.stop.assert_awaited_once()
-        # Shared state still present
+        # Session still present — other subscriber remains
         assert "ws-cleanup-2" in wshandler._sessions
+        assert other_ws in session.subscribers
+        assert ws not in session.subscribers
 
         # Cleanup
         container.registry.states.pop("ws-cleanup-2", None)
-        session = wshandler._sessions.pop("ws-cleanup-2", None)
+        wshandler._sessions.pop("ws-cleanup-2", None)
 
     async def test_cleanup_minimal(self):
         ws = _mock_ws()
         state = _base_state()
         await cleanup_connection(ws, state)
         assert state["terminal_session"] is None
-
-    async def test_cleanup_stops_container_last_conn(self):
-        ws = _mock_ws()
-        state = _base_state()
-        state["container_id"] = "ctr-1"
-        state["workspace_id"] = "ws-cleanup-3"
-        container.registry.add_connection("ws-cleanup-3")
-        with patch.object(
-            container.registry,
-            "stop_and_remove_container",
-            new_callable=AsyncMock,
-        ) as mock_stop:
-            await cleanup_connection(ws, state)
-        mock_stop.assert_awaited_once_with("ctr-1")
-        container.registry.states.pop("ws-cleanup-3", None)
 
 
 # --- handle_prompt ---
@@ -650,8 +624,8 @@ class TestHandleWebsocketDispatch:
         ws = await self._run_commands(user, [{"cmd": "workspace_disconnect"}])
         ws.accept.assert_awaited_once()
 
-    async def test_container_stopped_on_disconnect(self, user):
-        """Container should be stopped and removed on disconnect."""
+    async def test_container_survives_disconnect(self, user):
+        """Container should NOT be killed on disconnect — idle timeout handles it."""
         from bark_backend import auth as auth_mod
 
         token = auth_mod.create_token(user["id"], user["email"])
@@ -673,7 +647,6 @@ class TestHandleWebsocketDispatch:
         async def fake_start(ws_arg, state, wid, ws_obj):
             state["workspace_id"] = wid
             state["container_id"] = "cid-stop"
-            container.registry.add_connection(wid)
 
         with (
             patch.object(
@@ -694,7 +667,7 @@ class TestHandleWebsocketDispatch:
         ):
             await handle_websocket(ws)
 
-        mock_stop.assert_awaited_once_with("cid-stop")
+        mock_stop.assert_not_awaited()
 
 
 # --- handle_restart_container additional coverage ---

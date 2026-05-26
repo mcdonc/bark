@@ -190,9 +190,7 @@ async def start_workspace_container(
     host_path = str(
         workspaces.get_workspace_host_path(user["id"], workspace_id)
     )
-    home_path = str(
-        workspaces.get_home_host_path(user["id"], workspace_id)
-    )
+    home_path = str(workspaces.get_home_host_path(user["id"], workspace_id))
 
     # Find the most recent Pi session file to resume (if any).
     session_files = sorted(
@@ -229,7 +227,6 @@ async def start_workspace_container(
 
     session = get_or_create_session(workspace_id)
     async with session.lock:
-        container.registry.add_connection(workspace_id)
         session.container_id = container_id
         session.subscribers.add(ws)
 
@@ -279,9 +276,7 @@ async def handle_workspace_connect(
 
     ports = await container.registry.get_workspace_ports(workspace_id)
     status = state.get("container_status", "created")
-    container_name = (
-        f"bark-{container.INSTANCE_ID}-{workspace_id[:12]}"
-    )
+    container_name = f"bark-{container.INSTANCE_ID}-{workspace_id[:12]}"
     ports_str = f" (ports {','.join(str(p) for p in ports)})" if ports else ""
     status_msg = {
         "connected": f"Connected to running container {container_name}{ports_str}",
@@ -346,9 +341,7 @@ async def handle_restart_container(ws: WebSocket, state: dict) -> None:
         logger.warning("Cleanup error during restart: %s", e)
 
     if workspace is None:
-        workspace = await workspaces.get_workspace(
-            workspace_id, user["id"]
-        )
+        workspace = await workspaces.get_workspace(workspace_id, user["id"])
     if workspace is None:
         await send_error(ws, "Workspace not found")
         return
@@ -358,9 +351,7 @@ async def handle_restart_container(ws: WebSocket, state: dict) -> None:
 
     ports = await container.registry.get_workspace_ports(workspace_id)
     ports_str = f" (ports {','.join(str(p) for p in ports)})" if ports else ""
-    container_name = (
-        f"bark-{container.INSTANCE_ID}-{workspace_id[:12]}"
-    )
+    container_name = f"bark-{container.INSTANCE_ID}-{workspace_id[:12]}"
     status_msg = f"Container restarted {container_name}{ports_str}"
 
     timeout_mins = container.IDLE_TIMEOUT_SECONDS / 60
@@ -664,20 +655,12 @@ async def cleanup_connection(ws: WebSocket, state: dict) -> None:
     if session:
         session.subscribers.discard(ws)
 
-    # Decrement connection refcount. Only the last connection to disconnect
-    # destroys the container.
-    remaining = 0
-    if workspace_id:
-        remaining = container.registry.remove_connection(workspace_id)
-
-    if remaining == 0 and workspace_id:
+    # Clean up session if no subscribers remain. The container is NOT
+    # killed — the idle timeout handles container cleanup. This avoids
+    # the race where disconnecting one of several connections kills the
+    # container while others are still active.
+    if session and not session.subscribers:
         await remove_session(workspace_id)
-
-        container_id = state.get("container_id")
-        if container_id:
-            await container.registry.stop_and_remove_container(
-                container_id
-            )
 
 
 async def reset_workspace_state(workspace_id: str) -> None:
