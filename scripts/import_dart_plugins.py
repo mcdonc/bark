@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Register Dart plugins as a generated package in $BARK_PLUGINS_DIR/.dart/.
 
-Scans $BARK_PLUGINS_DIR/*/dart/pubspec.yaml for plugins with Dart packages
+Scans $BARK_PLUGINS_DIR/*/bark/pubspec.yaml for plugins with Dart packages
 and generates:
 
   $BARK_PLUGINS_DIR/.dart/pubspec.yaml         — package with path deps
@@ -33,14 +33,14 @@ PLUGIN_API_DEP = {
 
 
 def find_plugins():
-    """Scan plugins/*/dart/ for Dart packages, return metadata."""
+    """Scan plugins/*/bark/ for Dart packages, return metadata."""
     plugins = []
     if not os.path.isdir(PLUGINS_DIR):
         return plugins
 
     for name in sorted(os.listdir(PLUGINS_DIR)):
         plugin_dir = os.path.join(PLUGINS_DIR, name)
-        dart_dir = os.path.join(plugin_dir, "dart")
+        dart_dir = os.path.join(plugin_dir, "bark")
         pubspec_file = os.path.join(dart_dir, "pubspec.yaml")
         plugin_dart = os.path.join(dart_dir, "lib", "plugin.dart")
 
@@ -120,7 +120,7 @@ def generate_dart(plugins):
 
 
 def write_overrides_and_symlink():
-    """Write pubspec_overrides.yaml at ~/.bark/dart/ and symlink it
+    """Write pubspec_overrides.yaml at ~/.bark/bark/ and symlink it
     into the frontend directory so Flutter can find it."""
     overrides_content = (
         f"dependency_overrides:\n  bark_plugins:\n    path: {BARK_DART_PLUGINS_PKG}\n"

@@ -495,17 +495,17 @@ GitHub Actions run automatically on PRs and pushes to main (all also support `wo
 All plugins live in `$BARK_PLUGINS_DIR/<name>/` directories. A plugin can contain:
 
 - `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `src/docker/extensions/` at build time.
-- `dart/` — Optional Dart package for client-side tools:
-  - `dart/pubspec.yaml` — Package definition, depends on `bark_plugin_api` (git)
-  - `dart/lib/plugin.dart` — Class extending `ToolPlugin` with action handlers
-  - `dart/lib/*.dart` — Supporting Dart files (widgets, utilities)
+- `bark/` — Optional Dart package for client-side browser actions:
+  - `bark/pubspec.yaml` — Package definition, depends on `bark_plugin_api` (git)
+  - `bark/lib/plugin.dart` — Class extending `ToolPlugin` with action handlers
+  - `bark/lib/*.dart` — Supporting Dart files (widgets, utilities)
 - `tools/` — Server-side scripts. Everything in this subdirectory is copied to `/opt/bark/plugin-tools/<name>/` in the Docker image.
 
-A plugin needs at minimum an `extension.ts`. The `dart/` subdirectory is only needed for client-side tools that delegate execution to the browser via `ctx.ui.input("HOST_TOOL_REQUEST", ...)`.
+A plugin needs at minimum an `extension.ts`. The `bark/` subdirectory is only needed for client-side browser actions (e.g., celebrate, beep, authenticated fetch) that are dispatched via the browser bridge.
 
 **Build integration:**
 
-- `scripts/import_dart_plugins.py` scans `$BARK_PLUGINS_DIR/*/dart/` for plugin Dart packages and generates `$BARK_PLUGINS_DIR/.dart/` (the `bark_plugins` package with path deps and `createAllPlugins()`)
+- `scripts/import_dart_plugins.py` scans `$BARK_PLUGINS_DIR/*/bark/` for plugin Dart packages and generates `$BARK_PLUGINS_DIR/.dart/` (the `bark_plugins` package with path deps and `createAllPlugins()`)
 - `dockerbuild` stages `extension.ts` and `tools/` files from all plugins into `$BARK_PLUGINS_DIR/.docker/` and passes them via named Docker build contexts (`plugin-extensions`, `plugin-tools`)
 - `flutterbuildweb` runs the codegen before compiling
 - `stub_dart_plugins.sh` creates a minimal stub at `$BARK_PLUGINS_DIR/.dart/` so `flutter pub get` works before plugins are fetched (runs automatically at devenv shell startup via `enterShell`; skips if `pubspec_overrides.yaml` already exists)
@@ -516,7 +516,7 @@ A plugin needs at minimum an `extension.ts`. The `dart/` subdirectory is only ne
 For local development, create files directly in `$BARK_PLUGINS_DIR`:
 
 1. Create `$BARK_PLUGINS_DIR/<name>/extension.ts` with `pi.registerTool()`
-2. For client-side tools, add `dart/pubspec.yaml` (depends on `bark_plugin_api`) and `dart/lib/plugin.dart` extending `ToolPlugin`
+2. For client-side browser actions, add `bark/pubspec.yaml` (depends on `bark_plugin_api`) and `bark/lib/plugin.dart` extending `ToolPlugin`
 3. For server-side scripts, add files in `$BARK_PLUGINS_DIR/<name>/tools/`
 4. `devenv up` rebuilds automatically when `$BARK_PLUGINS_DIR` changes
 

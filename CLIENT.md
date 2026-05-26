@@ -119,7 +119,7 @@ Reimplement existing client-side tools using the bridge:
 
 ### Phase 5: Dart plugin system for browser actions
 
-The Flutter app needs a plugin registry so different deployments can handle different `browser_request` actions. A Bark plugin is a normal Pi extension (npm package) that optionally includes a `dart/` directory with Flutter code.
+The Flutter app needs a plugin registry so different deployments can handle different `browser_request` actions. A Bark plugin is a normal Pi extension (npm package) that optionally includes a `bark/` directory with Flutter code.
 
 **Dart plugin interface:**
 
