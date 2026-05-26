@@ -33,7 +33,9 @@ def server():
 
     # Start nginx as an LLM proxy so containers can reach the LLM.
     nginx_proc = None
+    nginx_log = os.path.join(data_dir, "nginx.log")
     if os.environ.get("LLM_BASE_URL"):
+        log_fd = open(nginx_log, "w")
         nginx_proc = subprocess.Popen(
             [os.path.join(project_root, "scripts", "nginx.sh")],
             env={
@@ -42,10 +44,24 @@ def server():
                 "BARK_NGINX_PORT": nginx_port,
                 "BARK_PORT": port,
             },
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_fd,
+            stderr=log_fd,
         )
-        time.sleep(1)
+        # Wait for nginx to start listening
+        for _ in range(10):
+            try:
+                httpx.get(f"http://localhost:{nginx_port}/", timeout=1)
+                break
+            except Exception:
+                time.sleep(0.5)
+        else:
+            nginx_proc.kill()
+            log_content = (
+                open(nginx_log).read() if os.path.exists(nginx_log) else ""
+            )
+            raise RuntimeError(
+                f"Nginx failed to start on port {nginx_port}:\n{log_content}"
+            )
 
     env = {
         **os.environ,
