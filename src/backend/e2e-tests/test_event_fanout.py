@@ -368,6 +368,20 @@ class TestEventFanout:
                 f"=== Running containers ===\n{containers.stdout}\n"
             )
 
+            # Start docker events monitoring in background
+            docker_events = subprocess.Popen(
+                [
+                    "docker",
+                    "events",
+                    "--filter",
+                    "type=container",
+                    "--format",
+                    "{{.Time}} {{.Action}} {{.Actor.Attributes.name}}",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
             # ws1 sends a prompt
             await ws1.send(json.dumps({"cmd": "prompt", "text": "say hello"}))
 
@@ -409,6 +423,13 @@ class TestEventFanout:
             sys.stderr.write(
                 f"\n=== Containers after recv ===\n{dead.stdout}\n"
             )
+            # Stop docker events and dump
+            docker_events.kill()
+            events_out = docker_events.stdout.read().decode(
+                "utf-8", errors="replace"
+            )
+            if events_out.strip():
+                sys.stderr.write(f"=== Docker events ===\n{events_out}\n")
             for line in dead.stdout.strip().split("\n"):
                 if line and "Exited" in line:
                     cid = line.split()[0]
