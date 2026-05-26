@@ -33,7 +33,7 @@ addopts = "--capture=no --cov=bark_backend --cov-report=term-missing --no-cov-on
 line-length = 79
 
 [project.scripts]
-bark = "bark_backend.cli.main:app"
+bark = "bark_backend.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["bark_backend"]

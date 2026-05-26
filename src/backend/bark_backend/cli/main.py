@@ -343,5 +343,13 @@ def images() -> None:
         console.print(f"  {prefix} {img}")
 
 
+def main() -> None:  # pragma: no cover
+    try:
+        app()
+    except httpx.ConnectError:
+        _err.print("[red]Cannot connect to server[/red] — is it running?")
+        raise SystemExit(1) from None
+
+
 if __name__ == "__main__":  # pragma: no cover
-    app()
+    main()
