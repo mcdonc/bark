@@ -181,9 +181,9 @@ class FileViewerPanelState extends State<FileViewerPanel> {
 
     try {
       final response = await _client.post(
-        Uri.parse('$_baseUrl/workspaces/${widget.workspaceId}/files/rename'
-            '?old_path=${Uri.encodeComponent(path)}&new_path=${Uri.encodeComponent(newPath)}'),
+        Uri.parse('$_baseUrl/workspaces/${widget.workspaceId}/files/rename'),
         headers: _headers,
+        body: jsonEncode({'old_path': path, 'new_path': newPath}),
       );
       if (response.statusCode == 200) {
         _loadFiles();

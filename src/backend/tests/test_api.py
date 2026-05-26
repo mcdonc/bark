@@ -766,8 +766,9 @@ class TestFileRoutes:
             files={"file": ("old.txt", b"data", "text/plain")},
         )
         resp = await client.post(
-            f"/workspaces/{ws_id}/files/rename?old_path=old.txt&new_path=new.txt",
+            f"/workspaces/{ws_id}/files/rename",
             headers=headers,
+            json={"old_path": "old.txt", "new_path": "new.txt"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "renamed"
@@ -776,8 +777,9 @@ class TestFileRoutes:
         headers = await _auth_headers(client)
         ws_id = await self._create_workspace(client, headers)
         resp = await client.post(
-            f"/workspaces/{ws_id}/files/rename?old_path=nope.txt&new_path=new.txt",
+            f"/workspaces/{ws_id}/files/rename",
             headers=headers,
+            json={"old_path": "nope.txt", "new_path": "new.txt"},
         )
         assert resp.status_code == 404
 
@@ -796,8 +798,9 @@ class TestFileRoutes:
             files={"file": ("b.txt", b"b", "text/plain")},
         )
         resp = await client.post(
-            f"/workspaces/{ws_id}/files/rename?old_path=a.txt&new_path=b.txt",
+            f"/workspaces/{ws_id}/files/rename",
             headers=headers,
+            json={"old_path": "a.txt", "new_path": "b.txt"},
         )
         assert resp.status_code == 409
 
@@ -897,8 +900,9 @@ class TestFileRoutes:
     async def test_rename_nonexistent_workspace(self, client, user):
         headers = await _auth_headers(client)
         resp = await client.post(
-            "/workspaces/fake-id/files/rename?old_path=a&new_path=b",
+            "/workspaces/fake-id/files/rename",
             headers=headers,
+            json={"old_path": "a", "new_path": "b"},
         )
         assert resp.status_code == 404
 
@@ -906,8 +910,9 @@ class TestFileRoutes:
         headers = await _auth_headers(client)
         ws_id = await self._create_workspace(client, headers)
         resp = await client.post(
-            f"/workspaces/{ws_id}/files/rename?old_path=../../etc/passwd&new_path=stolen",
+            f"/workspaces/{ws_id}/files/rename",
             headers=headers,
+            json={"old_path": "../../etc/passwd", "new_path": "stolen"},
         )
         assert resp.status_code == 400
 
@@ -965,7 +970,9 @@ class TestSetIdleTimeout:
 
     async def test_endpoint_missing_without_test_mode(self, client):
         """Without BARK_TEST_MODE, the endpoints should not exist."""
-        resp = await client.post("/api/test/set-idle-timeout?seconds=10")
+        resp = await client.post(
+            "/api/test/set-idle-timeout", json={"seconds": 10}
+        )
         assert resp.status_code in (404, 405)
         resp = await client.get("/api/test/idle-timeout")
         assert resp.status_code in (404, 405)

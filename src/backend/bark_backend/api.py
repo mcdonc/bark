@@ -46,9 +46,15 @@ if resolve_env_secret("BARK_TEST_MODE"):  # pragma: no cover
             }
         return {"idle_timeout_seconds": container_manager.IDLE_TIMEOUT_SECONDS}
 
+    class SetIdleTimeoutRequest(BaseModel):
+        seconds: int
+        workspace_id: str | None = None
+
     @router.post("/api/test/set-idle-timeout")
-    async def set_idle_timeout(seconds: int, workspace_id: str | None = None):
+    async def set_idle_timeout(body: SetIdleTimeoutRequest):
         """Set the idle timeout. Per-workspace if workspace_id given, else global."""
+        seconds = body.seconds
+        workspace_id = body.workspace_id
         if workspace_id:
             container_manager.registry.set_workspace_idle_timeout(
                 workspace_id, seconds
@@ -463,11 +469,15 @@ async def delete_file(
     return {"path": deleted, "status": "deleted"}
 
 
+class RenameFileRequest(BaseModel):
+    old_path: str
+    new_path: str
+
+
 @router.post("/workspaces/{workspace_id}/files/rename")
 async def rename_file(
     workspace_id: str,
-    old_path: str,
-    new_path: str,
+    body: RenameFileRequest,
     user: dict = Depends(auth.get_current_user),
 ):
     workspace = await workspace_manager.get_workspace(workspace_id, user["id"])
@@ -475,7 +485,7 @@ async def rename_file(
         raise HTTPException(status_code=404, detail="Workspace not found")
     try:
         renamed = file_service.rename_path(
-            user["id"], workspace_id, old_path, new_path
+            user["id"], workspace_id, body.old_path, body.new_path
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

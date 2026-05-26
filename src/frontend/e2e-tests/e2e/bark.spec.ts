@@ -256,8 +256,8 @@ test.describe("Bark E2E", () => {
 
     // Rename
     const renameResp = await request.post(
-      `${API_BASE}/workspaces/${workspaceId}/files/rename?old_path=${fileName}&new_path=${renamedName}`,
-      { headers },
+      `${API_BASE}/workspaces/${workspaceId}/files/rename`,
+      { headers, data: { old_path: fileName, new_path: renamedName } },
     );
     expect(renameResp.ok()).toBeTruthy();
 
@@ -765,10 +765,10 @@ test.describe("Bark E2E", () => {
       await createAndOpenWorkspace(page, request, "e2e-idle-test");
 
     // Set a short idle timeout for this workspace only
-    await request.post(
-      `${API_BASE}/api/test/set-idle-timeout?seconds=5&workspace_id=${workspaceId}`,
-      { headers },
-    );
+    await request.post(`${API_BASE}/api/test/set-idle-timeout`, {
+      headers,
+      data: { seconds: 5, workspace_id: workspaceId },
+    });
 
     try {
       // Wait for the container to actually stop
@@ -784,10 +784,10 @@ test.describe("Bark E2E", () => {
 
       // Reset per-workspace timeout so the restarted container isn't
       // immediately killed again.
-      await request.post(
-        `${API_BASE}/api/test/set-idle-timeout?seconds=300&workspace_id=${workspaceId}`,
-        { headers },
-      );
+      await request.post(`${API_BASE}/api/test/set-idle-timeout`, {
+        headers,
+        data: { seconds: 300, workspace_id: workspaceId },
+      });
 
       // Re-open the workspace using openWorkspace which handles login,
       // navigation, WebSocket lifecycle, and container_ready properly.
