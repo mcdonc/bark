@@ -197,6 +197,37 @@ export async function sendPrompt(
   );
 }
 
+/** Poll until the agent has finished responding (an assistant or tool_call
+ *  message with is_complete=true exists, or timeout is reached).
+ *  Returns all messages at the time of completion. */
+export async function waitForAgentDone(
+  page: Page,
+  request: APIRequestContext,
+  workspaceId: string,
+  headers: Record<string, string>,
+  timeoutMs: number = 60_000,
+): Promise<any[]> {
+  const deadline = Date.now() + timeoutMs;
+  let messages: any[] = [];
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(2000);
+    const msgResp = await request.get(
+      `${API_BASE}/workspaces/${workspaceId}/messages`,
+      { headers },
+    );
+    if (msgResp.ok()) {
+      messages = await msgResp.json();
+      const hasComplete = messages.some(
+        (m: any) =>
+          (m.entry_type === "assistant" || m.entry_type === "tool_call") &&
+          m.is_complete,
+      );
+      if (hasComplete) return messages;
+    }
+  }
+  return messages;
+}
+
 /** Click the terminal area, wait for it to be interactive, then type a command and press Enter. */
 export async function terminalType(
   page: Page,

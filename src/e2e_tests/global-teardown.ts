@@ -40,6 +40,16 @@ async function globalTeardown() {
     }
   }
 
+  // Stop nginx LLM proxy
+  const nginxPid = process.env.BARK_E2E_NGINX_PID;
+  if (nginxPid) {
+    try {
+      process.kill(Number(nginxPid), "SIGKILL");
+    } catch {
+      // Already dead
+    }
+  }
+
   // Remove any containers that survived shutdown (including stopped ones holding ports)
   try {
     const ids = execSync(

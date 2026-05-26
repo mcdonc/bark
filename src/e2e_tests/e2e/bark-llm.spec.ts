@@ -5,6 +5,7 @@ import {
   flutterClick,
   sendPrompt,
   createAndOpenWorkspace,
+  waitForAgentDone,
 } from "./helpers";
 
 // LLM-dependent tests: each test contacts the LLM provider and may be slow or flaky.
@@ -34,33 +35,28 @@ test.describe("Bark LLM", () => {
         "what is the hosted url for a service running on port 8000? use the get_hosted_url tool to find out.",
       );
 
-      // Poll for a hosted URL in the assistant messages or tool output
+      // Wait for the agent to finish, then check messages for a hosted URL
+      const messages = await waitForAgentDone(
+        page,
+        request,
+        workspaceId,
+        headers,
+      );
+
+      const urlRegex = /https?:\/\/[^\/]+\/hosted\/[^\/]+\/\d+\//;
       let hostedUrl: string | null = null;
-      for (let i = 0; i < 15; i++) {
-        await page.waitForTimeout(2000);
-        const msgResp = await request.get(
-          `${API_BASE}/workspaces/${workspaceId}/messages`,
-          { headers },
-        );
-        if (msgResp.ok()) {
-          const messages = await msgResp.json();
-          const urlRegex = /https?:\/\/[^\/]+\/hosted\/[^\/]+\/\d+\//;
-          for (const m of messages) {
-            // Check assistant text and tool_call output for hosted URLs
-            const text =
-              m.entry_type === "assistant"
-                ? (m.content ?? "")
-                : m.entry_type === "tool_call"
-                  ? (m.tool_output ?? "")
-                  : "";
-            const urlMatch = text.match(urlRegex);
-            if (urlMatch) {
-              hostedUrl = urlMatch[0];
-              break;
-            }
-          }
+      for (const m of messages) {
+        const text =
+          m.entry_type === "assistant"
+            ? (m.content ?? "")
+            : m.entry_type === "tool_call"
+              ? (m.tool_output ?? "")
+              : "";
+        const urlMatch = text.match(urlRegex);
+        if (urlMatch) {
+          hostedUrl = urlMatch[0];
+          break;
         }
-        if (hostedUrl) break;
       }
       expect(hostedUrl).toBeTruthy();
     } finally {
@@ -87,24 +83,16 @@ test.describe("Bark LLM", () => {
         'create a file called hello.txt containing exactly the text "bark-e2e-test-ok"',
       );
 
-      // Poll for the file to appear with the expected content
-      let content: string | null = null;
-      for (let i = 0; i < 15; i++) {
-        await page.waitForTimeout(2000);
-        const resp = await request.get(
-          `${API_BASE}/workspaces/${workspaceId}/files/content?path=hello.txt`,
-          { headers },
-        );
-        if (resp.ok()) {
-          const data = await resp.json();
-          if (data.content && data.content.includes("bark-e2e-test-ok")) {
-            content = data.content;
-            break;
-          }
-        }
-      }
-      expect(content).toBeTruthy();
-      expect(content).toContain("bark-e2e-test-ok");
+      // Wait for the agent to finish, then check the file
+      await waitForAgentDone(page, request, workspaceId, headers);
+
+      const resp = await request.get(
+        `${API_BASE}/workspaces/${workspaceId}/files/content?path=hello.txt`,
+        { headers },
+      );
+      expect(resp.ok()).toBeTruthy();
+      const data = await resp.json();
+      expect(data.content).toContain("bark-e2e-test-ok");
     } finally {
       await cleanup();
     }

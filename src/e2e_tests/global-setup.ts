@@ -54,13 +54,42 @@ async function globalSetup() {
     console.log("LLM not configured — skipping warmup");
   }
 
+  const logDir = join(projectRoot, "src", "e2e_tests", "logs");
+  mkdirSync(logDir, { recursive: true });
+
+  // Start nginx as an LLM proxy so containers can reach the LLM.
+  // Containers are configured with LLM_PROXY_URL pointing at this nginx.
+  const nginxPort = "18995";
+  if (llmUrl) {
+    const nginxLogPath = join(
+      logDir,
+      `nginx-${new Date().toISOString().replace(/[:.]/g, "-")}.log`,
+    );
+    const nginxLogFd = require("fs").openSync(nginxLogPath, "w");
+    const nginxProcess = spawn(join(projectRoot, "scripts", "nginx.sh"), [], {
+      detached: true,
+      stdio: ["ignore", nginxLogFd, nginxLogFd],
+      env: {
+        ...process.env,
+        DEVENV_STATE: dataDir,
+        BARK_NGINX_PORT: nginxPort,
+        BARK_PORT: backendPort,
+      },
+    });
+    process.env.BARK_E2E_NGINX_PID = String(nginxProcess.pid);
+    // Wait briefly for nginx to start
+    await new Promise((r) => setTimeout(r, 1000));
+    console.log(
+      `LLM proxy nginx started on port ${nginxPort} (log: ${nginxLogPath})`,
+    );
+  }
+
   console.log(
     `Starting E2E server on port ${backendPort} ` +
       `with BARK_DATA_DIR=${dataDir}`,
   );
 
   // Start uvicorn directly with E2E overrides as env vars.
-  // No devenv up or nginx needed — just the backend server.
   const backendProcess = spawn(
     "uvicorn",
     ["bark_backend.main:app", "--host", "0.0.0.0", "--port", backendPort],
@@ -71,6 +100,7 @@ async function globalSetup() {
       env: {
         ...process.env,
         BARK_PORT: backendPort,
+        BARK_NGINX_PORT: nginxPort,
         BARK_DATA_DIR: dataDir,
         BARK_LOGIN_LOCKOUT_FAILURES: "5",
         BARK_JWT_SECRET: "e2e-test-secret",
@@ -88,8 +118,6 @@ async function globalSetup() {
   // Write backend output to a per-run log file so logs aren't overwritten
   // when test-e2e runs each browser sequentially.
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const logDir = join(projectRoot, "src", "e2e_tests", "logs");
-  mkdirSync(logDir, { recursive: true });
   const logPath = join(logDir, `backend-${timestamp}.log`);
   const logStream = createWriteStream(logPath);
   process.env.BARK_E2E_LOG = logPath;

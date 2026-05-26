@@ -49,8 +49,10 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    // LLM chain: sequential within each browser, no fail-fast so one
-    // flaky test doesn't skip the rest (fullyParallel: false).
+    // LLM tests run first (Ollama is warm from global setup), sequential
+    // within each browser, no fail-fast (fullyParallel: false without
+    // mode: "serial") so one flaky test doesn't skip the rest.
+    // Non-LLM tests follow each browser's LLM tests.
     {
       name: "chromium-llm",
       testMatch: "bark-llm.spec.ts",
@@ -58,36 +60,35 @@ export default defineConfig({
       use: chromiumUse,
     },
     {
+      name: "chromium",
+      testMatch: "bark.spec.ts",
+      dependencies: ["chromium-llm"],
+      use: chromiumUse,
+    },
+    {
       name: "firefox-llm",
       testMatch: "bark-llm.spec.ts",
-      dependencies: ["chromium-llm"],
+      dependencies: ["chromium"],
       fullyParallel: false,
+      use: firefoxUse,
+    },
+    {
+      name: "firefox",
+      testMatch: "bark.spec.ts",
+      dependencies: ["firefox-llm"],
       use: firefoxUse,
     },
     {
       name: "webkit-llm",
       testMatch: "bark-llm.spec.ts",
-      dependencies: ["firefox-llm"],
+      dependencies: ["firefox"],
       fullyParallel: false,
       use: webkitUse,
-    },
-    // Non-LLM chain: independent of LLM chain so LLM failures don't
-    // block these tests. May overlap with LLM tests.
-    {
-      name: "chromium",
-      testMatch: "bark.spec.ts",
-      use: chromiumUse,
-    },
-    {
-      name: "firefox",
-      testMatch: "bark.spec.ts",
-      dependencies: ["chromium"],
-      use: firefoxUse,
     },
     {
       name: "webkit",
       testMatch: "bark.spec.ts",
-      dependencies: ["firefox"],
+      dependencies: ["webkit-llm"],
       use: webkitUse,
     },
   ],
