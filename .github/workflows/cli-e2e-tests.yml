@@ -25,39 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: DeterminateSystems/determinate-nix-action@main
-
-      - name: Free disk space
-        run: |
-          set -x
-          rm -rf "$HOME/.cache"
-          nohup sudo ionice -c3 nice -n19 rm -rf \
-            /usr/share/dotnet /usr/local/lib/android \
-            /opt/hostedtoolcache /usr/lib/jvm \
-            /usr/share/swift "$HOME/.rustup" \
-            /usr/local/share/chromium \
-            /usr/lib/google-cloud-sdk \
-            /usr/local/powershell /usr/local/.ghcup \
-            /usr/local/julia* &
-
-      - name: Bootstrap
-        run: |
-          ./bootstrap --unattended --cachix-version v1.11.1
-
-      - name: Prepare bark devenv
-        run: |
-          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          devenv shell -- true
-
-      - name: Build Docker image
-        run: |
-          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          devenv tasks run bark:docker-build
-
-      - name: Start services
-        run: |
-          . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-          devenv processes up -d
+      - uses: ./.github/actions/devenv-setup
+        with:
+          build-tasks: bark:docker-build
 
       - name: Run CLI E2E tests
         run: |

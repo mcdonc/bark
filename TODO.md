@@ -40,7 +40,6 @@
 
 ## CI
 
-- **CI: factor shared devenv setup into a composite action**: The Flutter E2E and CLI E2E workflows duplicate the nix bootstrap, devenv setup, and disk space cleanup steps. Extract these into a shared composite action (e.g., `.github/actions/devenv-setup/action.yml`) that both workflows can reference.
 - **E2E: cache Docker image build in CI**: The Docker image is rebuilt from scratch on every CI run. Options: (A) Push to GHCR (`ghcr.io/<repo>/bark-pi:<hash>`) keyed on a hash of Dockerfile + entrypoint + system-prompt + builtin-extensions + plugins — pull if exists, build and push if not. Requires `packages: write` permission but handles large images well. (B) Use GitHub Actions cache with `docker save`/`docker load` — simpler, no registry auth, but the 10 GB total cache limit is tight for a ~2-3 GB compressed tar. (C) Modify `dockerbuild.sh` to check a registry when `BARK_DOCKER_REGISTRY` is set — works for CI and anyone with registry access but couples the build script to a registry. Cache key should hash: `src/docker/Dockerfile`, `src/docker/entrypoint.sh`, `src/docker/*.md`, `src/docker/builtin-extensions/*.ts`, and `plugins/` contents.
 
 ## Monitoring

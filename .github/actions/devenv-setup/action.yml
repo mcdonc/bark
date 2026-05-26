@@ -1,0 +1,48 @@
+name: Devenv Setup
+description: Bootstrap nix/devenv, build Docker image, and start services
+
+inputs:
+  build-tasks:
+    description: "Space-separated devenv tasks to run (e.g. 'bark:docker-build bark:flutter-build')"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: DeterminateSystems/determinate-nix-action@main
+
+    - name: Free disk space
+      shell: bash
+      run: |
+        set -x
+        rm -rf "$HOME/.cache"
+        nohup sudo ionice -c3 nice -n19 rm -rf \
+          /usr/share/dotnet /usr/local/lib/android \
+          /opt/hostedtoolcache /usr/lib/jvm \
+          /usr/share/swift "$HOME/.rustup" \
+          /usr/local/share/chromium \
+          /usr/lib/google-cloud-sdk \
+          /usr/local/powershell /usr/local/.ghcup \
+          /usr/local/julia* &
+
+    - name: Bootstrap
+      shell: bash
+      run: ./bootstrap --unattended --cachix-version v1.11.1
+
+    - name: Prepare bark devenv
+      shell: bash
+      run: |
+        . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+        devenv shell -- true
+
+    - name: Build
+      shell: bash
+      run: |
+        . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+        devenv tasks run ${{ inputs.build-tasks }}
+
+    - name: Start services
+      shell: bash
+      run: |
+        . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+        devenv processes up -d
