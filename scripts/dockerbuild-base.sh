@@ -11,8 +11,8 @@ echo "==> Building base image"
 docker build --platform linux/amd64 \
   --build-arg BARK_UID="$(id -u)" \
   --build-arg BARK_GID="$(id -g)" \
-  -f src/dockerimage/Dockerfile.base \
-  -t "$IMAGE" "$@" src/dockerimage/
+  -f src/docker/Dockerfile.base \
+  -t "$IMAGE" "$@" src/docker/
 
 # Requires: docker login ghcr.io
 #echo "==> Pushing to GHCR"

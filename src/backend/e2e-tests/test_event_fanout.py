@@ -29,7 +29,7 @@ def server():
     data_dir = tempfile.mkdtemp(prefix="bark-fanout-e2e-")
     port = "18996"
     nginx_port = "18994"
-    project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+    project_root = os.path.join(os.path.dirname(__file__), "..", "..", "..")
 
     # Start nginx as an LLM proxy so containers can reach the LLM.
     nginx_proc = None
@@ -69,7 +69,7 @@ def server():
             "--port",
             port,
         ],
-        cwd=os.path.join(project_root, "src", "backend"),
+        cwd=os.path.join(os.path.dirname(__file__), ".."),
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -133,7 +133,9 @@ def auth(server):
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    resp = httpx.post(f"{url}/workspaces?name=fanout-test", headers=headers, timeout=10)
+    resp = httpx.post(
+        f"{url}/workspaces?name=fanout-test", headers=headers, timeout=10
+    )
     assert resp.status_code == 200
     workspace_id = resp.json()["id"]
 
@@ -143,13 +145,17 @@ def auth(server):
         "workspace_id": workspace_id,
     }
 
-    httpx.delete(f"{url}/workspaces/{workspace_id}", headers=headers, timeout=10)
+    httpx.delete(
+        f"{url}/workspaces/{workspace_id}", headers=headers, timeout=10
+    )
 
 
 async def ws_connect(server, auth):
     """Open a WebSocket, connect to workspace, return (ws, first_msg)."""
     ws_url = server["url"].replace("http://", "ws://")
-    ws = await websockets.connect(f"{ws_url}/ws?token={auth['token']}", max_size=2**20)
+    ws = await websockets.connect(
+        f"{ws_url}/ws?token={auth['token']}", max_size=2**20
+    )
     await ws.send(
         json.dumps(
             {
@@ -182,7 +188,9 @@ async def recv_until(ws, predicate, timeout=30):
 
 class TestEventFanout:
     @pytest.mark.asyncio
-    async def test_both_connections_receive_container_ready(self, server, auth):
+    async def test_both_connections_receive_container_ready(
+        self, server, auth
+    ):
         """Two connections to the same workspace both get events."""
         ws1 = await ws_connect(server, auth)
         ws2 = await ws_connect(server, auth)
@@ -225,7 +233,9 @@ class TestEventFanout:
 
             # ws1 starts an exec
             await ws1.send(
-                json.dumps({"cmd": "exec_start", "command": ["echo", "from-ws1"]})
+                json.dumps(
+                    {"cmd": "exec_start", "command": ["echo", "from-ws1"]}
+                )
             )
 
             # ws1 should get exec_output + exec_exit
@@ -285,7 +295,9 @@ class TestEventFanout:
             await ws2.close()
 
     @pytest.mark.asyncio
-    async def test_prompt_response_reaches_both_connections(self, server, auth):
+    async def test_prompt_response_reaches_both_connections(
+        self, server, auth
+    ):
         """When one connection sends a prompt, both receive the Pi events."""
         ws1 = await ws_connect(server, auth)
 
@@ -316,7 +328,9 @@ class TestEventFanout:
             )
 
             def event_types(msgs):
-                return [m.get("event", {}).get("type", m.get("type")) for m in msgs]
+                return [
+                    m.get("event", {}).get("type", m.get("type")) for m in msgs
+                ]
 
             assert any(is_pi_event(m) for m in msgs1), (
                 f"ws1 did not receive Pi event. Got: {event_types(msgs1)}"

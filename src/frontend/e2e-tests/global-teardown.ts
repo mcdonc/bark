@@ -3,7 +3,7 @@ import { existsSync, rmSync } from "fs";
 import { join } from "path";
 
 async function globalTeardown() {
-  const projectRoot = join(__dirname, "..", "..");
+  const projectRoot = join(__dirname, "..", "..", "..");
 
   const pid = process.env.BARK_E2E_PID;
   if (pid) {

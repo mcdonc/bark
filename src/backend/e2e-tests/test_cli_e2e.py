@@ -48,7 +48,14 @@ def server():
         "LOGFIRE_TOKEN": "",
     }
     proc = subprocess.Popen(
-        ["uvicorn", "bark_backend.main:app", "--host", "0.0.0.0", "--port", port],
+        [
+            "uvicorn",
+            "bark_backend.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            port,
+        ],
         cwd=os.path.join(os.path.dirname(__file__), ".."),
         env=env,
         stdout=subprocess.PIPE,
@@ -143,7 +150,10 @@ class TestLogin:
             env=cli_config["env"],
         )
         assert result.returncode == 0
-        assert "Logged in" in result.stdout or "Already logged in" in result.stdout
+        assert (
+            "Logged in" in result.stdout
+            or "Already logged in" in result.stdout
+        )
         # Config file should exist now
         assert cli_config["config_file"].exists()
 
@@ -258,7 +268,14 @@ class TestSync:
 
         # Verify files arrived
         verify = _run(
-            ["bark", "ws", "exec", "e2e-test", "cat", "/work/synced/file1.txt"],
+            [
+                "bark",
+                "ws",
+                "exec",
+                "e2e-test",
+                "cat",
+                "/work/synced/file1.txt",
+            ],
             env=cli_config["env"],
             timeout=60,
         )

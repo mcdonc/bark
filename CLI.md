@@ -139,7 +139,7 @@ email = "admin@example.com"
 - `select()` with timeout in stdin_forward for prompt exit
 - Base64 encoding for binary-safe WebSocket transport
 - Container image includes rsync
-- CLI E2E tests (`src/cli-e2e/`) — 16 tests against real server + Docker containers
+- CLI E2E tests (`src/backend/e2e-tests/`) — 16 tests against real server + Docker containers
 - GitHub Actions workflow for CI
 
 ### Phase 6 (future): Local Docker exec optimization
@@ -159,7 +159,7 @@ email = "admin@example.com"
 | `src/backend/bark_backend/exec_session.py`     | Backend raw exec session (no PTY)              |
 | `src/backend/bark_backend/terminal_manager.py` | Backend PTY session (docker exec)              |
 | `src/backend/bark_backend/ws_handler.py`       | WebSocket terminal + exec protocol             |
-| `src/cli-e2e/test_cli_e2e.py`                  | CLI E2E tests against real server              |
+| `src/backend/e2e-tests/test_cli_e2e.py`        | CLI E2E tests against real server              |
 
 ## Verification
 

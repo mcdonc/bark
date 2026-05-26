@@ -51,7 +51,7 @@ Thumbs.db
 src/frontend/coverage/
 
 # E2E test artifacts
-src/e2e_tests/logs/
+src/frontend/e2e-tests/logs/
 
 # Generated config (created by devenv enterShell)
 .prettierignore

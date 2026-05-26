@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "src/dockerimage/Dockerfile.base"
+      - "src/docker/Dockerfile.base"
       - ".github/workflows/docker-base.yml"
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
           docker build --platform linux/amd64 \
             --build-arg BARK_UID=1000 \
             --build-arg BARK_GID=1000 \
-            -f src/dockerimage/Dockerfile.base \
+            -f src/docker/Dockerfile.base \
             -t ghcr.io/${{ github.repository }}/bark-pi-base:latest \
-            src/dockerimage/
+            src/docker/
           docker push ghcr.io/${{ github.repository }}/bark-pi-base:latest

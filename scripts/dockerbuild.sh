@@ -30,4 +30,4 @@ docker ps -a --filter "label=bark.instance=${BARK_INSTANCE_ID}" -q | xargs -r do
 docker build --platform linux/amd64 \
   --build-context plugin-extensions="$STAGING/extensions" \
   --build-context plugin-tools="$STAGING/tools" \
-  -t "${BARK_IMAGE_NAME}" "$@" src/dockerimage/
+  -t "${BARK_IMAGE_NAME}" "$@" src/docker/

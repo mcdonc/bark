@@ -9,7 +9,7 @@
     enable = true;
     npm.enable = true;
     npm.install.enable = true;
-    directory = "./src/e2e_tests";
+    directory = "./src/frontend/e2e-tests";
     corepack.enable = false; # disinclude dev version of node, squash warnings
   };
   languages.python = {
@@ -55,7 +55,7 @@
       showOutput = true;
       execIfModified = [
         "scripts/dockerbuild.sh"
-        "src/dockerimage/**"
+        "src/docker/**"
         "${config.env.BARK_PLUGINS_DIR}/**/*.ts"
         "${config.env.BARK_PLUGINS_DIR}/**/tools/**"
         "${config.env.BARK_PLUGINS_DIR}/plugins.lock"
@@ -152,13 +152,13 @@
   # CLI E2E tests: start real server, run bark commands, need Docker
   scripts.test-cli-e2e.exec = ''
     cd $DEVENV_ROOT
-    exec python -m pytest src/cli-e2e -v -p no:xdist --no-cov "$@"
+    exec python -m pytest src/backend/e2e-tests -v -p no:xdist --no-cov "$@"
   '';
 
-  scripts.test-e2e.exec = ''
+  scripts.test-frontend-e2e.exec = ''
     cd $DEVENV_ROOT
     devenv tasks run bark:flutter-build bark:docker-build
-    cd src/e2e_tests
+    cd src/frontend/e2e-tests
     npm install --silent
     exec npx playwright test --reporter=list "$@"
   '';

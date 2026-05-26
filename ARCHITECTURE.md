@@ -33,7 +33,7 @@ $BARK_DATA_DIR/workspaces/<user-id>/work/<workspace-id>/
 - **Backend** (`src/backend/`): Python/FastAPI — single-port server for API, WebSocket, and frontend static files
 - **CLI** (`src/backend/bark_backend/cli/`): `bark` command — typer-based thin client that talks to the backend over HTTP + WebSocket for terminal access to containers. See [CLI.md](CLI.md).
 - **Frontend** (`src/frontend/`): Flutter Web — chat with markdown rendering, syntax-highlighted code blocks, file viewer, debug panel
-- **Docker** (`src/dockerimage/`): Custom Dockerfile for Pi agent containers with Python3, Node.js, build-essential, SQLite, vim, emacs, network tools, Pi extensions
+- **Docker** (`src/docker/`): Custom Dockerfile for Pi agent containers with Python3, Node.js, build-essential, SQLite, vim, emacs, network tools, Pi extensions
 
 ### LLM Proxy
 
@@ -90,7 +90,7 @@ bark/
     pull-base-image.sh         # Pull latest base image from GHCR (if changed)
     nginx.sh                   # nginx reverse proxy: config generation and exec
 
-  src/dockerimage/
+  src/docker/
     Dockerfile                  # Workspace image: FROM bark-pi-base + plugin extensions + tools + npm deps for builtin extensions + entrypoint + /etc/bash.bashrc
     Dockerfile.base             # Base image: node:22-slim + Pi + Python3 + build-essential + SQLite + vim + emacs + net tools + /bin/sh→bash (pushed to GHCR)
     entrypoint.sh               # Sets up Pi config (FIFO for models.json, system prompt), starts Pi in RPC mode
@@ -121,7 +121,7 @@ bark/
       terminal_manager.py      # Docker exec PTY subprocess for interactive shell access
     tests/                      # pytest unit tests (100% coverage, parallel via xdist)
 
-  src/cli-e2e/
+  src/backend/e2e-tests/
     test_cli_e2e.py             # CLI E2E tests (real server + Docker, run with test-cli-e2e)
 
   src/frontend/
@@ -162,7 +162,7 @@ bark/
         ide_layout.dart         # Split layout: chat left, Terminal+Files tabs + slidable Debug right
     test/                       # Dart unit tests (VM-mode, no browser required)
 
-  src/e2e_tests/                # Playwright E2E tests with isolated test server
+  src/frontend/e2e-tests/                # Playwright E2E tests with isolated test server
     e2e/bark.spec.ts            # E2E test specs
     global-setup.ts             # Starts isolated Bark server for E2E
     global-teardown.ts          # Stops test server, cleans up temp data
@@ -212,7 +212,7 @@ bark/
 - Both config FIFOs written by a `nohup` background process that survives the `exec` to Pi — settings.json is written first (Pi's SettingsManager reads it), then models.json (Pi's ModelRegistry reads it)
 - All provider env vars (`LLM_*`, `ANTHROPIC_*`, etc.) stripped from Pi's process environment before exec
 - `/bin/sh` symlinked to `/bin/bash` in the base image so Pi's bash tool supports bashisms (`source`, etc.)
-- System prompt (`src/dockerimage/system-prompt.md`) copied into image at build time. Instructs the agent to: create virtualenvs for Python projects, run `npm init` for Node projects, background long-running servers, always use `get_hosted_url` for fresh URLs, show full URLs as link text, and warn users that container restarts kill running processes
+- System prompt (`src/docker/system-prompt.md`) copied into image at build time. Instructs the agent to: create virtualenvs for Python projects, run `npm init` for Node projects, background long-running servers, always use `get_hosted_url` for fresh URLs, show full URLs as link text, and warn users that container restarts kill running processes
 - 30-minute idle timeout (configurable via `BARK_IDLE_TIMEOUT_SECONDS`) with automatic container stop, debug notification, and terminal overlay with restart button. Activity is recorded on user actions (prompt, steer, terminal input) and on every Pi event (tool calls, text streaming), so containers stay alive during long-running LLM requests as long as events are flowing. Stuck tool executions (e.g., foreground server) produce no events and will eventually time out.
 - All user containers stopped on logout and backend shutdown
 - Read-only root filesystem (`ReadonlyRootfs: True`) — the agent cannot modify system files or install packages outside the workspace. Writable paths:
@@ -415,7 +415,7 @@ The `dockerbuild` and `flutterbuildweb` commands run the corresponding devenv ta
 On normal startup, Flutter and Docker builds run automatically when their source files have changed (via devenv `execIfModified` content hashing). Watched paths:
 
 - **Flutter**: `src/frontend/lib/**`, `src/frontend/web/**`, `src/frontend/pubspec.yaml`, `src/frontend/pubspec.lock`, `$BARK_PLUGINS_DIR/**/*.dart`, `$BARK_PLUGINS_DIR/plugins.lock`
-- **Docker**: `src/dockerimage/**`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
+- **Docker**: `src/docker/**`, `$BARK_PLUGINS_DIR/**/*.ts`, `$BARK_PLUGINS_DIR/**/tools/**`, `$BARK_PLUGINS_DIR/plugins.lock`
 
 ### Testing
 
@@ -494,7 +494,7 @@ GitHub Actions run automatically on PRs and pushes to main (all also support `wo
 
 All plugins live in `$BARK_PLUGINS_DIR/<name>/` directories. A plugin can contain:
 
-- `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `src/dockerimage/extensions/` at build time.
+- `extension.ts` — Pi extension with `pi.registerTool()`. Copied to `src/docker/extensions/` at build time.
 - `dart/` — Optional Dart package for client-side tools:
   - `dart/pubspec.yaml` — Package definition, depends on `bark_plugin_api` (git)
   - `dart/lib/plugin.dart` — Class extending `ToolPlugin` with action handlers

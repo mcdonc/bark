@@ -7,7 +7,7 @@ async function globalSetup() {
   const dataDir = mkdtempSync(join(tmpdir(), "bark-e2e-"));
   process.env.BARK_E2E_DATA_DIR = dataDir;
 
-  const projectRoot = join(__dirname, "..", "..");
+  const projectRoot = join(__dirname, "..", "..", "..");
   const backendPort = process.env.BARK_E2E_PORT || "18997";
 
   // Warm up LLM before starting the server to force model loading.
@@ -54,7 +54,7 @@ async function globalSetup() {
     console.log("LLM not configured — skipping warmup");
   }
 
-  const logDir = join(projectRoot, "src", "e2e_tests", "logs");
+  const logDir = join(projectRoot, "src", "frontend", "e2e-tests", "logs");
   mkdirSync(logDir, { recursive: true });
 
   // Start nginx as an LLM proxy so containers can reach the LLM.
