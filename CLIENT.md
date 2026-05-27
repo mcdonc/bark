@@ -89,7 +89,7 @@ const result = await browserFetch("https://authenticated-api.com/data");
 await browserAction("celebrate");
 ```
 
-**Location**: `packages/bark-bridge/` (published as `@bark/bridge`)
+**Location**: `src/bridge/` (published as `@bark/bridge`)
 
 ### Phase 4: Pi extensions
 

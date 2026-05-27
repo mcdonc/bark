@@ -59,7 +59,9 @@ async function browserFetch(url, options = {}) {
     } catch {
       text = `(status ${resp.status})`;
     }
-    throw new Error(`@bark/bridge: fetch request failed (${resp.status}): ${text}`);
+    throw new Error(
+      `@bark/bridge: fetch request failed (${resp.status}): ${text}`,
+    );
   }
 
   return await resp.json();
@@ -95,7 +97,9 @@ async function browserAction(action, payload = {}) {
     } catch {
       text = `(status ${resp.status})`;
     }
-    throw new Error(`@bark/bridge: action '${action}' failed (${resp.status}): ${text}`);
+    throw new Error(
+      `@bark/bridge: action '${action}' failed (${resp.status}): ${text}`,
+    );
   }
 
   return await resp.json();

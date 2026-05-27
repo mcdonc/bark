@@ -11,12 +11,13 @@ Bark gives each user their own isolated coding environment (a "workspace") using
 ### Prerequisites
 
 - Docker daemon running
+- [Nix](https://nixos.org/download/) with [devenv](https://devenv.sh/) installed (or run `./bootstrap` to install both)
 - An OpenAI-compatible LLM provider (e.g., [Ollama Cloud](https://ollama.com) or self-hosted Ollama)
 
 ### Setup
 
 ```bash
-git clone git@github.com/mcdonc/bark
+git clone git@github.com:mcdonc/bark.git
 cd bark
 
 # Create .env with your LLM provider credentials
@@ -46,11 +47,11 @@ Open [http://localhost:8995](http://localhost:8995) and log in with `admin@examp
 ### What You Can Do
 
 1. **Create a workspace** — each workspace is an isolated coding environment
-2. **View files** in the file viewer panel, drag-and-drop files or folders to upload, right-click to download, rename, or delete
+2. **Chat with the AI agent** — execute "pi" in the terminal, then ask it to write code, create projects, fix bugs
 3. **Use the terminal** for direct shell access to the container (bash with tab completion and colors)
-4. **Monitor activity** in the debug panel
-5. **Manage users** (admin only) — add, edit, delete users and toggle admin roles
-6. **Chat with the AI agent** — execute "pi" in the terminal, then ask it to write code, create projects, fix bugs
+4. **View files** in the file viewer panel, drag-and-drop files or folders to upload, right-click to download, rename, or delete
+5. **Monitor activity** in the debug panel
+6. **Manage users** (admin only) — add, edit, delete users and toggle admin roles
 
 ### CLI Access
 
