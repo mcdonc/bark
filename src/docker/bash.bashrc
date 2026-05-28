@@ -4,8 +4,8 @@
 
 # Wait for the entrypoint to finish setup before showing a prompt.
 # Prevents races where the user runs pi before config files are ready.
-# /tmp is a tmpfs, so .bark-ready is cleared on every container start.
-while [ ! -f /tmp/.bark-ready ]; do sleep 0.1; done
+# /tmp is a tmpfs, so .bark-command is cleared on every container start.
+while [ ! -f /tmp/.bark-command ]; do sleep 0.1; done
 
 PS1='\[\033[01;34m\]\w\[\033[00m\]\$ '
 HISTFILE=~/.bash_history
@@ -15,3 +15,9 @@ shopt -s histappend
 PROMPT_COMMAND="history -a"
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
+
+# If .bark-command contains a command, exec into it (replaces this shell).
+BARK_CMD=$(cat /tmp/.bark-command)
+if [ -n "$BARK_CMD" ]; then
+  exec $BARK_CMD
+fi

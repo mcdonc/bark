@@ -1317,39 +1317,6 @@ class TestBroadcastDeadSubscribers:
             wshandler._sessions.pop("ws-dead-sub", None)
 
 
-class TestStartWorkspaceContainerResumeSession:
-    async def test_resume_session_found(self, user):
-        ws = _mock_ws(headers={"host": "localhost:8997"})
-        state = _base_state(user=user)
-        workspace = await ws_mod.create_workspace(user["id"], "resume-ws")
-
-        async def fake_start(*a, **kw):
-            container.registry.track_activity("cid-r", workspace["id"])
-            assert (
-                kw.get("resume_session") == "/home/bark/.pi/sessions/s/r.jsonl"
-            )
-            return ("cid-r", "created")
-
-        home_path = str(ws_mod.get_home_host_path(user["id"], workspace["id"]))
-        session_file = f"{home_path}/.pi/sessions/s/r.jsonl"
-
-        with (
-            patch.object(
-                container.registry,
-                "start_container",
-                side_effect=fake_start,
-            ),
-            patch("glob.glob", return_value=[session_file]),
-        ):
-            await start_workspace_container(
-                ws, state, workspace["id"], workspace
-            )
-
-        assert state["container_id"] == "cid-r"
-        wshandler._sessions.pop(workspace["id"], None)
-        container.registry.states.pop(workspace["id"], None)
-
-
 class TestHandleRestartContainer:
     async def test_restart_not_connected(self):
         ws = _mock_ws()

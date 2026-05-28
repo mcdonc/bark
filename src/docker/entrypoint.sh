@@ -68,25 +68,15 @@ fi
 
 git config --global --add safe.directory /work 2>/dev/null
 
-# If a default command is set, append exec to /etc/bash.bashrc so every
-# interactive shell (docker exec -it ... bash) immediately replaces itself
-# with the command. Exiting the command exits the shell — no escape to bash.
-if [ -n "$BARK_DEFAULT_COMMAND" ]; then
-  echo "exec $BARK_DEFAULT_COMMAND" >>/etc/bash.bashrc
-fi
-
 # Signal that setup is complete. Terminal sessions (docker exec) source
 # /etc/bash.bashrc which waits for this file before showing a prompt,
 # preventing races where the user runs pi before config is ready.
-# /tmp is a tmpfs, so .bark-ready is cleared on every container start.
-touch /tmp/.bark-ready
-
-# Build Pi command line
-PI_CMD="pi --mode rpc --no-context-files --append-system-prompt $SYSTEM_PROMPT_FILE --session-dir /home/bark/.pi/sessions"
-if [ -n "$BARK_RESUME_SESSION" ]; then
-  PI_CMD="$PI_CMD --session $BARK_RESUME_SESSION"
-fi
+# /tmp is a tmpfs, so .bark-command is cleared on every container start.
+# If BARK_DEFAULT_COMMAND is set, the file contains the command and
+# bash.bashrc will exec into it. Otherwise the file is empty.
+printf '%s' "${BARK_DEFAULT_COMMAND:-}" >/tmp/.bark-command
 
 export PI_CODING_AGENT_DIR="$PI_AGENT_DIR"
-# shellcheck disable=SC2086
-exec env -u BARK_RESUME_SESSION $PI_CMD
+
+# Keep the container alive. Terminal sessions are started via docker exec.
+exec sleep infinity

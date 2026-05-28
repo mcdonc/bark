@@ -402,28 +402,6 @@ class TestStartContainer:
         assert cid == "new-cid"
         assert status == "created"
 
-    async def test_resume_session_env_var(self, workspace):
-        mock_docker = _mock_docker()
-        mock_c = _mock_container("cid")
-        mock_docker.containers.create_or_replace = AsyncMock(
-            return_value=mock_c
-        )
-
-        with patch.object(
-            container.registry, "get_docker", return_value=mock_docker
-        ):
-            await container.registry.start_container(
-                workspace["id"],
-                "/tmp/ws",
-                "/tmp/home",
-                resume_session="/path/to/session.jsonl",
-            )
-        call_kwargs = mock_docker.containers.create_or_replace.call_args
-        env = call_kwargs[1]["config"]["Env"]
-        assert any(
-            "BARK_RESUME_SESSION=/path/to/session.jsonl" in e for e in env
-        )
-
     async def test_disallowed_image_raises(self, workspace):
         with pytest.raises(ValueError, match="not in the allowed list"):
             await container.registry.start_container(

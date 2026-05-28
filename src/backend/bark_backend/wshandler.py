@@ -1,7 +1,6 @@
 """WebSocket handler: auth, workspace routing, terminal/exec/bridge."""
 
 import asyncio
-import glob
 import json
 import logging
 import uuid
@@ -199,15 +198,6 @@ async def start_workspace_container(
     )
     home_path = str(workspaces.get_home_host_path(user["id"], workspace_id))
 
-    # Find the most recent Pi session file to resume (if any).
-    session_files = sorted(
-        glob.glob(f"{home_path}/.pi/sessions/**/*.jsonl", recursive=True)
-    )
-    resume_session = None
-    if session_files:
-        most_recent = session_files[-1]
-        resume_session = most_recent.replace(home_path, "/home/bark")
-
     hosting_hostname, hosting_proto, hosting_base_path = derive_hosting_info(
         ws.headers
     )
@@ -219,7 +209,6 @@ async def start_workspace_container(
         host_path,
         home_path,
         workspace.get("container_id"),
-        resume_session=resume_session,
         num_ports=workspace.get(
             "num_ports", container.DEFAULT_PORTS_PER_WORKSPACE
         ),

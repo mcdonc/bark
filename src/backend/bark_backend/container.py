@@ -194,7 +194,6 @@ class ContainerRegistry:
         host_path: str,
         home_path: str,
         existing_container_id: str | None = None,
-        resume_session: str | None = None,
         num_ports: int = DEFAULT_PORTS_PER_WORKSPACE,
         hosting_hostname: str = "localhost",
         hosting_proto: str = "http",
@@ -299,8 +298,6 @@ class ContainerRegistry:
         env_vars.append(f"BARK_HOSTING_HOSTNAME={hosting_hostname}")
         env_vars.append(f"BARK_HOSTING_PROTO={hosting_proto}")
         env_vars.append(f"BARK_HOSTING_BASE_PATH={hosting_base_path}")
-        if resume_session:
-            env_vars.append(f"BARK_RESUME_SESSION={resume_session}")
         if default_command:
             env_vars.append(f"BARK_DEFAULT_COMMAND={default_command}")
 

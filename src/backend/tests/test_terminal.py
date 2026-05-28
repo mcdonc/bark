@@ -115,7 +115,6 @@ class TestStart:
         ]
         assert "BARK_LLM_API_KEY" in unset_keys
         assert "ANTHROPIC_API_KEY" in unset_keys
-        assert "BARK_RESUME_SESSION" in unset_keys
 
         loop.remove_reader(master_fd)
 
