@@ -167,11 +167,13 @@ async def _ws_shell(
     token: str,
     workspace_id: str,
     raw_mode: bool = True,
+    command_override: str | None = None,
 ) -> None:
     """Run the interactive PTY shell over WebSocket.
 
     raw_mode controls whether stdin is placed in raw (cbreak) mode.
     Pass False in tests or when stdin is not a real terminal.
+    command_override, if set, overrides the workspace default command.
     """
     async with websockets.connect(
         f"{ws_url}?token={token}", max_size=2**20
@@ -188,9 +190,10 @@ async def _ws_shell(
 
         # 2. Start terminal
         cols, rows = _get_terminal_size()
-        await ws.send(
-            json.dumps({"cmd": "terminal_start", "cols": cols, "rows": rows})
-        )
+        start_msg = {"cmd": "terminal_start", "cols": cols, "rows": rows}
+        if command_override is not None:
+            start_msg["commandOverride"] = command_override
+        await ws.send(json.dumps(start_msg))
 
         # 3. Drain messages until the first terminal_output (the clear sequence).
         # Timeout prevents hanging if the container fails to start a shell.

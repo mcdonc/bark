@@ -75,6 +75,52 @@ class TestWsShell:
         sent = [c[0][0] for c in ws_mock.send.call_args_list]
         assert any("workspace_connect" in s for s in sent)
         assert any("terminal_start" in s for s in sent)
+        # No commandOverride by default
+        start_msgs = [json.loads(s) for s in sent if "terminal_start" in s]
+        assert "commandOverride" not in start_msgs[0]
+
+    @pytest.mark.asyncio
+    async def test_ws_shell_sends_command_override(self):
+        from bark_backend.cli.client import _ws_shell
+
+        ws_mock = MagicMock()
+
+        async def fake_enter(self):
+            return ws_mock
+
+        async def fake_exit(self, *args):
+            return None
+
+        ws_mock.__aenter__ = fake_enter
+        ws_mock.__aexit__ = fake_exit
+        ws_mock.send = AsyncMock()
+        ws_mock.recv = AsyncMock(
+            side_effect=[
+                json.dumps({"type": "workspace_ready", "workspaceId": "ws1"}),
+                json.dumps(
+                    {"type": "terminal_output", "data": "\x1b[2J\x1b[H"}
+                ),
+                Exception("stop"),
+            ]
+        )
+
+        with patch("websockets.connect", return_value=ws_mock):
+            with patch("termios.tcgetattr", return_value=None):
+                with patch("termios.tcsetattr"):
+                    with patch("tty.setraw"):
+                        try:
+                            await _ws_shell(
+                                "ws://localhost/ws",
+                                "token",
+                                "ws1",
+                                command_override="bash",
+                            )
+                        except Exception:
+                            pass
+
+        sent = [c[0][0] for c in ws_mock.send.call_args_list]
+        start_msgs = [json.loads(s) for s in sent if "terminal_start" in s]
+        assert start_msgs[0]["commandOverride"] == "bash"
 
 
 class TestRunShell:

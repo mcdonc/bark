@@ -118,6 +118,48 @@ class TestStart:
 
         loop.remove_reader(master_fd)
 
+    async def test_command_override_sets_env_var(self, mock_os):
+        proc = _mock_proc()
+        master_fd = mock_os["master_fd"]
+        loop = asyncio.get_event_loop()
+
+        with patch(
+            "asyncio.create_subprocess_exec", return_value=proc
+        ) as m_exec:
+            s = TerminalSession("cid")
+            await s.start(command_override="bash")
+
+        exec_args = m_exec.call_args[0]
+        assert "-e" in exec_args
+        # Find all -e flags and their values
+        env_flags = []
+        for i, arg in enumerate(exec_args):
+            if arg == "-e" and i + 1 < len(exec_args):
+                env_flags.append(exec_args[i + 1])
+        assert "BARK_CMD_OVERRIDE=bash" in env_flags
+
+        loop.remove_reader(master_fd)
+
+    async def test_no_command_override_by_default(self, mock_os):
+        proc = _mock_proc()
+        master_fd = mock_os["master_fd"]
+        loop = asyncio.get_event_loop()
+
+        with patch(
+            "asyncio.create_subprocess_exec", return_value=proc
+        ) as m_exec:
+            s = TerminalSession("cid")
+            await s.start()
+
+        exec_args = m_exec.call_args[0]
+        env_flags = []
+        for i, arg in enumerate(exec_args):
+            if arg == "-e" and i + 1 < len(exec_args):
+                env_flags.append(exec_args[i + 1])
+        assert not any("BARK_CMD_OVERRIDE" in f for f in env_flags)
+
+        loop.remove_reader(master_fd)
+
 
 class TestOnReadable:
     async def test_data_queued(self, mock_os):

@@ -21,10 +21,15 @@ PROMPT_COMMAND="history -a"
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 
-# If a default command is configured (read-only config mount), exec into it.
+# Determine which command to exec into (if any).
+# BARK_CMD_OVERRIDE (set per-session via docker exec -e) takes priority.
+# Otherwise fall back to the workspace default from the config mount.
 # BARK_CMD_STARTED guard prevents infinite recursion if the command is bash.
-if [ -f /opt/bark/config/default-command ] && [ -z "$BARK_CMD_STARTED" ]; then
-  BARK_CMD=$(cat /opt/bark/config/default-command)
+if [ -z "$BARK_CMD_STARTED" ]; then
+  BARK_CMD="${BARK_CMD_OVERRIDE:-}"
+  if [ -z "$BARK_CMD" ] && [ -f /opt/bark/config/default-command ]; then
+    BARK_CMD=$(cat /opt/bark/config/default-command)
+  fi
   if [ -n "$BARK_CMD" ]; then
     export BARK_CMD_STARTED=1
     # shellcheck disable=SC2086

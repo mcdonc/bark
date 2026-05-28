@@ -42,7 +42,12 @@ class TerminalSession:
         self._output_queue: asyncio.Queue[str | None] = asyncio.Queue()
         self._running = False
 
-    async def start(self, cols: int = 80, rows: int = 24) -> None:
+    async def start(
+        self,
+        cols: int = 80,
+        rows: int = 24,
+        command_override: str | None = None,
+    ) -> None:
         """Start a shell session via docker exec with a PTY."""
         master_fd, slave_fd = openpty()
 
@@ -75,6 +80,9 @@ class TerminalSession:
             "OTEL_SERVICE_NAME",
         ):
             env_unset.extend(["-u", key])
+        docker_env = ["-e", "TERM=xterm-256color"]
+        if command_override is not None:
+            docker_env.extend(["-e", f"BARK_CMD_OVERRIDE={command_override}"])
         exec_cmd = [
             "docker",
             "exec",
@@ -83,8 +91,7 @@ class TerminalSession:
             "bark",
             "-w",
             "/work",
-            "-e",
-            "TERM=xterm-256color",
+            *docker_env,
             self.container_id,
             "env",
             *env_unset,

@@ -207,6 +207,12 @@ def shell(
     workspace: str | None = typer.Argument(
         None, help="Workspace name (or select interactively)"
     ),
+    command: str | None = typer.Option(
+        None,
+        "--command",
+        "-c",
+        help="Override the workspace default command (use 'bash' for a plain shell)",
+    ),
 ) -> None:
     """Connect to a workspace and drop into a bash shell."""
     cfg = _cfg()
@@ -256,7 +262,7 @@ def shell(
 
     token = cfg.auth.token
     _err.print(f"Connecting to [bold]{ws.name}[/bold]...")
-    asyncio.run(_ws_shell(ws_url, token, ws.id))
+    asyncio.run(_ws_shell(ws_url, token, ws.id, command_override=command))
 
 
 @app.command(

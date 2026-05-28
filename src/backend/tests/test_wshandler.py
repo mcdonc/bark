@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from unittest.mock import AsyncMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 from fastapi import WebSocketDisconnect
 
@@ -264,11 +264,38 @@ class TestHandleTerminalStart:
             await handle_terminal_start(ws, state, {"cols": 100, "rows": 30})
 
         MockTS.assert_called_once_with("cid")
-        mock_session.start.assert_awaited_once_with(100, 30)
+        mock_session.start.assert_awaited_once_with(
+            100, 30, command_override=None
+        )
         assert state["terminal_session"] is mock_session
         assert state["terminal_task"] is not None
 
         # Clean up
+        state["terminal_task"].cancel()
+        try:
+            await state["terminal_task"]
+        except asyncio.CancelledError:
+            pass
+        container.registry.states.pop("ws", None)
+
+    async def test_passes_command_override(self):
+        ws = _mock_ws()
+        state = _base_state()
+        state["container_id"] = "cid"
+        container.registry.track_activity("cid", "ws")
+
+        mock_session = AsyncMock()
+        mock_session.is_alive = True
+        MockTS = MagicMock(return_value=mock_session)
+        with patch("bark_backend.wshandler.TerminalSession", MockTS):
+            await handle_terminal_start(
+                ws, state, {"cols": 80, "rows": 24, "commandOverride": "bash"}
+            )
+
+        mock_session.start.assert_awaited_once_with(
+            80, 24, command_override="bash"
+        )
+
         state["terminal_task"].cancel()
         try:
             await state["terminal_task"]
