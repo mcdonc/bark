@@ -200,14 +200,14 @@ class TestWorkspaceCRUD:
 
     def test_delete_nonexistent_fails(self, cli_config):
         result = _run(
-            ["bark", "delete", "nonexistent-ws"],
+            ["bark", "rm", "nonexistent-ws"],
             env=cli_config["env"],
         )
         assert result.returncode != 0
 
     def test_delete_workspace(self, cli_config):
         result = _run(
-            ["bark", "delete", "e2e-crud"],
+            ["bark", "rm", "e2e-crud"],
             env=cli_config["env"],
         )
         assert result.returncode == 0
@@ -226,7 +226,7 @@ class TestExec:
     def workspace(self, cli_config):
         _run(["bark", "create", "e2e-exec"], env=cli_config["env"])
         yield
-        _run(["bark", "delete", "e2e-exec"], env=cli_config["env"])
+        _run(["bark", "rm", "e2e-exec"], env=cli_config["env"])
 
     def test_exec_echo(self, cli_config):
         result = _run(
@@ -261,7 +261,7 @@ class TestSync:
     def workspace(self, cli_config):
         _run(["bark", "create", "e2e-sync"], env=cli_config["env"])
         yield
-        _run(["bark", "delete", "e2e-sync"], env=cli_config["env"])
+        _run(["bark", "rm", "e2e-sync"], env=cli_config["env"])
 
     def test_sync_to_container(self, cli_config, tmp_path):
         # Create local files
@@ -382,7 +382,7 @@ class TestDefaultCommand:
             assert result.returncode == 0
             assert "Updated" in result.stdout
         finally:
-            _run(["bark", "delete", "e2e-defcmd"], env=env)
+            _run(["bark", "rm", "e2e-defcmd"], env=env)
 
     def test_default_command_bash_no_infinite_loop(self, cli_config):
         """Setting default command to bash should not cause infinite recursion."""
@@ -418,7 +418,7 @@ class TestDefaultCommand:
             )
             assert result.returncode == 0
         finally:
-            _run(["bark", "delete", "e2e-defbash"], env=env)
+            _run(["bark", "rm", "e2e-defbash"], env=env)
 
 
 class TestAuthError:

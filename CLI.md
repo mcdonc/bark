@@ -49,7 +49,7 @@ Add to `pyproject.toml`:
 | `bark status [--plain]`                                    | Show connection info (server, user, login status)                                |
 | `bark list [--plain]`                                      | List workspaces                                                                  |
 | `bark create NAME`                                         | Create a workspace                                                               |
-| `bark delete NAME`                                         | Delete a workspace                                                               |
+| `bark rm NAME`                                             | Delete a workspace                                                               |
 | `bark shell [WORKSPACE]`                                   | **Main command.** Connect to workspace, drop into bash inside the container.     |
 | `bark exec WORKSPACE COMMAND...`                           | Run a command in a container. Also usable as an rsync transport.                 |
 | `bark sync SRC DEST`                                       | Sync files to/from a container via rsync (wraps `bark exec`).                    |
@@ -101,7 +101,7 @@ email = "admin@example.com"
 - `cli/` package: `__init__.py`, `config.py`, `auth.py`, `client.py`, `main.py`
 - typer dependency + `[project.scripts]` entry in `pyproject.toml`
 - `bark login [EMAIL]`, `bark logout`, `bark status [--plain]`
-- `bark list [--plain]`, `bark create`, `bark delete` (HTTP client via httpx)
+- `bark list [--plain]`, `bark create`, `bark rm` (HTTP client via httpx)
 - `bark shell` — WebSocket terminal with raw mode, stdin/stdout forwarding, select-based interruptible stdin, SIGWINCH via polling
 - `--password-file` for non-interactive login (scripting)
 - Token reuse: `bark login` verifies saved token before prompting
@@ -171,4 +171,4 @@ email = "admin@example.com"
    - `bark shell cli-test` — drops into bash inside container
    - `bark exec cli-test ls /work` — runs a command
    - `bark sync ~/project cli-test:/work/project` — syncs files
-   - `bark delete cli-test` — cleans up
+   - `bark rm cli-test` — cleans up

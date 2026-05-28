@@ -166,8 +166,8 @@ def create(
     _out.print(f"Created workspace [bold]{name}[/bold] ({ws.id[:12]})")
 
 
-@app.command()
-def delete(
+@app.command("rm")
+def rm(
     name: str = typer.Argument(..., help="Workspace name"),
 ) -> None:
     """Delete a workspace."""

@@ -54,7 +54,7 @@ bark create my-project                # create a workspace
 bark shell my-project                 # drop into bash inside the container
 bark exec my-project ls /work         # run a command in the container
 bark sync ~/src my-project:/work      # sync files to/from the container
-bark delete my-project                # delete a workspace
+bark rm my-project                # delete a workspace
 ```
 
 The CLI connects to the running Bark backend over HTTP + WebSocket — it works locally and against remote servers. See [CLI.md](CLI.md) for the full CLI reference and roadmap.
