@@ -208,7 +208,7 @@ async def _ws_shell(
             start_msg["commandOverride"] = command_override
         await ws.send(json.dumps(start_msg))
 
-        # 3. Drain messages until the first terminal_output (the clear sequence).
+        # 3. Drain messages until the first terminal_output (the shell prompt).
         # Timeout prevents hanging if the container fails to start a shell.
         try:
             deadline = asyncio.get_event_loop().time() + 30
