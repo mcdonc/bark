@@ -37,6 +37,7 @@ if [ -z "$BARK_CMD_STARTED" ]; then
   fi
   if [ -n "$BARK_CMD" ]; then
     export BARK_CMD_STARTED=1
+    stty sane 2>/dev/null
     # shellcheck disable=SC2086
     exec $BARK_CMD
   fi
