@@ -95,7 +95,3 @@ USER bark
 RUN . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
     && nix profile install --accept-flake-config github:cachix/devenv/v2.1.2
 USER root
-
-# Add Nix paths to system PATH so nix/devenv are available in all contexts
-# (not just interactive shells that source bash.bashrc).
-ENV PATH="/home/bark/.nix-profile/bin:/nix/var/nix/profiles/default/bin:${PATH}"
