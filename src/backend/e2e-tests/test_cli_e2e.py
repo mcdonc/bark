@@ -425,6 +425,24 @@ class TestDefaultCommand:
             _run(["bark", "ws", "delete", "e2e-defbash"], env=env)
 
 
+class TestAuthError:
+    def test_command_without_login_shows_clean_error(self, server, tmp_path):
+        """Commands that need auth should show a clean error, not a traceback."""
+        # Fresh config dir with no login
+        config_dir = tmp_path / "no-login"
+        config_dir.mkdir()
+        bark_config = config_dir / ".config" / "bark"
+        bark_config.mkdir(parents=True)
+        env = {**os.environ, "HOME": str(config_dir)}
+        result = _run(
+            ["bark", "ws", "list"],
+            env=env,
+        )
+        assert result.returncode != 0
+        assert "Traceback" not in result.stderr
+        assert "login" in result.stderr.lower()
+
+
 class TestLogout:
     def test_logout(self, cli_config):
         result = _run(

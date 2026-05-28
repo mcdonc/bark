@@ -13,7 +13,13 @@ from rich.console import Console
 from rich.table import Table
 
 from .auth import login, logout as do_logout
-from .client import BarkClient, WorkspaceNotFoundError, _ws_exec, _ws_shell
+from .client import (
+    AuthError,
+    BarkClient,
+    WorkspaceNotFoundError,
+    _ws_exec,
+    _ws_shell,
+)
 from .config import CLIConfig
 
 app = typer.Typer(
@@ -376,6 +382,9 @@ def images() -> None:
 def main() -> None:  # pragma: no cover
     try:
         app()
+    except AuthError as exc:
+        _err.print(f"[red]{exc}[/red]")
+        raise SystemExit(1) from None
     except httpx.ConnectError:
         _err.print("[red]Cannot connect to server[/red] — is it running?")
         raise SystemExit(1) from None

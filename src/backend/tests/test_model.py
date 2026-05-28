@@ -134,6 +134,18 @@ class TestPortAllocations:
         assert ports == [9000, 9002, 9004]
 
 
+class TestPortInUse:
+    def test_free_port(self):
+        assert model._port_in_use(59123) is False
+
+    def test_bound_port(self):
+        import socket
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("0.0.0.0", 59124))
+            assert model._port_in_use(59124) is True
+
+
 class TestDefaultCommand:
     async def test_create_with_default_command(self, user):
         ws = await model.create_workspace(
