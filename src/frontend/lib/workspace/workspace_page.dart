@@ -129,9 +129,18 @@ class _WorkspacePageState extends State<WorkspacePage> {
   void _onClientUpdate() {
     final wsClient = context.read<WsClient>();
     if (wsClient.currentWorkspaceId == widget.workspaceId) {
+      final defaultCommand = wsClient.defaultCommand;
       setState(() => _connecting = false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         wsClient.sendUiReady();
+        if (defaultCommand != null && defaultCommand.isNotEmpty) {
+          // Send after a short delay to let the terminal shell start
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              wsClient.sendTerminalInput('$defaultCommand\n');
+            }
+          });
+        }
       });
     }
   }

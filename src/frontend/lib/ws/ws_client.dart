@@ -33,6 +33,7 @@ class WsClient extends ChangeNotifier {
   WebSocketChannel? _channel;
   AuthService? _auth;
   String? _currentWorkspaceId;
+  String? _defaultCommand;
   bool _connected = false;
   Timer? _heartbeatTimer;
 
@@ -70,6 +71,7 @@ class WsClient extends ChangeNotifier {
   Stream<WsDebugEntry> get debugLog => _debugLogController.stream;
   bool get connected => _connected;
   String? get currentWorkspaceId => _currentWorkspaceId;
+  String? get defaultCommand => _defaultCommand;
 
   void updateAuth(AuthService auth) {
     _auth = auth;
@@ -123,6 +125,7 @@ class WsClient extends ChangeNotifier {
 
           if (type == 'workspace_ready') {
             _currentWorkspaceId = json['workspaceId'] as String?;
+            _defaultCommand = json['defaultCommand'] as String?;
             _startHeartbeat();
             notifyListeners();
           } else if (type == 'terminal_output') {
@@ -141,6 +144,7 @@ class WsClient extends ChangeNotifier {
       onDone: () {
         _connected = false;
         _currentWorkspaceId = null;
+        _defaultCommand = null;
         notifyListeners();
       },
       onError: (e) {

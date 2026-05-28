@@ -625,6 +625,43 @@ class TestWorkspaceRoutes:
         resp = await client.get("/workspaces")
         assert resp.status_code == 401
 
+    async def test_create_with_default_command(self, client, user):
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/workspaces",
+            json={"name": "cmd-ws", "default_command": "pi"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["default_command"] == "pi"
+
+    async def test_update_workspace_command(self, client, user):
+        headers = await _auth_headers(client)
+        resp = await client.post(
+            "/workspaces",
+            json={"name": "upd-cmd"},
+            headers=headers,
+        )
+        ws_id = resp.json()["id"]
+        resp = await client.put(
+            f"/workspaces/{ws_id}/command",
+            json={"default_command": "pi"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        resp = await client.get("/workspaces", headers=headers)
+        match = [w for w in resp.json() if w["id"] == ws_id]
+        assert match[0]["default_command"] == "pi"
+
+    async def test_update_workspace_command_not_found(self, client, user):
+        headers = await _auth_headers(client)
+        resp = await client.put(
+            "/workspaces/nonexistent/command",
+            json={"default_command": "pi"},
+            headers=headers,
+        )
+        assert resp.status_code == 404
+
 
 # --- Messages ---
 
@@ -982,10 +1019,7 @@ class TestSetIdleTimeout:
             container.IDLE_TIMEOUT_SECONDS = 42
             assert container.IDLE_TIMEOUT_SECONDS == 42
             # Per-workspace lookup falls back to global
-            assert (
-                container.registry.get_workspace_idle_timeout("any")
-                == 42
-            )
+            assert container.registry.get_workspace_idle_timeout("any") == 42
         finally:
             container.IDLE_TIMEOUT_SECONDS = original_timeout
 
@@ -1005,17 +1039,12 @@ class TestSetIdleTimeout:
             container.registry.track_activity("cid-test", "ws-test")
             container.registry.set_workspace_idle_timeout("ws-test", 5)
             assert (
-                container.registry.get_workspace_idle_timeout(
-                    "ws-test"
-                )
-                == 5
+                container.registry.get_workspace_idle_timeout("ws-test") == 5
             )
             assert container.IDLE_TIMEOUT_SECONDS == original_timeout
             # Unknown workspace returns global default
             assert (
-                container.registry.get_workspace_idle_timeout(
-                    "ws-other"
-                )
+                container.registry.get_workspace_idle_timeout("ws-other")
                 == original_timeout
             )
         finally:
@@ -1194,9 +1223,7 @@ class TestAdminEndpoints:
                 "stop_user_containers",
                 new_callable=AsyncMock,
             ),
-            patch.object(
-                ws_mod, "archive_user_data", new_callable=AsyncMock
-            ),
+            patch.object(ws_mod, "archive_user_data", new_callable=AsyncMock),
         ):
             resp = await client.delete(
                 f"/admin/users/{user['id']}", headers=headers
@@ -1333,9 +1360,7 @@ class TestArchiveUserData:
         data_dir.mkdir(parents=True)
         (data_dir / "hello.txt").write_text("test content")
 
-        result = await ws_mod.archive_user_data(
-            user["id"], user["email"]
-        )
+        result = await ws_mod.archive_user_data(user["id"], user["email"])
         assert result is not None
         assert result.exists()
         assert result.name == f"{user['id']}-{user['email']}.tar.xz"
@@ -1344,9 +1369,7 @@ class TestArchiveUserData:
 
     async def test_archive_no_data_dir(self, temp_data_dir, user):
         """Returns None if user has no data directory."""
-        result = await ws_mod.archive_user_data(
-            user["id"], user["email"]
-        )
+        result = await ws_mod.archive_user_data(user["id"], user["email"])
         assert result is None
 
     async def test_archive_tar_nonzero_exit(self, temp_data_dir, user):
@@ -1359,9 +1382,7 @@ class TestArchiveUserData:
         mock_proc.returncode = 1
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
-            result = await ws_mod.archive_user_data(
-                user["id"], user["email"]
-            )
+            result = await ws_mod.archive_user_data(user["id"], user["email"])
         assert result is None
 
     async def test_archive_tar_oserror(self, temp_data_dir, user):
@@ -1372,9 +1393,7 @@ class TestArchiveUserData:
         with patch(
             "asyncio.create_subprocess_exec", side_effect=OSError("no tar")
         ):
-            result = await ws_mod.archive_user_data(
-                user["id"], user["email"]
-            )
+            result = await ws_mod.archive_user_data(user["id"], user["email"])
         assert result is None
 
     async def test_archive_sanitizes_email(self, temp_data_dir, user):

@@ -302,6 +302,7 @@ async def handle_workspace_connect(
             "type": "workspace_ready",
             "workspaceId": workspace_id,
             "ports": ports,
+            "defaultCommand": workspace.get("default_command"),
         }
     )
     # Store status for when frontend sends ui_ready

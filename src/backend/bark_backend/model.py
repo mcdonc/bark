@@ -51,6 +51,7 @@ async def init_db() -> None:
                 container_id TEXT,
                 num_ports INTEGER NOT NULL DEFAULT 5,  -- see container.DEFAULT_PORTS_PER_WORKSPACE
                 image TEXT,  -- custom Docker image; NULL means use default
+                default_command TEXT,  -- auto-run in terminal on connect
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(user_id, name)
             )
@@ -295,16 +296,20 @@ async def get_user_by_id(user_id: str) -> dict | None:
 
 
 async def create_workspace(
-    user_id: str, name: str, image: str | None = None
+    user_id: str,
+    name: str,
+    image: str | None = None,
+    default_command: str | None = None,
 ) -> dict:
     db = await get_db()
     try:
         workspace_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         await db.execute(
-            "INSERT INTO workspaces (id, user_id, name, image, created_at)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (workspace_id, user_id, name, image, created_at),
+            "INSERT INTO workspaces"
+            " (id, user_id, name, image, default_command, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (workspace_id, user_id, name, image, default_command, created_at),
         )
         await db.commit()
         from . import container
@@ -314,6 +319,7 @@ async def create_workspace(
             "user_id": user_id,
             "name": name,
             "image": image,
+            "default_command": default_command,
             "num_ports": container.DEFAULT_PORTS_PER_WORKSPACE,
             "created_at": created_at,
         }
@@ -325,7 +331,9 @@ async def list_workspaces(user_id: str) -> list[dict]:
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT id, name, container_id, image, created_at FROM workspaces WHERE user_id = ? ORDER BY created_at",
+            "SELECT id, name, container_id, image, default_command,"
+            " created_at FROM workspaces"
+            " WHERE user_id = ? ORDER BY created_at",
             (user_id,),
         )
         rows = await cursor.fetchall()
@@ -335,6 +343,7 @@ async def list_workspaces(user_id: str) -> list[dict]:
                 "name": row["name"],
                 "container_id": row["container_id"],
                 "image": row["image"],
+                "default_command": row["default_command"],
                 "created_at": row["created_at"],
             }
             for row in rows
@@ -347,7 +356,9 @@ async def get_workspace(workspace_id: str, user_id: str) -> dict | None:
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT id, user_id, name, container_id, num_ports, image FROM workspaces WHERE id = ? AND user_id = ?",
+            "SELECT id, user_id, name, container_id, num_ports, image,"
+            " default_command"
+            " FROM workspaces WHERE id = ? AND user_id = ?",
             (workspace_id, user_id),
         )
         row = await cursor.fetchone()
@@ -360,6 +371,7 @@ async def get_workspace(workspace_id: str, user_id: str) -> dict | None:
             "container_id": row["container_id"],
             "num_ports": row["num_ports"],
             "image": row["image"],
+            "default_command": row["default_command"],
         }
     finally:
         await db.close()
@@ -479,6 +491,22 @@ async def update_workspace_container(
             (container_id, workspace_id),
         )
         await db.commit()
+    finally:
+        await db.close()
+
+
+async def update_workspace_default_command(
+    workspace_id: str, user_id: str, default_command: str | None
+) -> bool:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "UPDATE workspaces SET default_command = ?"
+            " WHERE id = ? AND user_id = ?",
+            (default_command, workspace_id, user_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
     finally:
         await db.close()
 

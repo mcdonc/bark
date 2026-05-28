@@ -488,8 +488,39 @@ class TestHandleWorkspaceConnect:
         ready = [c for c in calls if c.get("type") == "workspace_ready"]
         assert len(ready) == 1
         assert ready[0]["workspaceId"] == workspace["id"]
+        assert ready[0]["defaultCommand"] is None
         # Integer timeout (default 30m) should show as "30m" not "30.0m"
         assert "30m" in state["pending_status_msg"]
+
+    async def test_connect_sends_default_command(self, user):
+        ws = _mock_ws()
+        workspace = await ws_mod.create_workspace(
+            user["id"], "cmd-ws", default_command="pi"
+        )
+        state = _base_state(user=user)
+
+        async def fake_start(ws, state, wid, workspace):
+            state["container_id"] = "cid"
+
+        with (
+            patch.object(
+                wshandler,
+                "start_workspace_container",
+                side_effect=fake_start,
+            ),
+            patch.object(
+                container.registry,
+                "get_workspace_ports",
+                return_value=[9000],
+            ),
+        ):
+            await handle_workspace_connect(
+                ws, state, {"workspaceId": workspace["id"]}
+            )
+
+        calls = [c[0][0] for c in ws.send_json.call_args_list]
+        ready = [c for c in calls if c.get("type") == "workspace_ready"]
+        assert ready[0]["defaultCommand"] == "pi"
 
 
 class TestHandleWorkspaceDisconnect:

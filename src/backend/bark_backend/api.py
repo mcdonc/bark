@@ -342,6 +342,7 @@ async def list_workspaces(user: dict = Depends(auth.get_current_user)):
 class CreateWorkspaceRequest(BaseModel):
     name: str
     image: str | None = None
+    default_command: str | None = None
 
 
 @router.get("/images")
@@ -364,7 +365,10 @@ async def create_workspace(
         )
     try:
         return await workspaces.create_workspace(
-            user["id"], body.name, image=body.image
+            user["id"],
+            body.name,
+            image=body.image,
+            default_command=body.default_command,
         )
     except sqlite3.IntegrityError:
         raise HTTPException(
@@ -373,6 +377,24 @@ async def create_workspace(
         )
     except OSError as e:  # pragma: no cover
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class UpdateCommandRequest(BaseModel):
+    default_command: str | None = None
+
+
+@router.put("/workspaces/{workspace_id}/command")
+async def update_workspace_command(
+    workspace_id: str,
+    body: UpdateCommandRequest,
+    user: dict = Depends(auth.get_current_user),
+):
+    updated = await model.update_workspace_default_command(
+        workspace_id, user["id"], body.default_command
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return {"status": "updated"}
 
 
 @router.delete("/workspaces/{workspace_id}")

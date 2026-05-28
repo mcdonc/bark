@@ -134,6 +134,49 @@ class TestPortAllocations:
         assert ports == [9000, 9002, 9004]
 
 
+class TestDefaultCommand:
+    async def test_create_with_default_command(self, user):
+        ws = await model.create_workspace(
+            user["id"], "cmd-ws", default_command="pi"
+        )
+        assert ws["default_command"] == "pi"
+        fetched = await model.get_workspace(ws["id"], user["id"])
+        assert fetched["default_command"] == "pi"
+
+    async def test_update_default_command(self, workspace, user):
+        updated = await model.update_workspace_default_command(
+            workspace["id"], user["id"], "pi"
+        )
+        assert updated is True
+        ws = await model.get_workspace(workspace["id"], user["id"])
+        assert ws["default_command"] == "pi"
+
+    async def test_clear_default_command(self, workspace, user):
+        await model.update_workspace_default_command(
+            workspace["id"], user["id"], "pi"
+        )
+        await model.update_workspace_default_command(
+            workspace["id"], user["id"], None
+        )
+        ws = await model.get_workspace(workspace["id"], user["id"])
+        assert ws["default_command"] is None
+
+    async def test_update_nonexistent_workspace(self, user):
+        updated = await model.update_workspace_default_command(
+            "nonexistent", user["id"], "pi"
+        )
+        assert updated is False
+
+    async def test_list_includes_default_command(self, user):
+        await model.create_workspace(
+            user["id"], "cmd-ws", default_command="pi"
+        )
+        wss = await model.list_workspaces(user["id"])
+        match = [w for w in wss if w["name"] == "cmd-ws"]
+        assert len(match) == 1
+        assert match[0]["default_command"] == "pi"
+
+
 class TestContainerTracking:
     async def test_update_workspace_container(self, workspace, user):
         await model.update_workspace_container(

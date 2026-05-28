@@ -7,6 +7,7 @@ import httpx
 import pytest
 import typer
 
+from bark_backend.cli.client import WorkspaceNotFoundError
 from bark_backend.cli.config import CLIConfig
 from bark_backend.cli.client import Workspace
 
@@ -491,6 +492,157 @@ class TestMainCLI:
                     assert result.exit_code == 0
 
         assert captured_kwargs.get("initial_command") == "pi"
+
+    def test_shell_uses_workspace_default_command(
+        self, logged_in_cfg, monkeypatch, reset_env
+    ):
+        from bark_backend.cli import main
+
+        ws = Workspace(
+            id="target" + "0" * 52,
+            name="target-ws",
+            created_at="2025-01-01T00:00:00Z",
+            default_command="pi",
+        )
+        client = MagicMock()
+        client.resolve_workspace.return_value = ws
+
+        captured_kwargs = {}
+
+        async def fake_shell(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+
+        with patch.object(main, "_client", return_value=client):
+            with patch.object(main, "_ws_shell", fake_shell):
+                os.environ["TERM"] = "xterm-256color"
+                with patch("termios.tcgetattr", return_value=None):
+                    from typer.testing import CliRunner
+
+                    runner = CliRunner()
+                    result = runner.invoke(
+                        main.app, ["ws", "shell", "target-ws"]
+                    )
+                    assert result.exit_code == 0
+
+        assert captured_kwargs.get("initial_command") == "pi"
+
+    def test_shell_c_overrides_default_command(
+        self, logged_in_cfg, monkeypatch, reset_env
+    ):
+        from bark_backend.cli import main
+
+        ws = Workspace(
+            id="target" + "0" * 52,
+            name="target-ws",
+            created_at="2025-01-01T00:00:00Z",
+            default_command="pi",
+        )
+        client = MagicMock()
+        client.resolve_workspace.return_value = ws
+
+        captured_kwargs = {}
+
+        async def fake_shell(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+
+        with patch.object(main, "_client", return_value=client):
+            with patch.object(main, "_ws_shell", fake_shell):
+                os.environ["TERM"] = "xterm-256color"
+                with patch("termios.tcgetattr", return_value=None):
+                    from typer.testing import CliRunner
+
+                    runner = CliRunner()
+                    result = runner.invoke(
+                        main.app,
+                        ["ws", "shell", "target-ws", "-c", "python3"],
+                    )
+                    assert result.exit_code == 0
+
+        assert captured_kwargs.get("initial_command") == "python3"
+
+    def test_set_command(self, logged_in_cfg, monkeypatch):
+        from bark_backend.cli import main
+
+        ws = Workspace(
+            id="ws1" + "0" * 52,
+            name="my-ws",
+            created_at="2025-01-01T00:00:00Z",
+        )
+        client = MagicMock()
+        client.resolve_workspace.return_value = ws
+        client.put.return_value = MagicMock(status_code=200)
+
+        with patch.object(main, "_client", return_value=client):
+            from typer.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(
+                main.app, ["ws", "set-command", "my-ws", "pi"]
+            )
+            assert result.exit_code == 0
+
+        client.put.assert_called_once()
+        call_args = client.put.call_args
+        assert call_args[0][0] == f"/workspaces/{ws.id}/command"
+        assert call_args[1]["json"] == {"default_command": "pi"}
+
+    def test_set_command_clear(self, logged_in_cfg, monkeypatch):
+        from bark_backend.cli import main
+
+        ws = Workspace(
+            id="ws1" + "0" * 52,
+            name="my-ws",
+            created_at="2025-01-01T00:00:00Z",
+        )
+        client = MagicMock()
+        client.resolve_workspace.return_value = ws
+        client.put.return_value = MagicMock(status_code=200)
+
+        with patch.object(main, "_client", return_value=client):
+            from typer.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(main.app, ["ws", "set-command", "my-ws"])
+            assert result.exit_code == 0
+
+        call_args = client.put.call_args
+        assert call_args[1]["json"] == {"default_command": None}
+
+    def test_set_command_workspace_not_found(self, logged_in_cfg, monkeypatch):
+        from bark_backend.cli import main
+
+        client = MagicMock()
+        client.resolve_workspace.side_effect = WorkspaceNotFoundError("nope")
+
+        with patch.object(main, "_client", return_value=client):
+            from typer.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(
+                main.app, ["ws", "set-command", "nope", "pi"]
+            )
+            assert result.exit_code == 1
+
+    def test_set_command_404_from_server(self, logged_in_cfg, monkeypatch):
+        from bark_backend.cli import main
+
+        ws = Workspace(
+            id="ws1" + "0" * 52,
+            name="my-ws",
+            created_at="2025-01-01T00:00:00Z",
+        )
+        client = MagicMock()
+        client.resolve_workspace.return_value = ws
+        client.put.return_value = MagicMock(status_code=404)
+
+        with patch.object(main, "_client", return_value=client):
+            from typer.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(
+                main.app, ["ws", "set-command", "my-ws", "pi"]
+            )
+            assert result.exit_code == 1
 
     def test_exec_runs_command(self, logged_in_cfg, monkeypatch):
         from bark_backend.cli import main

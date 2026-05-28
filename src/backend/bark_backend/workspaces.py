@@ -71,9 +71,14 @@ def home_path(user_id: str, workspace_id: str) -> Path:
 
 
 async def create_workspace(
-    user_id: str, name: str, image: str | None = None
+    user_id: str,
+    name: str,
+    image: str | None = None,
+    default_command: str | None = None,
 ) -> dict:
-    workspace = await model.create_workspace(user_id, name, image=image)
+    workspace = await model.create_workspace(
+        user_id, name, image=image, default_command=default_command
+    )
     path = workspace_path(user_id, workspace["id"])
     path.mkdir(parents=True, exist_ok=True)
     home = home_path(user_id, workspace["id"])

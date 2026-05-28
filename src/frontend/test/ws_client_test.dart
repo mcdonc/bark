@@ -311,10 +311,12 @@ void main() {
       channel.serverSend({
         'type': 'workspace_ready',
         'workspaceId': 'ws-42',
+        'defaultCommand': 'pi',
       });
       await Future.delayed(Duration.zero);
 
       expect(client.currentWorkspaceId, 'ws-42');
+      expect(client.defaultCommand, 'pi');
       expect(notified, isTrue);
     });
 

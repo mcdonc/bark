@@ -25,6 +25,7 @@ class Workspace:
     id: str
     name: str
     created_at: str
+    default_command: str | None = None
 
 
 def _get_terminal_size() -> tuple[int, int]:
@@ -61,6 +62,14 @@ class BarkClient:
             **kwargs,
         )
 
+    def put(self, path: str, **kwargs) -> httpx.Response:  # pragma: no cover
+        return httpx.put(
+            f"{self.cfg.server.url}{path}",
+            headers=self._headers(),
+            timeout=15.0,
+            **kwargs,
+        )
+
     def delete(
         self, path: str, **kwargs
     ) -> httpx.Response:  # pragma: no cover
@@ -81,7 +90,12 @@ class BarkClient:
         raw = resp.json()
         # (workspace listing is tested via test_list_workspaces_empty, test_resolve_workspace_by_name, etc.)
         return [
-            Workspace(id=w["id"], name=w["name"], created_at=w["created_at"])
+            Workspace(
+                id=w["id"],
+                name=w["name"],
+                created_at=w["created_at"],
+                default_command=w.get("default_command"),
+            )
             for w in raw
         ]
 

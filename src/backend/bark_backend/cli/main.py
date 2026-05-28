@@ -174,6 +174,35 @@ def delete(
     typer.echo(f"Deleted workspace {name}")
 
 
+@ws_app.command("set-command")
+def set_command(
+    workspace: str = typer.Argument(..., help="Workspace name"),
+    command: str | None = typer.Argument(
+        None, help="Default command (omit to clear)"
+    ),
+) -> None:
+    """Set or clear the default terminal command for a workspace."""
+    _require_auth()
+    client = _client()
+    try:
+        ws = client.resolve_workspace(workspace)
+    except WorkspaceNotFoundError:
+        _err.print(f"[red]No workspace named[/red] '{workspace}'")
+        raise typer.Exit(code=1) from None
+    resp = client.put(
+        f"/workspaces/{ws.id}/command",
+        json={"default_command": command},
+    )
+    if resp.status_code == 404:
+        _err.print("[red]Workspace not found[/red]")
+        raise typer.Exit(code=1)
+    resp.raise_for_status()
+    if command:
+        typer.echo(f"Default command set to: {command}")
+    else:
+        typer.echo("Default command cleared")
+
+
 @ws_app.command()
 def shell(
     workspace: str | None = typer.Argument(
@@ -236,7 +265,7 @@ def shell(
         ws_url = f"ws://{server_url}/ws"
 
     token = cfg.auth.token
-    initial_command = command
+    initial_command = command or ws.default_command
     _err.print(f"Connecting to [bold]{ws.name}[/bold]...")
     asyncio.run(
         _ws_shell(ws_url, token, ws.id, initial_command=initial_command)
