@@ -482,6 +482,9 @@ def volumes_create(
     client = _client()
     resp = client.post("/volumes", json={"name": name})
     client._check_auth(resp)
+    if resp.status_code == 409:
+        _err.print(f"[red]Volume already exists:[/red] {name}")
+        raise typer.Exit(code=1)
     resp.raise_for_status()
     typer.echo(f"Created volume {name}")
 
