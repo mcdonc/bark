@@ -633,7 +633,7 @@ void main() {
           return http.Response(
             jsonEncode({
               'default': 'bark-pi',
-              'allowed': ['bark-pi', 'bark-shell'],
+              'allowed': ['bark-pi', 'bark-custom'],
             }),
             200,
           );
@@ -665,7 +665,7 @@ void main() {
       // Select non-default image
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('bark-shell').last);
+      await tester.tap(find.text('bark-custom').last);
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).first, 'ImgWS');
@@ -675,7 +675,7 @@ void main() {
       expect(postedBody, isNotNull);
       final body = jsonDecode(postedBody!) as Map<String, dynamic>;
       expect(body['name'], 'ImgWS');
-      expect(body['image'], 'bark-shell');
+      expect(body['image'], 'bark-custom');
     });
 
     testWidgets('create dialog sends default_command when provided',
@@ -1012,7 +1012,7 @@ void main() {
           return http.Response(
             jsonEncode({
               'default': 'bark-pi',
-              'allowed': ['bark-pi', 'bark-shell'],
+              'allowed': ['bark-pi', 'bark-custom'],
             }),
             200,
           );
@@ -1061,7 +1061,7 @@ void main() {
           return http.Response(
             jsonEncode({
               'default': 'bark-pi',
-              'allowed': ['bark-pi', 'bark-shell'],
+              'allowed': ['bark-pi', 'bark-custom'],
             }),
             200,
           );
@@ -1082,7 +1082,7 @@ void main() {
       // Change image
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('bark-shell').last);
+      await tester.tap(find.text('bark-custom').last);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Save'));
@@ -1090,7 +1090,7 @@ void main() {
 
       expect(putBody, isNotNull);
       final body = jsonDecode(putBody!) as Map<String, dynamic>;
-      expect(body['image'], 'bark-shell');
+      expect(body['image'], 'bark-custom');
     });
 
     testWidgets('edit dialog submit via Enter', (tester) async {

@@ -1,7 +1,0 @@
-FROM ghcr.io/mcdonc/bark/bark-pi-base:latest
-
-COPY bash.bashrc /etc/bash.bashrc
-COPY entrypoint-shell.sh /opt/bark/entrypoint.sh
-RUN chmod +x /opt/bark/entrypoint.sh
-
-ENTRYPOINT ["/opt/bark/entrypoint.sh"]
