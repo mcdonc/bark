@@ -34,6 +34,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tree \
     htop \
     zip \
+    fzf \
+    bat \
+    iproute2 \
+    bsdextrautils \
     && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI (not in default Debian repos)
