@@ -330,7 +330,7 @@ class ContainerRegistry:
                 )
                 + (extra_mounts or []),
                 "Tmpfs": {
-                    "/tmp": "rw,nosuid,size=256m",
+                    "/tmp": "rw,exec,nosuid,size=256m",
                     "/run": "rw,noexec,nosuid,size=16m",
                     "/var/log": "rw,noexec,nosuid,size=16m",
                 },
