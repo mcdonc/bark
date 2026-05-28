@@ -57,6 +57,7 @@ class TerminalSession:
         # our PTY must be transparent to avoid double-processing escape
         # sequences (e.g., ESC being consumed, breaking arrow keys).
         tty.setraw(master_fd)
+        tty.setraw(slave_fd)
         set_winsize(master_fd, rows, cols)
         set_winsize(slave_fd, rows, cols)
 
