@@ -1,6 +1,5 @@
 #!/bin/sh
-# Minimal container entrypoint. Pi setup is handled by bark-pi (the
-# default command script), not here.
+# Minimal container entrypoint.
 set -e
 
 chown bark:bark /home/bark /work
