@@ -291,7 +291,7 @@ class TestBarkClient:
         mock_resp = MagicMock()
         mock_resp.status_code = 401
         with patch.object(client, "get", return_value=mock_resp):
-            with pytest.raises(AuthError, match="Not logged in"):
+            with pytest.raises(AuthError, match="Session expired"):
                 client.list_workspaces()
 
     def test_list_workspaces_parses_response(self):
@@ -632,8 +632,8 @@ class TestRunShell:
 
 class TestMisc:
     def test_auth_error_message(self):
-        err = AuthError("Not logged in — run `bark login`")
-        assert "Not logged in" in str(err)
+        err = AuthError("Session expired — run `bark login`")
+        assert "Session expired" in str(err)
         assert "bark login" in str(err)
 
     def test_workspace_dataclass_fields(self):

@@ -81,13 +81,16 @@ class BarkClient:
 
     # --- REST API ---
 
+    def _check_auth(self, resp: httpx.Response) -> None:
+        """Raise AuthError if the server returned 401."""
+        if resp.status_code == 401:
+            raise AuthError("Session expired — run `bark login`")
+
     def list_workspaces(self) -> list[Workspace]:
         resp = self.get("/workspaces")
-        if resp.status_code == 401:
-            raise AuthError("Not logged in — run `bark login`")
+        self._check_auth(resp)
         resp.raise_for_status()
         raw = resp.json()
-        # (workspace listing is tested via test_list_workspaces_empty, test_resolve_workspace_by_name, etc.)
         return [
             Workspace(id=w["id"], name=w["name"], created_at=w["created_at"])
             for w in raw
@@ -100,8 +103,7 @@ class BarkClient:
         if image:
             body["image"] = image
         resp = self.post("/workspaces", json=body)
-        if resp.status_code == 401:
-            raise AuthError("Not logged in — run `bark login`")
+        self._check_auth(resp)
         resp.raise_for_status()
         w = resp.json()
         return Workspace(
@@ -110,8 +112,7 @@ class BarkClient:
 
     def list_images(self) -> dict:  # pragma: no cover
         resp = self.get("/images")
-        if resp.status_code == 401:
-            raise AuthError("Not logged in — run `bark login`")
+        self._check_auth(resp)
         resp.raise_for_status()
         return resp.json()
 
@@ -126,8 +127,7 @@ class BarkClient:
     def delete_workspace(self, name: str) -> None:
         ws = self.resolve_workspace(name)
         resp = self.delete(f"/workspaces/{ws.id}")
-        if resp.status_code == 401:
-            raise AuthError("Not logged in — run `bark login`")
+        self._check_auth(resp)
         if not resp.is_success:
             logging.error("Failed to delete workspace: %s", resp.text)
             sys.exit(1)
