@@ -79,3 +79,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/
     | sh -s -- install linux --no-confirm --init none --no-start-daemon
 USER root
 RUN chown -R bark:bark /nix
+USER bark
+RUN . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh \
+    && nix profile install --accept-flake-config github:cachix/devenv/v2.1.2
+USER root
