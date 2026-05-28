@@ -598,6 +598,41 @@ class TestMainCLI:
         body = client.put.call_args[1]["json"]
         assert body["image"] == "bark-custom"
 
+    def test_edit_with_mount_flag(self, logged_in_cfg, monkeypatch):
+        from bark_backend.cli import main
+
+        ws = Workspace(
+            id="ws1" + "0" * 52,
+            name="my-ws",
+            created_at="2025-01-01T00:00:00Z",
+        )
+        client = MagicMock()
+        client.resolve_workspace.return_value = ws
+        client.put.return_value = MagicMock(status_code=200)
+
+        with patch.object(main, "_client", return_value=client):
+            from typer.testing import CliRunner
+
+            runner = CliRunner()
+            result = runner.invoke(
+                main.app,
+                [
+                    "edit",
+                    "my-ws",
+                    "--mount",
+                    "/home/me/src:/work/src",
+                    "--mount",
+                    "/data:/mnt/data:ro",
+                ],
+            )
+            assert result.exit_code == 0
+
+        body = client.put.call_args[1]["json"]
+        assert body["mounts"] == [
+            "/home/me/src:/work/src",
+            "/data:/mnt/data:ro",
+        ]
+
     def test_edit_interactive_no_changes(self, logged_in_cfg, monkeypatch):
         from bark_backend.cli import main
 

@@ -190,6 +190,36 @@ class TestDefaultCommand:
         assert ws["name"] == "renamed"
         assert ws["default_command"] == "pi"
 
+    async def test_create_with_mounts(self, user):
+        mounts = ["/home/me/project:/work/project"]
+        ws = await model.create_workspace(
+            user["id"], "mount-ws", mounts=mounts
+        )
+        assert ws["mounts"] == mounts
+        fetched = await model.get_workspace(ws["id"], user["id"])
+        assert fetched["mounts"] == mounts
+
+    async def test_update_mounts(self, workspace, user):
+        mounts = ["/data:/mnt/data:ro"]
+        await model.update_workspace(
+            workspace["id"], user["id"], mounts=mounts
+        )
+        ws = await model.get_workspace(workspace["id"], user["id"])
+        assert ws["mounts"] == mounts
+
+    async def test_list_includes_mounts(self, user):
+        mounts = ["/tmp/test:/work/test"]
+        await model.create_workspace(user["id"], "mount-list", mounts=mounts)
+        wss = await model.list_workspaces(user["id"])
+        match = [w for w in wss if w["name"] == "mount-list"]
+        assert match[0]["mounts"] == mounts
+
+    async def test_update_ignores_unknown_fields(self, workspace, user):
+        result = await model.update_workspace(
+            workspace["id"], user["id"], bogus="ignored"
+        )
+        assert result is False
+
     async def test_update_no_fields(self, workspace, user):
         result = await model.update_workspace(workspace["id"], user["id"])
         assert result is False

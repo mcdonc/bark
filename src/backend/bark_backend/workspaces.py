@@ -98,9 +98,14 @@ async def create_workspace(
     name: str,
     image: str | None = None,
     default_command: str | None = None,
+    mounts: list[str] | None = None,
 ) -> dict:
     workspace = await model.create_workspace(
-        user_id, name, image=image, default_command=default_command
+        user_id,
+        name,
+        image=image,
+        default_command=default_command,
+        mounts=mounts,
     )
     path = workspace_path(user_id, workspace["id"])
     path.mkdir(parents=True, exist_ok=True)

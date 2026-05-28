@@ -146,11 +146,18 @@ def create(
     image: str | None = typer.Option(
         None, "--image", help="Docker image to use (see `bark images`)"
     ),
+    mount: list[str] | None = typer.Option(
+        None,
+        "--mount",
+        help="Bind mount, repeatable (e.g. /home/me/src:/work/src or /data:/mnt/data:ro)",
+    ),
 ) -> None:
     """Create a new workspace."""
     _require_auth()
     try:
-        ws = _client().create_workspace(name, image=image)
+        ws = _client().create_workspace(
+            name, image=image, mounts=mount or None
+        )
     except httpx.HTTPStatusError as exc:
         detail = exc.response.json().get("detail", exc.response.text)
         _err.print(f"[red]Failed to create workspace:[/red] {detail}")
@@ -197,6 +204,11 @@ def edit(
     command: str | None = typer.Option(
         None, "--command", "-c", help="Default shell command (use '' to clear)"
     ),
+    mount: list[str] | None = typer.Option(
+        None,
+        "--mount",
+        help="Bind mount, repeatable (e.g. /home/me/src:/work/src or /data:/mnt/data:ro)",
+    ),
 ) -> None:
     """Edit workspace settings.
 
@@ -211,7 +223,7 @@ def edit(
         _err.print(f"[red]No workspace named[/red] '{workspace}'")
         raise typer.Exit(code=1) from None
 
-    if name is None and image is None and command is None:
+    if name is None and image is None and command is None and mount is None:
         # Interactive mode
         new_name = _prompt("Name", ws.name)
         new_image = _prompt("Container Image", ws.image)
@@ -233,6 +245,8 @@ def edit(
             body["image"] = image or None
         if command is not None:
             body["default_command"] = command or None
+        if mount is not None:
+            body["mounts"] = mount or None
 
     if not body:
         typer.echo("No changes.")

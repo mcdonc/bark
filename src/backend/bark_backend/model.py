@@ -1,3 +1,4 @@
+import json
 import socket
 from contextlib import asynccontextmanager
 
@@ -52,6 +53,7 @@ async def init_db() -> None:
                 num_ports INTEGER NOT NULL DEFAULT 5,  -- see container.DEFAULT_PORTS_PER_WORKSPACE
                 image TEXT,  -- custom Docker image; NULL means use default
                 default_command TEXT,  -- auto-run in terminal on connect
+                mounts TEXT,  -- JSON array of host:container mount specs
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(user_id, name)
             )
@@ -300,16 +302,27 @@ async def create_workspace(
     name: str,
     image: str | None = None,
     default_command: str | None = None,
+    mounts: list[str] | None = None,
 ) -> dict:
     db = await get_db()
     try:
         workspace_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        mounts_json = json.dumps(mounts) if mounts else None
         await db.execute(
             "INSERT INTO workspaces"
-            " (id, user_id, name, image, default_command, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (workspace_id, user_id, name, image, default_command, created_at),
+            " (id, user_id, name, image, default_command, mounts,"
+            " created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                workspace_id,
+                user_id,
+                name,
+                image,
+                default_command,
+                mounts_json,
+                created_at,
+            ),
         )
         await db.commit()
         from . import container
@@ -320,6 +333,7 @@ async def create_workspace(
             "name": name,
             "image": image,
             "default_command": default_command,
+            "mounts": mounts,
             "num_ports": container.DEFAULT_PORTS_PER_WORKSPACE,
             "created_at": created_at,
         }
@@ -332,7 +346,7 @@ async def list_workspaces(user_id: str) -> list[dict]:
     try:
         cursor = await db.execute(
             "SELECT id, name, container_id, image, default_command,"
-            " created_at FROM workspaces"
+            " mounts, created_at FROM workspaces"
             " WHERE user_id = ? ORDER BY created_at",
             (user_id,),
         )
@@ -344,6 +358,7 @@ async def list_workspaces(user_id: str) -> list[dict]:
                 "container_id": row["container_id"],
                 "image": row["image"],
                 "default_command": row["default_command"],
+                "mounts": json.loads(row["mounts"]) if row["mounts"] else None,
                 "created_at": row["created_at"],
             }
             for row in rows
@@ -357,7 +372,7 @@ async def get_workspace(workspace_id: str, user_id: str) -> dict | None:
     try:
         cursor = await db.execute(
             "SELECT id, user_id, name, container_id, num_ports, image,"
-            " default_command"
+            " default_command, mounts"
             " FROM workspaces WHERE id = ? AND user_id = ?",
             (workspace_id, user_id),
         )
@@ -372,6 +387,7 @@ async def get_workspace(workspace_id: str, user_id: str) -> dict | None:
             "num_ports": row["num_ports"],
             "image": row["image"],
             "default_command": row["default_command"],
+            "mounts": json.loads(row["mounts"]) if row["mounts"] else None,
         }
     finally:
         await db.close()
@@ -501,8 +517,15 @@ async def update_workspace(
     **fields: str | None,
 ) -> bool:
     """Update workspace fields. Only provided fields are changed."""
-    allowed = {"name", "image", "default_command"}
-    to_set = {k: v for k, v in fields.items() if k in allowed}
+    allowed = {"name", "image", "default_command", "mounts"}
+    to_set = {}
+    for k, v in fields.items():
+        if k not in allowed:
+            continue
+        if k == "mounts":
+            to_set[k] = json.dumps(v) if v is not None else None
+        else:
+            to_set[k] = v
     if not to_set:
         return False
     set_clause = ", ".join(f"{k} = ?" for k in to_set)

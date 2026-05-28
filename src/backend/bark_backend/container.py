@@ -200,6 +200,7 @@ class ContainerRegistry:
         hosting_base_path: str = "",
         image: str | None = None,
         config_path: str | None = None,
+        extra_mounts: list[str] | None = None,
     ) -> tuple[str, str]:
         """Start (or restart) a Pi container for a workspace.
 
@@ -325,7 +326,8 @@ class ContainerRegistry:
                     [f"{config_path}:/opt/bark/config:ro"]
                     if config_path
                     else []
-                ),
+                )
+                + (extra_mounts or []),
                 "Tmpfs": {
                     "/tmp": "rw,noexec,nosuid,size=256m",
                     "/run": "rw,noexec,nosuid,size=16m",

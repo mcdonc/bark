@@ -105,11 +105,16 @@ class BarkClient:
         ]
 
     def create_workspace(  # pragma: no cover
-        self, name: str, image: str | None = None
+        self,
+        name: str,
+        image: str | None = None,
+        mounts: list[str] | None = None,
     ) -> Workspace:
         body: dict = {"name": name}
         if image:
             body["image"] = image
+        if mounts:
+            body["mounts"] = mounts
         resp = self.post("/workspaces", json=body)
         self._check_auth(resp)
         resp.raise_for_status()
