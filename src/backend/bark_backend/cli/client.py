@@ -25,7 +25,6 @@ class Workspace:
     id: str
     name: str
     created_at: str
-    default_command: str | None = None
 
 
 def _get_terminal_size() -> tuple[int, int]:
@@ -90,12 +89,7 @@ class BarkClient:
         raw = resp.json()
         # (workspace listing is tested via test_list_workspaces_empty, test_resolve_workspace_by_name, etc.)
         return [
-            Workspace(
-                id=w["id"],
-                name=w["name"],
-                created_at=w["created_at"],
-                default_command=w.get("default_command"),
-            )
+            Workspace(id=w["id"], name=w["name"], created_at=w["created_at"])
             for w in raw
         ]
 
@@ -173,14 +167,11 @@ async def _ws_shell(
     token: str,
     workspace_id: str,
     raw_mode: bool = True,
-    initial_command: str | None = None,
 ) -> None:
     """Run the interactive PTY shell over WebSocket.
 
     raw_mode controls whether stdin is placed in raw (cbreak) mode.
     Pass False in tests or when stdin is not a real terminal.
-    initial_command, if set, is sent as terminal input after the shell
-    starts (a newline is appended automatically).
     """
     async with websockets.connect(
         f"{ws_url}?token={token}", max_size=2**20
@@ -222,18 +213,7 @@ async def _ws_shell(
                 "Terminal did not start within 30 seconds"
             ) from None
 
-        # 4. Send initial command if provided
-        if initial_command:
-            await ws.send(
-                json.dumps(
-                    {
-                        "cmd": "terminal_input",
-                        "data": initial_command + "\n",
-                    }
-                )
-            )
-
-        # 5. Put terminal in raw mode, run shell, restore
+        # 4. Put terminal in raw mode, run shell, restore
         # raw_mode path: tcgetattr + tty.setraw + _raw_mode_exit + terminal_stop  # pragma: no cover
         if raw_mode:
             old_settings = _raw_mode_enter()

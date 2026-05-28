@@ -68,6 +68,13 @@ fi
 
 git config --global --add safe.directory /work 2>/dev/null
 
+# If a default command is set, append exec to /etc/bash.bashrc so every
+# interactive shell (docker exec -it ... bash) immediately replaces itself
+# with the command. Exiting the command exits the shell — no escape to bash.
+if [ -n "$BARK_DEFAULT_COMMAND" ]; then
+  echo "exec $BARK_DEFAULT_COMMAND" >>/etc/bash.bashrc
+fi
+
 # Signal that setup is complete. Terminal sessions (docker exec) source
 # /etc/bash.bashrc which waits for this file before showing a prompt,
 # preventing races where the user runs pi before config is ready.

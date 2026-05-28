@@ -76,50 +76,6 @@ class TestWsShell:
         assert any("workspace_connect" in s for s in sent)
         assert any("terminal_start" in s for s in sent)
 
-    @pytest.mark.asyncio
-    async def test_ws_shell_sends_initial_command(self):
-        from bark_backend.cli.client import _ws_shell
-
-        ws_mock = MagicMock()
-
-        async def fake_enter(self):
-            return ws_mock
-
-        async def fake_exit(self, *args):
-            return None
-
-        ws_mock.__aenter__ = fake_enter
-        ws_mock.__aexit__ = fake_exit
-        ws_mock.send = AsyncMock()
-        ws_mock.recv = AsyncMock(
-            side_effect=[
-                json.dumps({"type": "workspace_ready", "workspaceId": "ws1"}),
-                json.dumps(
-                    {"type": "terminal_output", "data": "\x1b[2J\x1b[H"}
-                ),
-                Exception("stop"),
-            ]
-        )
-
-        with patch("websockets.connect", return_value=ws_mock):
-            with patch("termios.tcgetattr", return_value=None):
-                with patch("termios.tcsetattr"):
-                    with patch("tty.setraw"):
-                        try:
-                            await _ws_shell(
-                                "ws://localhost/ws",
-                                "token",
-                                "ws1",
-                                initial_command="pi",
-                            )
-                        except Exception:
-                            pass
-
-        sent = [c[0][0] for c in ws_mock.send.call_args_list]
-        input_msgs = [json.loads(s) for s in sent if "terminal_input" in s]
-        assert len(input_msgs) == 1
-        assert input_msgs[0]["data"] == "pi\n"
-
 
 class TestRunShell:
     @pytest.mark.asyncio

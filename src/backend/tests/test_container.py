@@ -462,6 +462,48 @@ class TestStartContainer:
         host_config = call_kwargs[1]["config"]["HostConfig"]
         assert "host.docker.internal:host-gateway" in host_config["ExtraHosts"]
 
+    async def test_default_command_env_var(self, workspace):
+        """Container gets BARK_DEFAULT_COMMAND when set."""
+        mock_docker = _mock_docker()
+        mock_c = _mock_container("cid")
+        mock_docker.containers.create_or_replace = AsyncMock(
+            return_value=mock_c
+        )
+
+        with patch.object(
+            container.registry, "get_docker", return_value=mock_docker
+        ):
+            await container.registry.start_container(
+                workspace["id"],
+                "/tmp/ws",
+                "/tmp/home",
+                default_command="pi",
+            )
+        call_kwargs = mock_docker.containers.create_or_replace.call_args
+        env = call_kwargs[1]["config"]["Env"]
+        env_dict = dict(e.split("=", 1) for e in env)
+        assert env_dict["BARK_DEFAULT_COMMAND"] == "pi"
+
+    async def test_no_default_command_env_var(self, workspace):
+        """Container does not get BARK_DEFAULT_COMMAND when not set."""
+        mock_docker = _mock_docker()
+        mock_c = _mock_container("cid")
+        mock_docker.containers.create_or_replace = AsyncMock(
+            return_value=mock_c
+        )
+
+        with patch.object(
+            container.registry, "get_docker", return_value=mock_docker
+        ):
+            await container.registry.start_container(
+                workspace["id"],
+                "/tmp/ws",
+                "/tmp/home",
+            )
+        call_kwargs = mock_docker.containers.create_or_replace.call_args
+        env = call_kwargs[1]["config"]["Env"]
+        assert not any(e.startswith("BARK_DEFAULT_COMMAND=") for e in env)
+
     async def test_hosting_env_vars(self, workspace):
         mock_docker = _mock_docker()
         mock_c = _mock_container("cid")
