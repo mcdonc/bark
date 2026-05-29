@@ -82,12 +82,21 @@ class _IdeLayoutState extends State<IdeLayout> {
               index: _selectedIndex,
               children: [
                 Container(
-                  color: KColors.bgCanvas,
-                  padding: const EdgeInsets.only(left: 5),
+                  decoration: const BoxDecoration(
+                    color: KColors.bgCanvas,
+                    border: Border(
+                      left: BorderSide(color: KColors.accentGreen, width: 3),
+                    ),
+                  ),
                   child: widget.terminal,
                 ),
                 Container(
-                  color: KColors.bgOverlay,
+                  decoration: const BoxDecoration(
+                    color: KColors.bgCanvas,
+                    border: Border(
+                      left: BorderSide(color: KColors.accentBlue, width: 3),
+                    ),
+                  ),
                   child: widget.fileViewer,
                 ),
               ],

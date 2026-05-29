@@ -327,7 +327,7 @@ class FileViewerPanelState extends State<FileViewerPanel> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: KColors.bgOverlay,
+              color: KColors.bgCanvas,
             ),
             child: Row(
               children: [
@@ -339,7 +339,7 @@ class FileViewerPanelState extends State<FileViewerPanel> {
                 Expanded(child: _buildBreadcrumbs()),
                 if (_currentPath != '.')
                   IconButton(
-                    icon: const Icon(Icons.arrow_upward, size: 16),
+                    icon: const Icon(Icons.arrow_upward, size: 28),
                     onPressed: () {
                       final parent = _currentPath.contains('/')
                           ? _currentPath.substring(
@@ -347,17 +347,13 @@ class FileViewerPanelState extends State<FileViewerPanel> {
                           : '.';
                       _navigateTo(parent);
                     },
-                    iconSize: 16,
-                    constraints: const BoxConstraints(),
-                    padding: EdgeInsets.zero,
+                    iconSize: 28,
                     tooltip: 'Up',
                   ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, size: 16),
+                  icon: const Icon(Icons.refresh, size: 28),
                   onPressed: _loadFiles,
-                  iconSize: 16,
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
+                  iconSize: 28,
                 ),
               ],
             ),
@@ -437,7 +433,7 @@ class FileViewerPanelState extends State<FileViewerPanel> {
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          color: KColors.bgOverlay,
+          color: KColors.bgCanvas,
           child: Row(
             children: [
               InkWell(
