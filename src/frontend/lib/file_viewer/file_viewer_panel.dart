@@ -391,6 +391,7 @@ class FileViewerPanelState extends State<FileViewerPanel> {
       children: [
         Expanded(
           child: ListView.builder(
+            padding: EdgeInsets.zero,
             itemCount: _entries.length,
             itemBuilder: (context, index) {
               final entry = _entries[index];
