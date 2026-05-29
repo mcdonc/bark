@@ -849,7 +849,8 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
                     final ws = _workspaces[index];
                     return Card(
                       child: ListTile(
-                        leading: const Icon(Icons.folder),
+                        leading:
+                            const Icon(Icons.folder, color: Color(0xFF6CB4EE)),
                         title: Text(ws['name'] as String),
                         subtitle:
                             Text(_formatCreatedAt(ws['created_at'] as String?)),
