@@ -52,7 +52,12 @@ class _IdeLayoutState extends State<IdeLayout> {
         // Tab bar
         Container(
           height: 40,
-          color: KColors.bgCanvas,
+          decoration: const BoxDecoration(
+            color: KColors.bgCanvas,
+            border: Border(
+              bottom: BorderSide(color: KColors.borderDefault, width: 1),
+            ),
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
