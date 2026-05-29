@@ -405,7 +405,7 @@ class ContainerRegistry:
                 "Tmpfs": {
                     "/tmp": "rw,exec,nosuid,size=2g",
                     "/run": "rw,noexec,nosuid,size=16m",
-                    "/var/log": "rw,noexec,nosuid,size=16m",
+                    "/var/log": "rw,noexec,nosuid,size=256m",
                 },
                 "PortBindings": port_bindings,
                 "ExtraHosts": ["host.docker.internal:host-gateway"],
