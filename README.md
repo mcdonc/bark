@@ -21,8 +21,10 @@ git clone git@github.com:mcdonc/bark.git
 cd bark
 
 # Create .env from the example (edit with your credentials)
-cp -n .env.example .env   # -n: don't overwrite if .env already exists
-$EDITOR .env              # set BARK_LLM_API_KEY, BARK_JWT_SECRET, etc.
+# -n: don't overwrite if .env already exists
+cp -n .env.example .env
+$EDITOR .env
+# set BARK_LLM_API_KEY, BARK_JWT_SECRET, etc.
 
 # Install Nix and devenv (if not already installed)
 ./bootstrap
@@ -78,7 +80,6 @@ All settings can be overridden in `.env`. Defaults are provided in `devenv.nix` 
 | `BARK_PORT`                | `8997`                       | Backend (FastAPI/uvicorn) — proxied through nginx                  |
 | `BARK_DATA_DIR`            | `$DEVENV_STATE/bark/data`    | Database, workspaces, Pi sessions                                  |
 | `BARK_PLUGINS_DIR`         | `$DEVENV_STATE/bark/plugins` | Fetched plugins (outside repo for `execIfModified`)                |
-| `SOLIPLEX_URL`             | (empty)                      | Soliplex base URL as seen by browser (empty = same origin)         |
 | `BARK_LLM_API_KEY`         |                              | LLM provider API key                                               |
 | `BARK_LLM_BASE_URL`        |                              | LLM API URL (any OpenAI-compatible provider)                       |
 | `BARK_LLM_MODEL`           |                              | LLM model name                                                     |
