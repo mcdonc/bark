@@ -200,12 +200,6 @@ def build_pi_args(system_prompt_path):
 
 
 def main():
-    # Git safe directory
-    subprocess.run(
-        ["git", "config", "--global", "--add", "safe.directory", "/home/klangk/work"],
-        capture_output=True,
-    )
-
     os.environ["PI_CODING_AGENT_DIR"] = str(AGENT_DIR)
 
     setup_dirs()
