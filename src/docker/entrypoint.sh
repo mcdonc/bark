@@ -12,23 +12,10 @@ if [ -S /var/run/docker.sock ]; then
   chmod 666 /var/run/docker.sock
 fi
 
-# Wire up Claude Code skills — symlink enabled skill dirs into discovery path.
-# KLANGK_SKILLS is a comma-separated list of skill directory names.
-# Skills are expected at /opt/klangk/skills/<name>/ (user-mounted).
-SKILLS_DIR="/opt/klangk/skills"
-CC_SKILLS_DIR="/home/klangk/.claude/skills"
-if [ -n "$KLANGK_SKILLS" ] && [ -d "$SKILLS_DIR" ]; then
-  rm -rf "$CC_SKILLS_DIR"
-  mkdir -p "$CC_SKILLS_DIR"
-  echo "$KLANGK_SKILLS" | tr ',' '\n' | while read -r skill_name; do
-    skill_name=$(echo "$skill_name" | tr -d ' ')
-    [ -z "$skill_name" ] && continue
-    if [ -d "$SKILLS_DIR/$skill_name" ]; then
-      ln -sf "$SKILLS_DIR/$skill_name" "$CC_SKILLS_DIR/$skill_name"
-    fi
-  done
-  chown -R klangk:klangk "$CC_SKILLS_DIR"
-fi
+# Set up Pi agent config as the klangk user (extensions, settings, models,
+# system prompt, Claude Code skills). Runs before the readiness signal so
+# terminal sessions find everything in place.
+su -c "python3 /usr/local/bin/setup_pi" klangk
 
 # Signal that setup is complete. Terminal sessions (docker exec) source
 # /etc/bash.bashrc which waits for this file before showing a prompt.
