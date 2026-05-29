@@ -5,7 +5,6 @@ Sets up Pi agent config, merges settings.json (preserving user-installed
 packages), builds system prompt, and execs Pi with appropriate flags.
 """
 
-import glob
 import json
 import os
 import re
@@ -195,9 +194,9 @@ def build_pi_args(system_prompt_path):
                 args.extend(["--skill", str(SKILLS_DIR / name)])
 
     # Resume most recent session
-    sessions = sorted(glob.glob(str(SESSION_DIR / "*.jsonl")))
-    if sessions:
-        args.extend(["--session", sessions[-1]])
+    # sessions = sorted(glob.glob(str(SESSION_DIR / "*.jsonl")))
+    # if sessions:
+    #    args.extend(["--session", sessions[-1]])
 
     return args
 
