@@ -10,13 +10,14 @@ export PI_CODING_AGENT_DIR="$PI_AGENT_DIR"
 SESSION_DIR="/home/klangk/.pi/sessions"
 
 # Set up Pi agent config (from build-time /opt/klangk).
-# /home/klangk is a persistent bind mount; sync image extensions/npm into
-# the writable agent dir so pi install can add new ones alongside.
+# /home/klangk is a persistent bind mount.
 # Remove stale symlinks from older image versions before creating dirs.
 [ -L "$PI_AGENT_DIR/extensions" ] && rm "$PI_AGENT_DIR/extensions"
 [ -L "$PI_AGENT_DIR/npm" ] && rm "$PI_AGENT_DIR/npm"
-mkdir -p "$PI_AGENT_DIR/bin" "$PI_AGENT_DIR/extensions" "$PI_AGENT_DIR/npm"
-rsync -a /opt/klangk/pi-agent/extensions/ "$PI_AGENT_DIR/extensions/"
+mkdir -p "$PI_AGENT_DIR/bin" "$PI_AGENT_DIR/npm"
+
+# Sync npm packages from the image so Pi finds packages from pi install
+# at build time without reinstalling. User-installed packages persist.
 rsync -a /opt/klangk/pi-agent/npm/ "$PI_AGENT_DIR/npm/"
 
 # Symlink system fd/rg into Pi's bin dir so it doesn't re-download them
@@ -41,8 +42,8 @@ cat >"$PI_AGENT_DIR/models.json" <<EOF
 EOF
 
 # Merge runtime LLM config into build-time settings (which has "packages"
-# from pi install). The npm dir is rsynced above so Pi finds the packages
-# without reinstalling.
+# from pi install). The npm dir is rsynced above so Pi finds packages
+# from build-time pi install without reinstalling.
 jq --arg model "$KLANGK_LLM_MODEL" '. + {defaultProvider: "llm-proxy", defaultModel: $model}' \
   /opt/klangk/pi-agent/settings.json >"$PI_AGENT_DIR/settings.json"
 
@@ -50,10 +51,11 @@ jq --arg model "$KLANGK_LLM_MODEL" '. + {defaultProvider: "llm-proxy", defaultMo
 SYSTEM_PROMPT_FILE="$PI_AGENT_DIR/system-prompt.md"
 cp /opt/klangk/system-prompt.md "$SYSTEM_PROMPT_FILE"
 
-if [ -d "$PI_AGENT_DIR/extensions" ] && [ "$(ls "$PI_AGENT_DIR/extensions"/*.ts 2>/dev/null)" ]; then
+IMAGE_EXTENSIONS="/opt/klangk/pi-agent/extensions"
+if [ -d "$IMAGE_EXTENSIONS" ] && [ "$(ls "$IMAGE_EXTENSIONS"/*.ts 2>/dev/null)" ]; then
   echo "" >>"$SYSTEM_PROMPT_FILE"
   echo "Registered extension tools (use these instead of bash when appropriate):" >>"$SYSTEM_PROMPT_FILE"
-  for ext in "$PI_AGENT_DIR/extensions"/*.ts; do
+  for ext in "$IMAGE_EXTENSIONS"/*.ts; do
     name=$(grep -E '^\s+name: "' "$ext" | head -1 | sed 's/.*name: "//;s/".*//')
     desc=$(grep -E '^\s+description: "' "$ext" | head -1 | sed 's/.*description: "//;s/".*//')
     if [ -n "$name" ] && [ -n "$desc" ]; then
@@ -65,6 +67,15 @@ fi
 # Build Pi command line
 PI_ARGS="--no-context-files --session-dir $SESSION_DIR"
 PI_ARGS="$PI_ARGS --append-system-prompt $SYSTEM_PROMPT_FILE"
+
+# Load image-provided extensions via --extension flags.
+# These are read-only .ts files from the Docker image; user-installed
+# extensions are discovered by Pi via settings.json automatically.
+if [ -d "$IMAGE_EXTENSIONS" ]; then
+  for ext in "$IMAGE_EXTENSIONS"/*.ts; do
+    [ -f "$ext" ] && PI_ARGS="$PI_ARGS --extension $ext"
+  done
+fi
 
 # Add enabled skills via Pi's native --skill flag.
 # KLANGK_SKILLS is a comma-separated list of skill directory names.
