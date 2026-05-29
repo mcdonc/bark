@@ -327,13 +327,7 @@ class FileViewerPanelState extends State<FileViewerPanel> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: KColors.bgTerminal,
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x30000000),
-                    blurRadius: 2,
-                    offset: Offset(0, 1)),
-              ],
+              color: KColors.bgCanvas,
             ),
             child: Row(
               children: [
