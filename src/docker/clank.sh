@@ -12,6 +12,9 @@ SESSION_DIR="/home/klangk/.pi/sessions"
 # Set up Pi agent config (from build-time /opt/klangk).
 # /home/klangk is a persistent bind mount; sync image extensions/npm into
 # the writable agent dir so pi install can add new ones alongside.
+# Remove stale symlinks from older image versions before creating dirs.
+[ -L "$PI_AGENT_DIR/extensions" ] && rm "$PI_AGENT_DIR/extensions"
+[ -L "$PI_AGENT_DIR/npm" ] && rm "$PI_AGENT_DIR/npm"
 mkdir -p "$PI_AGENT_DIR/bin" "$PI_AGENT_DIR/extensions" "$PI_AGENT_DIR/npm"
 rsync -a /opt/klangk/pi-agent/extensions/ "$PI_AGENT_DIR/extensions/"
 rsync -a /opt/klangk/pi-agent/npm/ "$PI_AGENT_DIR/npm/"
