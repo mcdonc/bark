@@ -809,18 +809,8 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
             ),
           ),
         ),
-        actions: [
-          if (context.watch<AuthService>().email != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(
-                child: Text(
-                  context.watch<AuthService>().email!,
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ),
-            ),
-          const AppBarActions(),
+        actions: const [
+          AppBarActions(),
         ],
       ),
       floatingActionButton: FloatingActionButton(

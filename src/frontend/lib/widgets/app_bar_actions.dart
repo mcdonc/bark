@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:klangk_plugin_api/klangk_plugin_api.dart';
 import '../auth/auth_service.dart';
 
-/// Shared widget for the settings, admin, and logout icons in the app bar.
-/// Renders icons based on auth state.
+/// Shared widget for the email chip, settings, admin, and logout icons in the
+/// app bar. Renders icons based on auth state.
 class AppBarActions extends StatelessWidget {
   final VoidCallback? onSettingsPressed;
   final VoidCallback? onLogoutPressed;
@@ -21,9 +21,27 @@ class AppBarActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final email = context.watch<AuthService>().email;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (email != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: KColors.bgCanvas,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: KColors.borderDefault),
+              ),
+              child: Text(
+                email,
+                style:
+                    const TextStyle(fontSize: 12, color: KColors.textSecondary),
+              ),
+            ),
+          ),
         if (context.watch<AuthService>().isAdmin)
           IconButton(
             icon: const Icon(Icons.admin_panel_settings,
