@@ -143,13 +143,14 @@ def merge_models_json():
 
 
 def build_system_prompt():
-    """Copy static system prompt template to ~/KLANGK.md.
+    """Write system prompt template to ~/AGENTS.md if it doesn't exist.
 
-    Extension tools are discovered by Pi via settings.json and the
-    extensions directory — no need to list them in the system prompt.
+    Pi auto-discovers AGENTS.md. Users can edit it freely — it won't
+    be overwritten on subsequent container starts.
     """
-    prompt_path = Path.home() / "KLANGK.md"
-    prompt_path.write_text(SYSTEM_PROMPT_SRC.read_text())
+    prompt_path = Path.home() / "AGENTS.md"
+    if not prompt_path.exists():
+        prompt_path.write_text(SYSTEM_PROMPT_SRC.read_text())
 
 
 def setup_claude_code_skills():
