@@ -9,11 +9,13 @@ and builds the system prompt.
 import json
 import os
 import subprocess
+import traceback
 from pathlib import Path
 
 IMAGE_DIR = Path("/opt/klangk/pi-agent")
 AGENT_DIR = Path.home() / ".pi" / "agent"
 SYSTEM_PROMPT_SRC = Path("/opt/klangk/system-prompt.md")
+ERROR_LOG = Path("/tmp/setup_clankers_errors.log")
 
 
 def setup_dirs():
@@ -206,17 +208,34 @@ def setup_pi_skills():
             (pi_skills_dir / name).symlink_to(skills_dir / name)
 
 
+def _run_step(name, fn):
+    """Run a setup step, logging errors to a tempfile and continuing."""
+    try:
+        fn()
+    except Exception:
+        with open(ERROR_LOG, "a") as f:
+            f.write(f"=== {name} failed ===\n")
+            traceback.print_exc(file=f)
+            f.write("\n")
+
+
 def main():
     os.environ["PI_CODING_AGENT_DIR"] = str(AGENT_DIR)
 
-    setup_dirs()
-    sync_image_files()
-    setup_bin()
-    merge_settings()
-    merge_models_json()
-    build_system_prompt()
-    setup_claude_code_skills()
-    setup_pi_skills()
+    # Clear previous error log
+    ERROR_LOG.unlink(missing_ok=True)
+
+    _run_step("setup_dirs", setup_dirs)
+    _run_step("sync_image_files", sync_image_files)
+    _run_step("setup_bin", setup_bin)
+    _run_step("merge_settings", merge_settings)
+    _run_step("merge_models_json", merge_models_json)
+    _run_step("build_system_prompt", build_system_prompt)
+    _run_step("setup_claude_code_skills", setup_claude_code_skills)
+    _run_step("setup_pi_skills", setup_pi_skills)
+
+    if ERROR_LOG.exists():
+        print(f"setup_clankers: some steps failed, see {ERROR_LOG}")
 
 
 if __name__ == "__main__":
