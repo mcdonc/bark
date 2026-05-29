@@ -8,7 +8,6 @@ and builds the system prompt.
 
 import json
 import os
-import re
 import subprocess
 from pathlib import Path
 
@@ -149,28 +148,13 @@ def merge_models_json():
 
 
 def build_system_prompt():
-    """Build system prompt from template + image extension tool descriptions."""
-    prompt = SYSTEM_PROMPT_SRC.read_text()
+    """Copy static system prompt template to ~/KLANGK.md.
 
-    ext_dir = IMAGE_DIR / "extensions"
-    tools = []
-    if ext_dir.is_dir():
-        for ext in sorted(ext_dir.glob("*.ts")):
-            text = ext.read_text()
-            name_m = re.search(r'^\s+name:\s*"([^"]+)"', text, re.MULTILINE)
-            desc_m = re.search(r'^\s+description:\s*"([^"]+)"', text, re.MULTILINE)
-            if name_m and desc_m:
-                tools.append((name_m.group(1), desc_m.group(1)))
-
-    if tools:
-        prompt += "\n\nRegistered extension tools (use these instead of bash when appropriate):\n"
-        for name, desc in tools:
-            prompt += f"- `{name}`: {desc}\n"
-
-    # Write as KLANGK.md in the home dir (overwritten each start).
-    # Users can create their own AGENTS.md for custom instructions.
+    Extension tools are discovered by Pi via settings.json and the
+    extensions directory — no need to list them in the system prompt.
+    """
     prompt_path = Path.home() / "KLANGK.md"
-    prompt_path.write_text(prompt)
+    prompt_path.write_text(SYSTEM_PROMPT_SRC.read_text())
 
 
 def setup_claude_code_skills():
