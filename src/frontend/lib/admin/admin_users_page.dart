@@ -89,6 +89,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
             child: const Text('Cancel'),
           ),
           TextButton(
@@ -304,6 +305,7 @@ class _AddUserDialogState extends State<_AddUserDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
           child: const Text('Cancel'),
         ),
         TextButton(
@@ -375,6 +377,7 @@ class _EditUserDialogState extends State<_EditUserDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
           child: const Text('Cancel'),
         ),
         TextButton(

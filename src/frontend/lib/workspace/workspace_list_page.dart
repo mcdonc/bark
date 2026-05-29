@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -118,7 +119,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
         String? envError;
         final primary = Theme.of(context).colorScheme.primary;
         final labelStyle = TextStyle(
-          color: primary,
+          color: KColors.textPrimary,
           fontWeight: FontWeight.bold,
         );
 
@@ -190,7 +191,8 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
 
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            title: Text('New Workspace', style: TextStyle(color: primary)),
+            title: Text('New Workspace',
+                style: TextStyle(color: KColors.textPrimary)),
             content: SizedBox(
               width: 400,
               child: SingleChildScrollView(
@@ -356,6 +358,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
                 child: const Text('Cancel'),
               ),
               FilledButton(
@@ -383,6 +386,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
+              style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
               child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
@@ -420,7 +424,8 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
       builder: (context) {
         final primary = Theme.of(context).colorScheme.primary;
         return AlertDialog(
-          title: Text('Duplicate Workspace', style: TextStyle(color: primary)),
+          title: Text('Duplicate Workspace',
+              style: TextStyle(color: KColors.textPrimary)),
           content: TextField(
             controller: nameController,
             autofocus: true,
@@ -433,6 +438,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
               child: const Text('Cancel'),
             ),
             FilledButton(
@@ -507,7 +513,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
       builder: (context) {
         final primary = Theme.of(context).colorScheme.primary;
         final labelStyle = TextStyle(
-          color: primary,
+          color: KColors.textPrimary,
           fontWeight: FontWeight.bold,
         );
         String? errorMessage;
@@ -586,7 +592,8 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
 
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            title: Text('Edit Workspace', style: TextStyle(color: primary)),
+            title: Text('Edit Workspace',
+                style: TextStyle(color: KColors.textPrimary)),
             content: SizedBox(
               width: 400,
               child: SingleChildScrollView(
@@ -765,6 +772,7 @@ class _WorkspaceListPageState extends State<WorkspaceListPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
                 child: const Text('Cancel'),
               ),
               FilledButton(

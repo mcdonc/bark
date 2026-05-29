@@ -128,7 +128,7 @@ class _KlangkAppState extends State<KlangkApp> {
 
   static final _theme = ThemeData(
     colorScheme: ColorScheme.fromSeed(
-      seedColor: KColors.accentCyan,
+      seedColor: KColors.accentGreen,
       brightness: Brightness.dark,
     ),
     useMaterial3: true,
@@ -165,7 +165,7 @@ class _KlangkAppState extends State<KlangkApp> {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: KColors.accentBlue,
+        foregroundColor: KColors.textPrimary,
       ),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(

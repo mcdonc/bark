@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 import 'package:http/http.dart' as http;
 import '../ws/ws_client.dart';
 import 'package:klangk_plugin_api/klangk_plugin_api.dart';
@@ -108,6 +109,7 @@ class FileViewerPanelState extends State<FileViewerPanel> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
+              style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
               child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -156,7 +158,9 @@ class FileViewerPanelState extends State<FileViewerPanel> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              onPressed: () => Navigator.pop(ctx),
+              style: TextButton.styleFrom(foregroundColor: KColors.accentRed),
+              child: const Text('Cancel')),
           TextButton(
               onPressed: () => Navigator.pop(ctx, controller.text),
               child: const Text('Rename')),

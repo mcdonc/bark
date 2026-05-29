@@ -1,5 +1,6 @@
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 import 'package:http/http.dart' as http;
 import 'package:klangk_plugin_api/klangk_plugin_api.dart';
 
@@ -172,7 +173,7 @@ class FileDropZoneState extends State<FileDropZone> {
                     TextButton(
                       onPressed: () => setState(() => _cancelled = true),
                       style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
+                        foregroundColor: KColors.accentRed,
                         backgroundColor: Colors.black38,
                       ),
                       child: const Text('Cancel'),
