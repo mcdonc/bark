@@ -130,6 +130,8 @@ class _KlangkAppState extends State<KlangkApp> {
     colorScheme: ColorScheme.fromSeed(
       seedColor: KColors.accentGreen,
       brightness: Brightness.dark,
+      onSurface: KColors.textPrimary,
+      onSurfaceVariant: KColors.textSecondary,
     ),
     useMaterial3: true,
     scaffoldBackgroundColor: KColors.bgCanvas,
@@ -193,6 +195,10 @@ class _KlangkAppState extends State<KlangkApp> {
       fillColor: KColors.bgCanvas,
       labelStyle: const TextStyle(color: KColors.textSecondary),
       hintStyle: const TextStyle(color: KColors.textMuted),
+    ),
+    listTileTheme: const ListTileThemeData(
+      textColor: KColors.textPrimary,
+      subtitleTextStyle: TextStyle(color: KColors.textSecondary, fontSize: 14),
     ),
     dividerColor: KColors.borderDefault,
     iconTheme: const IconThemeData(color: KColors.textSecondary),
