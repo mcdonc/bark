@@ -176,18 +176,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/workspaces'),
         ),
-        actions: [
-          if (context.watch<AuthService>().email != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(
-                child: Text(
-                  context.watch<AuthService>().email!,
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ),
-            ),
-          const AppBarActions(),
+        actions: const [
+          AppBarActions(),
         ],
       ),
       floatingActionButton: FloatingActionButton(
