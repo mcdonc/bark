@@ -28,6 +28,7 @@ shopt -s histappend
 PROMPT_COMMAND="history -a"
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
+alias pi='pi --append-system-prompt ~/KLANGK.md'
 
 # Determine which command to exec into (if any).
 # KLANGK_CMD_OVERRIDE (set per-session via docker exec -e) takes priority.

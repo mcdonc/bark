@@ -167,9 +167,9 @@ def build_system_prompt():
         for name, desc in tools:
             prompt += f"- `{name}`: {desc}\n"
 
-    # Write as AGENTS.md in the home dir so Pi auto-discovers it
-    # (Pi walks up from /home/klangk/work/ and finds it at /home/klangk/).
-    prompt_path = Path.home() / "AGENTS.md"
+    # Write as KLANGK.md in the home dir (overwritten each start).
+    # Users can create their own AGENTS.md for custom instructions.
+    prompt_path = Path.home() / "KLANGK.md"
     prompt_path.write_text(prompt)
 
 
