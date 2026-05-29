@@ -5,7 +5,6 @@ Sets up Pi agent config, merges settings.json (preserving user-installed
 packages), builds system prompt, and execs Pi with appropriate flags.
 """
 
-import json
 import os
 import re
 import subprocess
@@ -17,7 +16,6 @@ AGENT_DIR = Path.home() / ".pi" / "agent"
 SESSION_DIR = Path.home() / ".pi" / "sessions"
 SKILLS_DIR = Path("/opt/klangk/skills")
 SYSTEM_PROMPT_SRC = Path("/opt/klangk/system-prompt.md")
-SIDECAR = AGENT_DIR / ".image-packages"
 
 
 def setup_dirs():
@@ -82,75 +80,6 @@ def setup_bin():
             link.symlink_to(target)
 
 
-def write_models_json():
-    """Write models.json with proxy URL (no real API key)."""
-    proxy_url = os.environ.get("KLANGK_LLM_PROXY_URL", "")
-    model = os.environ.get("KLANGK_LLM_MODEL", "")
-    models = {
-        "providers": {
-            "llm-proxy": {
-                "baseUrl": proxy_url,
-                "api": "openai-completions",
-                "apiKey": "proxy",
-                "models": [{"id": model}],
-            }
-        }
-    }
-    (AGENT_DIR / "models.json").write_text(json.dumps(models, indent=2))
-
-
-def merge_settings():
-    """Merge image settings.json with user settings, preserving user packages.
-
-    Image-managed package names are tracked in a sidecar file. On each start:
-    - Packages in the old sidecar but not in the current image are removed
-    - Current image packages are added/updated
-    - User-installed packages (never in any sidecar) are preserved
-    """
-    image_settings = json.loads((IMAGE_DIR / "settings.json").read_text())
-    image_pkgs = image_settings.get("packages", [])
-
-    # Packages can be strings ("npm:foo") or dicts ({"name": "foo", ...})
-    def pkg_name(p):
-        return p["name"] if isinstance(p, dict) else str(p)
-
-    image_pkg_names = {pkg_name(p) for p in image_pkgs}
-
-    # Read previous sidecar (what the image managed last time)
-    old_image_names = set()
-    if SIDECAR.exists():
-        old_image_names = {
-            n.strip() for n in SIDECAR.read_text().splitlines() if n.strip()
-        }
-
-    user_settings_path = AGENT_DIR / "settings.json"
-    if user_settings_path.exists():
-        settings = json.loads(user_settings_path.read_text())
-        existing_pkgs = settings.get("packages", [])
-
-        # Remove packages that were image-managed but are no longer in image
-        dropped = old_image_names - image_pkg_names
-        existing_pkgs = [p for p in existing_pkgs if pkg_name(p) not in dropped]
-
-        # Remove existing image packages (will be re-added from current image)
-        existing_pkgs = [p for p in existing_pkgs if pkg_name(p) not in image_pkg_names]
-
-        # Add current image packages
-        settings["packages"] = existing_pkgs + image_pkgs
-    else:
-        settings = image_settings
-
-    # Set LLM config
-    model = os.environ.get("KLANGK_LLM_MODEL", "")
-    settings["defaultProvider"] = "llm-proxy"
-    settings["defaultModel"] = model
-
-    user_settings_path.write_text(json.dumps(settings, indent=2))
-
-    # Write sidecar
-    SIDECAR.write_text("\n".join(sorted(image_pkg_names)) + "\n")
-
-
 def build_system_prompt():
     """Build system prompt from template + image extension tool descriptions."""
     prompt = SYSTEM_PROMPT_SRC.read_text()
@@ -211,8 +140,6 @@ def main():
     setup_dirs()
     sync_image_files()
     setup_bin()
-    write_models_json()
-    merge_settings()
     prompt_path = build_system_prompt()
     args = build_pi_args(prompt_path)
 

@@ -20,7 +20,8 @@ COPY builtin-extensions/ /opt/klangk/pi-agent/extensions/
 COPY system-prompt.md /opt/klangk/system-prompt.md
 COPY entrypoint.sh /opt/klangk/entrypoint.sh
 COPY clank.py /usr/local/bin/clank
-RUN chmod +x /opt/klangk/entrypoint.sh /usr/local/bin/clank
+COPY lock_pi_config.py /usr/local/bin/lock_pi_config
+RUN chmod +x /opt/klangk/entrypoint.sh /usr/local/bin/clank /usr/local/bin/lock_pi_config
 COPY bash.bashrc /etc/bash.bashrc
 COPY tmux.conf /etc/tmux.conf
 
