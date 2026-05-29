@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Klangk logo widget — orange rounded square with paw icon on top and "Klangk" text below.
+/// Klangk logo widget — orange rounded square with robot icon on top and "Klangk" text below.
 class KlangkLogo extends StatelessWidget {
   final double height;
 
@@ -9,7 +9,7 @@ class KlangkLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconSize = height * 0.5;
-    final fontSize = height * 0.28;
+    final fontSize = height * 0.2;
     final radius = height * 0.18;
 
     return Container(
@@ -33,12 +33,12 @@ class KlangkLogo extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.pets, color: Colors.white, size: iconSize),
+            Icon(Icons.smart_toy_outlined, color: Colors.white, size: iconSize),
             Text(
-              'Klangk',
+              'klangk',
               style: TextStyle(
                 fontSize: fontSize,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w400,
                 color: Colors.white,
                 letterSpacing: 0.5,
                 height: 1.1,

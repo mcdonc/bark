@@ -67,7 +67,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Klangk'), findsOneWidget);
-      expect(find.byIcon(Icons.pets), findsOneWidget);
+      expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
     });
 
     testWidgets('shows workspace list from mock', (tester) async {

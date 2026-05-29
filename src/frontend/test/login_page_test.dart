@@ -85,7 +85,7 @@ void main() {
       await tester.pumpWidget(buildLoginPage());
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.pets), findsOneWidget);
+      expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
     });
 
     testWidgets('shows Web Coding Agent subtitle', (tester) async {

@@ -21,19 +21,19 @@ void main() {
       expect(logo.height, 120);
     });
 
-    testWidgets('renders paw icon', (tester) async {
+    testWidgets('renders robot icon', (tester) async {
       await tester.pumpWidget(buildLogo());
-      expect(find.byIcon(Icons.pets), findsOneWidget);
+      expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
     });
 
     testWidgets('renders Klangk text', (tester) async {
       await tester.pumpWidget(buildLogo());
-      expect(find.text('Klangk'), findsOneWidget);
+      expect(find.text('klangk'), findsOneWidget);
     });
 
     testWidgets('icon is white', (tester) async {
       await tester.pumpWidget(buildLogo());
-      final icon = tester.widget<Icon>(find.byIcon(Icons.pets));
+      final icon = tester.widget<Icon>(find.byIcon(Icons.smart_toy_outlined));
       expect(icon.color, Colors.white);
     });
 
@@ -41,12 +41,12 @@ void main() {
       await tester.pumpWidget(buildLogo());
       final text = tester.widget<Text>(find.text('Klangk'));
       expect(text.style?.color, Colors.white);
-      expect(text.style?.fontWeight, FontWeight.w800);
+      expect(text.style?.fontWeight, FontWeight.w400);
     });
 
     testWidgets('icon size scales with height', (tester) async {
       await tester.pumpWidget(buildLogo(height: 100));
-      final icon = tester.widget<Icon>(find.byIcon(Icons.pets));
+      final icon = tester.widget<Icon>(find.byIcon(Icons.smart_toy_outlined));
       expect(icon.size, 50); // height * 0.5
     });
 

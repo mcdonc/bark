@@ -96,11 +96,6 @@ class _LoginPageState extends State<LoginPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const KlangkLogo(height: 80),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Web Coding Agent',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
                     const SizedBox(height: 24),
                     Text(
                       _isRegister ? 'Create Account' : 'Log In',
