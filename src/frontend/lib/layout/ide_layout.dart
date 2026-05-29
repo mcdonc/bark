@@ -88,6 +88,7 @@ class _IdeLayoutState extends State<IdeLayout> {
               children: [
                 Container(
                   color: KColors.bgCanvas,
+                  padding: const EdgeInsets.only(left: 6, top: 4),
                   child: widget.terminal,
                 ),
                 Container(
