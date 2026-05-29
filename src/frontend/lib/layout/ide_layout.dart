@@ -62,6 +62,11 @@ class _IdeLayoutState extends State<IdeLayout> {
                   icon: Icons.terminal,
                   isSelected: _selectedIndex == 0,
                   onTap: () => _selectTab(0),
+                  roundedCorners: const BorderRadius.only(
+                    topRight: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                    bottomRight: Radius.circular(8),
+                  ),
                 ),
               ),
               Expanded(
@@ -70,6 +75,11 @@ class _IdeLayoutState extends State<IdeLayout> {
                   icon: Icons.folder_outlined,
                   isSelected: _selectedIndex == 1,
                   onTap: () => _selectTab(1),
+                  roundedCorners: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                    bottomRight: Radius.circular(8),
+                  ),
                 ),
               ),
             ],
@@ -141,12 +151,14 @@ class _SkeuoTab extends StatelessWidget {
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
+  final BorderRadius roundedCorners;
 
   const _SkeuoTab({
     required this.label,
     required this.icon,
     required this.isSelected,
     required this.onTap,
+    required this.roundedCorners,
   });
 
   @override
@@ -154,10 +166,7 @@ class _SkeuoTab extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(8),
-          bottomRight: Radius.circular(8),
-        ),
+        borderRadius: roundedCorners,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           color: isSelected ? KColors.bgCanvas : KColors.bgAppBar,
