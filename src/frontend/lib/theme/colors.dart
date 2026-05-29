@@ -24,12 +24,13 @@ class KColors {
 
   // ── Accents ──────────────────────────────────────────────────────────
   static const accentBlue = Color(0xFF58A6FF); // links, focus rings
-  static const accentCyan = Color(0xFF58B5E0); // brand, logo
+  static const accentCyan = Color(0xFF58B5E0); // secondary accent
+  static const accentYellow = Color(0xFFF5C518); // brand, logo (taxicab)
   static const accentGreen = Color(0xFF238636); // primary actions, success
   static const accentRed = Color(0xFFF85149); // danger, errors
   static const accentAmber = Color(0xFFD29922); // warnings, admin
 
   // ── Logo gradient ────────────────────────────────────────────────────
-  static const logoGradientStart = Color(0xFF1A6B8A);
-  static const logoGradientEnd = Color(0xFF0F4C63);
+  static const logoGradientStart = Color(0xFF8A7A1A);
+  static const logoGradientEnd = Color(0xFF635A0F);
 }
