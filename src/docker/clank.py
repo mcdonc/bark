@@ -28,16 +28,48 @@ def setup_dirs():
             p.unlink()
     (AGENT_DIR / "bin").mkdir(parents=True, exist_ok=True)
     (AGENT_DIR / "npm").mkdir(parents=True, exist_ok=True)
+    (AGENT_DIR / "extensions").mkdir(parents=True, exist_ok=True)
 
 
-def sync_npm():
-    """Rsync image npm packages into the writable agent dir."""
-    src = IMAGE_DIR / "npm"
-    if src.is_dir():
-        subprocess.run(
-            ["rsync", "-a", f"{src}/", f"{AGENT_DIR / 'npm'}/"],
-            check=True,
-        )
+def sync_image_files():
+    """Rsync image npm packages and extensions into the writable agent dir.
+
+    Image-managed extensions are tracked via a sidecar so we can remove
+    ones that were dropped from the image without touching user-installed files.
+    """
+    sidecar = AGENT_DIR / ".image-extensions"
+
+    # Remove extensions that were image-managed but no longer in the image
+    old_names = set()
+    if sidecar.exists():
+        old_names = {n.strip() for n in sidecar.read_text().splitlines() if n.strip()}
+
+    current_names = set()
+    ext_src = IMAGE_DIR / "extensions"
+    if ext_src.is_dir():
+        current_names = {f.name for f in ext_src.iterdir()}
+
+    for dropped in old_names - current_names:
+        target = AGENT_DIR / "extensions" / dropped
+        if target.exists() or target.is_symlink():
+            if target.is_dir():
+                import shutil
+
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+
+    # Rsync image files into writable dirs
+    for subdir in ("npm", "extensions"):
+        src = IMAGE_DIR / subdir
+        if src.is_dir():
+            subprocess.run(
+                ["rsync", "-a", f"{src}/", f"{AGENT_DIR / subdir}/"],
+                check=True,
+            )
+
+    # Write sidecar with current image extension names
+    sidecar.write_text("\n".join(sorted(current_names)) + "\n")
 
 
 def setup_bin():
@@ -151,12 +183,6 @@ def build_pi_args(system_prompt_path):
         str(system_prompt_path),
     ]
 
-    # Image-provided .ts extensions via --extension flags
-    ext_dir = IMAGE_DIR / "extensions"
-    if ext_dir.is_dir():
-        for ext in sorted(ext_dir.glob("*.ts")):
-            args.extend(["--extension", str(ext)])
-
     # Skills from KLANGK_SKILLS env var
     skills = os.environ.get("KLANGK_SKILLS", "")
     if skills and SKILLS_DIR.is_dir():
@@ -183,7 +209,7 @@ def main():
     os.environ["PI_CODING_AGENT_DIR"] = str(AGENT_DIR)
 
     setup_dirs()
-    sync_npm()
+    sync_image_files()
     setup_bin()
     write_models_json()
     merge_settings()
