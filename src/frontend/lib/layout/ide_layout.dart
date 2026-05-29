@@ -52,12 +52,7 @@ class _IdeLayoutState extends State<IdeLayout> {
         // Tab bar
         Container(
           height: 40,
-          decoration: const BoxDecoration(
-            color: KColors.bgCanvas,
-            border: Border(
-              bottom: BorderSide(color: KColors.borderDefault, width: 1),
-            ),
-          ),
+          color: KColors.bgCanvas,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -165,7 +160,7 @@ class _SkeuoTab extends StatelessWidget {
         ),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          color: isSelected ? KColors.bgAppBar : KColors.bgCanvas,
+          color: isSelected ? KColors.bgCanvas : KColors.bgAppBar,
           child: Row(
             children: [
               Icon(
