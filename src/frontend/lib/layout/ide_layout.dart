@@ -170,16 +170,15 @@ class _SkeuoTab extends StatelessWidget {
               Icon(
                 icon,
                 size: 14,
-                color: isSelected ? KColors.textPrimary : KColors.textSecondary,
+                color: KColors.textSecondary,
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color:
-                      isSelected ? KColors.textPrimary : KColors.textSecondary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                  color: KColors.textSecondary,
                 ),
               ),
             ],
