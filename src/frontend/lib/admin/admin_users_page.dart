@@ -1,4 +1,6 @@
 import 'dart:convert';
+// ignore: unused_import
+import '../theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -187,8 +189,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addUser,
-        backgroundColor: const Color(0xFFB8E6C8),
-        child: const Icon(Icons.person_add, color: Color(0xFF1A237E)),
+        child: const Icon(Icons.person_add),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -208,7 +209,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                           leading: Icon(
                             isAdmin ? Icons.admin_panel_settings : Icons.person,
                             color:
-                                isAdmin ? const Color(0xFF1A237E) : Colors.grey,
+                                isAdmin ? KColors.textSecondary : Colors.grey,
                           ),
                           title: Text(user['email'] ?? ''),
                           subtitle: Text(
@@ -222,7 +223,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                               // Edit user
                               IconButton(
                                 icon: const Icon(Icons.edit,
-                                    color: Color(0xFF1A237E)),
+                                    color: KColors.textSecondary),
                                 tooltip: 'Edit user',
                                 onPressed: () => _editUser(user),
                               ),

@@ -1,4 +1,6 @@
 import 'dart:convert';
+// ignore: unused_import
+import '../theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -143,7 +145,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1A237E)),
+          icon: const Icon(Icons.arrow_back, color: KColors.textSecondary),
           onPressed: () => context.go('/workspaces'),
         ),
         title: Row(

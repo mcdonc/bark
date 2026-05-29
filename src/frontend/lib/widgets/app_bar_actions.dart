@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:klangk_plugin_api/klangk_plugin_api.dart';
@@ -26,18 +27,18 @@ class AppBarActions extends StatelessWidget {
         if (context.watch<AuthService>().isAdmin)
           IconButton(
             icon: const Icon(Icons.admin_panel_settings,
-                color: Color(0xFF1A237E)),
+                color: KColors.textSecondary),
             tooltip: 'User Management',
             onPressed: onAdminPressed ?? () => context.go('/admin/users'),
           ),
         IconButton(
-          icon: const Icon(Icons.settings, color: Color(0xFF1A237E)),
+          icon: const Icon(Icons.settings, color: KColors.textSecondary),
           tooltip: 'Settings',
           onPressed: onSettingsPressed ??
               () => context.go('/settings'), // coverage:ignore-line
         ),
         IconButton(
-          icon: const Icon(Icons.logout, color: Color(0xFF1A237E)),
+          icon: const Icon(Icons.logout, color: KColors.textSecondary),
           tooltip: 'Logout',
           onPressed: onLogoutPressed ??
               () async {

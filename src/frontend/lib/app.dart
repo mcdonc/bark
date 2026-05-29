@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'auth/auth_service.dart';
 import 'auth/pending_redirect.dart';
+import 'theme/colors.dart';
 import 'admin/admin_users_page.dart';
 import 'auth/login_page.dart';
 import 'auth/verify_page.dart';
@@ -127,45 +128,73 @@ class _KlangkAppState extends State<KlangkApp> {
 
   static final _theme = ThemeData(
     colorScheme: ColorScheme.fromSeed(
-      seedColor: const Color(0xFF2B8C4E), // Harvest green
-      brightness: Brightness.light,
+      seedColor: KColors.accentCyan,
+      brightness: Brightness.dark,
     ),
     useMaterial3: true,
-    scaffoldBackgroundColor: const Color(0xFFF5F5F0), // warm off-white
+    scaffoldBackgroundColor: KColors.bgCanvas,
     appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF888888),
-      foregroundColor: Colors.white,
-      elevation: 6,
-      shadowColor: Color(0x80000000),
+      backgroundColor: KColors.bgSurface,
+      foregroundColor: KColors.textPrimary,
+      elevation: 0,
       surfaceTintColor: Colors.transparent,
-      scrolledUnderElevation: 6,
+      scrolledUnderElevation: 0,
     ),
     cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 3,
-      shadowColor: const Color(0x40000000),
+      color: KColors.bgSurface,
+      elevation: 0,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: KColors.borderDefault),
+      ),
+    ),
+    dialogTheme: const DialogThemeData(
+      backgroundColor: KColors.bgSurface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(12)),
+        side: BorderSide(color: KColors.borderDefault),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: const Color(0xFF2B8C4E),
+        backgroundColor: KColors.accentGreen,
         foregroundColor: Colors.white,
       ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: KColors.accentBlue,
+      ),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: KColors.accentGreen,
+      foregroundColor: Colors.white,
+    ),
+    snackBarTheme: const SnackBarThemeData(
+      backgroundColor: KColors.bgSurface,
+      contentTextStyle: TextStyle(color: KColors.textPrimary),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: const BorderSide(color: Color(0xFFD0D0D0)),
+        borderSide: const BorderSide(color: KColors.borderDefault),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: const BorderSide(color: Color(0xFFD0D0D0)),
+        borderSide: const BorderSide(color: KColors.borderDefault),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: KColors.accentBlue),
       ),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: KColors.bgCanvas,
+      labelStyle: const TextStyle(color: KColors.textSecondary),
+      hintStyle: const TextStyle(color: KColors.textMuted),
     ),
+    dividerColor: KColors.borderDefault,
+    iconTheme: const IconThemeData(color: KColors.textSecondary),
   );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:klangk_frontend/widgets/klangk_logo.dart';
+import 'package:klangk_frontend/theme/colors.dart';
 
 void main() {
   Widget buildLogo({double height = 200}) {
@@ -26,21 +27,21 @@ void main() {
       expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
     });
 
-    testWidgets('renders Klangk text', (tester) async {
+    testWidgets('renders klangk text', (tester) async {
       await tester.pumpWidget(buildLogo());
       expect(find.text('klangk'), findsOneWidget);
     });
 
-    testWidgets('icon is white', (tester) async {
+    testWidgets('icon uses accent cyan color', (tester) async {
       await tester.pumpWidget(buildLogo());
       final icon = tester.widget<Icon>(find.byIcon(Icons.smart_toy_outlined));
-      expect(icon.color, Colors.white);
+      expect(icon.color, KColors.accentCyan);
     });
 
-    testWidgets('text is white and bold', (tester) async {
+    testWidgets('text uses primary color and thin weight', (tester) async {
       await tester.pumpWidget(buildLogo());
-      final text = tester.widget<Text>(find.text('Klangk'));
-      expect(text.style?.color, Colors.white);
+      final text = tester.widget<Text>(find.text('klangk'));
+      expect(text.style?.color, KColors.textPrimary);
       expect(text.style?.fontWeight, FontWeight.w400);
     });
 
@@ -74,7 +75,7 @@ void main() {
       expect(decoration.borderRadius, isNotNull);
     });
 
-    testWidgets('has box shadow', (tester) async {
+    testWidgets('has border', (tester) async {
       await tester.pumpWidget(buildLogo());
       final container = tester.widget<Container>(
         find.descendant(
@@ -83,8 +84,7 @@ void main() {
         ),
       );
       final decoration = container.decoration as BoxDecoration;
-      expect(decoration.boxShadow, isNotNull);
-      expect(decoration.boxShadow!.length, 1);
+      expect(decoration.border, isNotNull);
     });
 
     testWidgets('uses FittedBox to prevent overflow', (tester) async {

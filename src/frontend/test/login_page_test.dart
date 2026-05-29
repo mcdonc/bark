@@ -37,7 +37,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(LoginPage), findsOneWidget);
-      expect(find.text('Klangk'), findsOneWidget);
+      expect(find.text('klangk'), findsOneWidget);
       expect(find.text('Log In'), findsWidgets); // button + title
     });
 
@@ -81,18 +81,11 @@ void main() {
       expect(find.textContaining('Log in'), findsWidgets);
     });
 
-    testWidgets('shows Klangk logo', (tester) async {
+    testWidgets('shows klangk logo', (tester) async {
       await tester.pumpWidget(buildLoginPage());
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
-    });
-
-    testWidgets('shows Web Coding Agent subtitle', (tester) async {
-      await tester.pumpWidget(buildLoginPage());
-      await tester.pumpAndSettle();
-
-      expect(find.text('Web Coding Agent'), findsOneWidget);
     });
 
     testWidgets('shows re-auth message when pendingRedirect is set',

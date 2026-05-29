@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:klangk_frontend/auth/auth_service.dart';
 import 'package:klangk_frontend/workspace/workspace_list_page.dart';
+import 'package:klangk_frontend/widgets/klangk_logo.dart';
 import 'package:klangk_plugin_api/klangk_plugin_api.dart';
 
 void main() {
@@ -62,11 +63,11 @@ void main() {
       expect(find.byIcon(Icons.logout), findsOneWidget);
     });
 
-    testWidgets('shows Klangk logo', (tester) async {
+    testWidgets('shows klangk logo', (tester) async {
       await tester.pumpWidget(buildPage());
       await tester.pump();
 
-      expect(find.text('Klangk'), findsOneWidget);
+      expect(find.byType(KlangkLogo), findsOneWidget);
       expect(find.byIcon(Icons.smart_toy_outlined), findsOneWidget);
     });
 
@@ -656,8 +657,8 @@ void main() {
       await tester.tap(find.byType(FloatingActionButton));
       await tester.pumpAndSettle();
 
-      // Dropdown should show both images
-      expect(find.text('klangk'), findsOneWidget);
+      // Dropdown should show the default image (logo also contains 'klangk')
+      expect(find.text('klangk'), findsWidgets);
 
       // Select non-default image
       await tester.tap(find.byType(DropdownButtonFormField<String>));

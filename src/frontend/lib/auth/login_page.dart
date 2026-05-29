@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'auth_service.dart';
@@ -161,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: auth.loading ? null : _submit,
                         style: _isRegister
                             ? FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E7D32),
+                                backgroundColor: KColors.accentGreen,
                                 foregroundColor: Colors.white,
                               )
                             : null,

@@ -1,4 +1,6 @@
 import 'dart:async';
+// ignore: unused_import
+import '../theme/colors.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -206,7 +208,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1A237E)),
+          icon: const Icon(Icons.arrow_back, color: KColors.textSecondary),
           onPressed: () => context.go('/workspaces'),
         ),
         title: MouseRegion(
@@ -282,7 +284,7 @@ class _WorkspacePageState extends State<WorkspacePage> {
                             icon: const Icon(Icons.refresh, size: 18),
                             label: const Text('Restart'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF5B8C5A),
+                              backgroundColor: KColors.accentGreen,
                               foregroundColor: Colors.white,
                             ),
                           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../theme/colors.dart';
 
-/// Klangk logo widget — orange rounded square with robot icon on top and "Klangk" text below.
+/// Klangk logo widget — dark rounded square with robot icon and "klangk" text.
 class KlangkLogo extends StatelessWidget {
   final double height;
 
@@ -20,12 +21,9 @@ class KlangkLogo extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFF8C00), Color(0xFFE06800)],
+          colors: [KColors.logoGradientStart, KColors.logoGradientEnd],
         ),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x30000000), blurRadius: 3, offset: Offset(1, 1)),
-        ],
+        border: Border.all(color: KColors.borderDefault, width: 1),
       ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
@@ -33,13 +31,14 @@ class KlangkLogo extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.smart_toy_outlined, color: Colors.white, size: iconSize),
+            Icon(Icons.smart_toy_outlined,
+                color: KColors.accentCyan, size: iconSize),
             Text(
               'klangk',
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w400,
-                color: Colors.white,
+                color: KColors.textPrimary,
                 letterSpacing: 0.5,
                 height: 1.1,
               ),
