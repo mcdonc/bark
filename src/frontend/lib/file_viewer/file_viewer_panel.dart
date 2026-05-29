@@ -271,7 +271,9 @@ class FileViewerPanelState extends State<FileViewerPanel> {
 
   Widget _buildBreadcrumbs() {
     if (_currentPath == '.') {
-      return const Text('~', style: TextStyle(fontWeight: FontWeight.bold));
+      return const Text('~',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: KColors.textSecondary));
     }
     final parts = _currentPath.split('/');
     final children = <InlineSpan>[];
@@ -280,7 +282,9 @@ class FileViewerPanelState extends State<FileViewerPanel> {
       alignment: PlaceholderAlignment.middle,
       child: InkWell(
         onTap: () => _navigateTo('.'),
-        child: const Text('~/', style: TextStyle(fontWeight: FontWeight.bold)),
+        child: const Text('~/',
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: KColors.textSecondary)),
       ),
     ));
     for (var i = 0; i < parts.length; i++) {
@@ -291,7 +295,8 @@ class FileViewerPanelState extends State<FileViewerPanel> {
         child: InkWell(
           onTap: () => _navigateTo(path),
           child: Text(parts[i],
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: KColors.textSecondary)),
         ),
       ));
       // Trailing slash — navigates to the parent of the next segment
@@ -300,7 +305,8 @@ class FileViewerPanelState extends State<FileViewerPanel> {
           alignment: PlaceholderAlignment.middle,
           child: InkWell(
             onTap: () => _navigateTo(path), // coverage:ignore-line
-            child: const Text('/'),
+            child:
+                const Text('/', style: TextStyle(color: KColors.textSecondary)),
           ),
         ));
       }
@@ -325,7 +331,7 @@ class FileViewerPanelState extends State<FileViewerPanel> {
         children: [
           // Path bar
           Container(
-            padding: const EdgeInsets.fromLTRB(8, 1, 8, 4),
+            padding: const EdgeInsets.fromLTRB(8, 1, 8, 1),
             decoration: BoxDecoration(
               color: KColors.bgCanvas,
             ),
