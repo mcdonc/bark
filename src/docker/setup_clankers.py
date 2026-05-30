@@ -22,6 +22,7 @@ def setup_dirs():
     """Create agent directories."""
     (AGENT_DIR / "bin").mkdir(parents=True, exist_ok=True)
     (AGENT_DIR / "npm").mkdir(parents=True, exist_ok=True)
+    (AGENT_DIR / "git").mkdir(parents=True, exist_ok=True)
     (AGENT_DIR / "extensions").mkdir(parents=True, exist_ok=True)
 
 
@@ -54,7 +55,7 @@ def sync_image_files():
                 target.unlink()
 
     # Rsync image files into writable dirs
-    for subdir in ("npm", "extensions"):
+    for subdir in ("npm", "extensions", "git"):
         src = IMAGE_DIR / subdir
         if src.is_dir():
             subprocess.run(
