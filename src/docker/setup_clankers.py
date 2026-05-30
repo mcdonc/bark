@@ -145,6 +145,32 @@ def merge_models_json():
     models_path.write_text(json.dumps(models, indent=2))
 
 
+def merge_keybindings():
+    """Merge default keybindings into ~/.pi/agent/keybindings.json.
+
+    Removes built-in cursor shortcuts from ctrl+b/ctrl+f/alt+f/ctrl+e
+    so extensions can use those keys without conflicts. Existing user
+    keybindings are preserved — only missing keys are added.
+    """
+    defaults = {
+        "tui.editor.cursorLeft": ["left"],
+        "tui.editor.cursorRight": ["right"],
+        "tui.editor.cursorWordRight": ["ctrl+right"],
+    }
+
+    kb_path = AGENT_DIR / "keybindings.json"
+    if kb_path.exists():
+        keybindings = json.loads(kb_path.read_text())
+    else:
+        keybindings = {}
+
+    for key, value in defaults.items():
+        if key not in keybindings:
+            keybindings[key] = value
+
+    kb_path.write_text(json.dumps(keybindings, indent=2))
+
+
 def build_system_prompt():
     """Write system prompt template to ~/AGENTS.md if it doesn't exist.
 
@@ -231,6 +257,7 @@ def main():
     _run_step("setup_bin", setup_bin)
     _run_step("merge_settings", merge_settings)
     _run_step("merge_models_json", merge_models_json)
+    _run_step("merge_keybindings", merge_keybindings)
     _run_step("build_system_prompt", build_system_prompt)
     _run_step("setup_claude_code_skills", setup_claude_code_skills)
     _run_step("setup_pi_skills", setup_pi_skills)
