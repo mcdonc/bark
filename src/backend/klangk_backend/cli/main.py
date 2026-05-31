@@ -582,6 +582,7 @@ def sync(
     cmd = [
         rsync_bin,
         "-avz",
+        "--blocking-io",
         "-e",
         f"{klangk_bin} exec",
         *ctx.args,
