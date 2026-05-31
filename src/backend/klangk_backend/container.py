@@ -513,7 +513,7 @@ class ContainerRegistry:
             for ws_id, state in list(self.states.items()):
                 timeout = state.get_idle_timeout()
                 idle_secs = now - state.last_activity
-                logger.info(
+                logger.debug(
                     "Idle check: %s idle %.0fs / %ds",
                     state.container_id[:12],
                     idle_secs,
